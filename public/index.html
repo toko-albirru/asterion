@@ -88,7 +88,7 @@ h1{margin:0;display:inline-block;padding:0 .12em;font-family:Cinzel,Georgia,seri
     <div class="hint">Untuk keamanan akunmu, ganti password sebelum melanjutkan (minimal 6 karakter).</div>
     <label for="np1">Password baru</label><input id="np1" type="password" autocomplete="new-password">
     <label for="np2">Ulangi password baru</label><input id="np2" type="password" autocomplete="new-password">
-    <button class="btn w" id="pgo">Simpan &amp; Masuk</button><div class="err" id="perr"></div>
+    <button class="btn w" id="pgo">Simpan &amp; Masuk</button><button class="btn s w" id="pback">‹ Kembali ke login</button><div class="err" id="perr"></div>
   </div>
 </div>
 
@@ -122,6 +122,7 @@ async function doLogin(){
   }catch(e){$("lerr").textContent="Gagal terhubung. Coba lagi."}
 }
 $("lgo").onclick=doLogin;$("lp").onkeydown=function(e){if(e.key==="Enter")doLogin()};
+$("pback").onclick=function(){$("np1").value="";$("np2").value="";$("perr").textContent="";logout()};
 $("pgo").onclick=async function(){
   var a=$("np1").value,b=$("np2").value;$("perr").textContent="";
   if(a.length<6){$("perr").textContent="Minimal 6 karakter.";return}
