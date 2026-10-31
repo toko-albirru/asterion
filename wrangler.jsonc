@@ -9,6 +9,6 @@
     "run_worker_first": ["/api/*"]
   },
   "kv_namespaces": [
-    { "binding": "LINKS", "id": "GANTI_DENGAN_ID_KV_KAMU" }
+    { "binding": "LINKS", "id": "587d322643cd4434a3909abc1f1405c6" }
   ]
 }
