@@ -68,6 +68,11 @@ body.dragging .link a::before{display:none}
 .ob:hover,.ob:active{border-color:rgba(245,192,74,.7);background:linear-gradient(135deg,rgba(245,192,74,.22),rgba(255,255,255,.05))}
 .ob:active{transform:scale(.95)}
 .ob[disabled]{opacity:.3;cursor:default;transform:none;border-color:rgba(255,255,255,.2);background:linear-gradient(135deg,rgba(255,255,255,.12),rgba(255,255,255,.03))}
+.sheet .fld{display:block;margin:0 0 5px 2px;font-size:12px;color:var(--mut)}
+.sheet input{width:100%;margin-bottom:12px;padding:12px 14px;border-radius:14px;border:1px solid var(--line);background:rgba(10,6,28,.5);color:#fff;font:400 16px Inter,system-ui,sans-serif;outline:none}
+.sheet input:focus{border-color:var(--gold)}
+.sheet .save{width:100%;margin-bottom:20px;padding:13px;border:0;border-radius:14px;font:700 14px Inter,system-ui,sans-serif;color:#241a3f;cursor:pointer;background:linear-gradient(135deg,#f5c04a,#e08a2e)}
+.sheet .save:active{transform:scale(.98)}
 .sheet .cancel{width:100%;margin-top:6px;padding:13px;border-radius:16px;font-size:14px;font-weight:600;color:#fff;cursor:pointer;background:transparent;border:1px solid var(--line)}
 .drag{opacity:.88;outline:1px solid rgba(245,192,74,.7);outline-offset:2px;border-radius:20px;box-shadow:0 16px 40px rgba(0,0,0,.5);position:relative;z-index:5;will-change:transform}
 .panel{margin:14px 0;padding:18px;border-radius:22px;background:linear-gradient(135deg,rgba(255,255,255,.16),rgba(255,255,255,.05));border:1px solid var(--line);backdrop-filter:blur(22px);-webkit-backdrop-filter:blur(22px);box-shadow:0 10px 34px rgba(8,4,24,.45),inset 0 1px 0 rgba(255,255,255,.4)}
@@ -114,7 +119,7 @@ body.dragging .link a::before{display:none}
     <label for="nsec">Atau buat kategori baru</label>
     <input id="nsec" placeholder="mis. RECORD KULIAH THN 3">
     <div class="row"><button class="btn" id="addSec">+ Tambah kategori</button><button class="btn g" id="logout">Keluar admin</button></div>
-    <div class="tip">Geser: tahan lalu tarik tombol ⠿. Atau tekan tombol ⋯ untuk tombol Paling atas / Naik 1 / Turun 1 / Paling bawah, dan untuk memindah link ke kategori lain. Link baru otomatis muncul di paling atas kategori.</div>
+    <div class="tip">Geser: tahan lalu tarik tombol ⠿. Atau tekan tombol ⋯ untuk edit nama/URL link, tombol Paling atas / Naik 1 / Turun 1 / Paling bawah, dan untuk memindah link ke kategori lain. Link baru otomatis muncul di paling atas kategori.</div>
     <div class="msg" id="msg"></div>
   </div>
 
@@ -258,6 +263,23 @@ function openSheet(kind,si,li){
       g.appendChild(b);
     });
     sh.appendChild(g);
+    if(!isC){
+      var cur=data[si].l[li];
+      sh.appendChild(mk("div","lbl","EDIT LINK"));
+      var l1=mk("label","fld","Nama link");sh.appendChild(l1);
+      var inN=mk("input");inN.value=cur.n;inN.placeholder="Nama link";sh.appendChild(inN);
+      var l2=mk("label","fld","URL");sh.appendChild(l2);
+      var inU=mk("input");inU.type="url";inU.value=cur.u;inU.placeholder="https://...";sh.appendChild(inU);
+      var sv=mk("button","save","Simpan perubahan");
+      sv.onclick=function(){
+        var nn=inN.value.trim(),uu=inU.value.trim();
+        if(!nn||!uu){sv.textContent="Nama dan URL wajib diisi";return}
+        if(!/^https?:\/\//i.test(uu))uu="https://"+uu;
+        cur.n=nn;cur.u=uu;
+        closeSheet();msg("Link diperbarui ✓");save();
+      };
+      sh.appendChild(sv);
+    }
     if(!isC&&data.length>1){
       sh.appendChild(mk("div","lbl","PINDAHKAN KE KATEGORI"));
       data.forEach(function(t,ti){
