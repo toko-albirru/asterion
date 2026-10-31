@@ -67,6 +67,12 @@ h1{margin:0;display:inline-block;padding:0 .12em;font-family:Cinzel,Georgia,seri
 .empty{text-align:center;color:var(--mut);padding:26px 10px;font-size:14px}
 #toast{position:fixed;left:50%;top:calc(16px + env(safe-area-inset-top,0));transform:translate(-50%,-80px);z-index:99;padding:10px 18px;border-radius:999px;background:rgba(30,22,56,.95);border:1px solid var(--line);font-size:13px;transition:transform .3s}
 #toast.on{transform:translate(-50%,0)}
+.vw.stk{position:sticky;top:58px;z-index:5}
+.vl{display:flex;gap:10px;align-items:center;width:100%;text-align:left;color:#fff;border-radius:16px;padding:8px;margin-bottom:8px;cursor:pointer;font:400 13px/1.35 Inter,sans-serif}
+.vl img{width:96px;aspect-ratio:16/9;object-fit:cover;border-radius:10px;flex:none;background:#000}
+.vl .n{width:20px;flex:none;text-align:center;color:var(--gold);font-weight:600;font-size:12px}
+.vl .tt{flex:1;min-width:0}.vl small{display:block;color:var(--mut);margin-top:2px}
+.vl.on{box-shadow:0 0 0 2px rgba(245,192,74,.7)}
 .gate{max-width:380px;margin:0 auto;padding:18px 18px 40px}
 .gate .pn{margin-top:10px}
 </style>
@@ -149,29 +155,51 @@ function embed(u){
   if(/youtube\.com|youtu\.be/.test(u)){
     if(m=u.match(/[?&]list=([\w-]+)/))return{s:"https://www.youtube.com/embed/videoseries?list="+m[1]+"&rel=0",yt:1};
     if(m=u.match(/youtu\.be\/([\w-]+)|[?&]v=([\w-]+)/))return{s:"https://www.youtube.com/embed/"+(m[1]||m[2])+"?rel=0",yt:1}}
-  if(m=u.match(/drive\.google\.com\/drive\/(?:u\/\d+\/)?folders\/([\w-]+)/))return{s:"https://drive.google.com/embeddedfolderview?id="+m[1]+"#list",tall:1};
   if(m=u.match(/drive\.google\.com\/file\/d\/([\w-]+)/))return{s:"https://drive.google.com/file/d/"+m[1]+"/preview",tall:1};
   if(m=u.match(/docs\.google\.com\/(document|presentation|spreadsheets)\/d\/([\w-]+)/))return{s:"https://docs.google.com/"+m[1]+"/d/"+m[2]+(m[1]==="presentation"?"/embed":"/preview"),tall:1};
   return null}
-function viewer(x,hintText){
-  var h="<div class='sec'>"+esc(x.n)+"</div>",e=x.u&&embed(x.u);
+function isFolder(u){return /drive\.google\.com\/drive\/(?:u\/\d+\/)?folders\//.test(u||"")}
+function ytList(u){var m=(u||"").match(/[?&]list=([\w-]+)/);return /youtube\.com|youtu\.be/.test(u||"")&&m?m[1]:""}
+function viewer(x){
+  var h="<div class='sec'>"+esc(x.n)+"</div>",e=x.u&&embed(x.u),pl=ytList(x.u);
   if(x.h)h+="<div class='vw tall g'><iframe sandbox='allow-scripts' srcdoc=\""+esc(x.h)+"\"></iframe></div>";
-  else if(e)h+="<div class='vw"+(e.tall?" tall":"")+"'><iframe src=\""+esc(e.s)+"\" allowfullscreen loading='lazy' allow='fullscreen; autoplay; encrypted-media; picture-in-picture'></iframe></div>"+(e.yt?"<div class='hint'>🎬 Video diputar berurutan sesuai daftar putar. Pilih video lain lewat daftar di pemutar.</div>":"");
+  else if(pl&&e){h+="<div class='vw stk' id='pv'><iframe id='pf' src=\""+esc(e.s)+"\" allowfullscreen allow='fullscreen; autoplay; encrypted-media; picture-in-picture'></iframe></div><div id='pl'><div class='empty'>Memuat daftar video…</div></div>";setTimeout(function(){plFill(pl)},0)}
+  else if(e)h+="<div class='vw"+(e.tall?" tall":"")+"'><iframe src=\""+esc(e.s)+"\" allowfullscreen loading='lazy' allow='fullscreen; autoplay; encrypted-media; picture-in-picture'></iframe></div>";
+  else if(isFolder(x.u))h+="<div class='pn g empty'>Folder Google Drive dibuka langsung di Drive.</div>";
   else h+="<div class='pn g empty'>Tautan ini tidak bisa dibuka langsung di dalam web.</div>";
-  if(x.u)h+="<a class='card g' href=\""+esc(x.u)+"\" target='_blank' rel='noopener noreferrer'><span class='i'>↗</span><span class='t'>Buka di tab baru</span></a>";
+  if(x.u)h+="<a class='card g' href=\""+esc(x.u)+"\" target='_blank' rel='noopener noreferrer'><span class='i'>↗</span><span class='t'>"+(isFolder(x.u)?"Buka folder Google Drive":pl?"Buka playlist di YouTube":"Buka di tab baru")+"</span></a>";
   return h}
+async function plFill(id){
+  try{var r=await api("playlist?id="+encodeURIComponent(id)),el=$("pl");if(!el)return;
+    if(!r.ok||!r.j||!r.j.v||!r.j.v.length){el.innerHTML="<div class='pn g empty'>Daftar video belum bisa dimuat. Pemutar di atas tetap bisa dipakai.</div>";return}
+    el.innerHTML="<div class='hint'>🎬 "+r.j.v.length+" video"+(r.j.partial?" (hanya sebagian yang berhasil dimuat)":"")+" · ketuk untuk memutar</div>"+
+      r.j.v.map(function(v,i){return"<button class='vl g' data-v='"+esc(v.id)+"' data-l='"+esc(id)+"'><span class='n'>"+(i+1)+"</span><img loading='lazy' alt='' src='https://i.ytimg.com/vi/"+esc(v.id)+"/mqdefault.jpg'><span class='tt'>"+esc(v.t||"Video")+(v.d?"<small>"+esc(v.d)+"</small>":"")+"</span></button>"}).join("")
+  }catch(e){}}
+$("main").addEventListener("click",function(e){
+  var b=e.target.closest("[data-v]"),f=$("pf");if(!b||!f)return;
+  f.src="https://www.youtube.com/embed/"+b.dataset.v+"?list="+b.dataset.l+"&autoplay=1&rel=0";
+  [].forEach.call(document.querySelectorAll(".vl.on"),function(x){x.classList.remove("on")});b.classList.add("on");
+  window.scrollTo({top:0,behavior:"smooth"})});
 function arrAt(P){var d=S.data,a=P[0];
   if(a==="materi")return P[1]==="drive"?d.drive:d.materi[+P[1]]&&d.materi[+P[1]][P[2]];
   if(a==="rekaman")return d.rekaman[+P[1]]&&d.rekaman[+P[1]][P[2]]}
+function ctl(i,k){var a=k?" data-k='"+k+"'":"";return"<div class='ctl'><button"+a+" data-a='up' data-i='"+i+"'>↑</button><button"+a+" data-a='dn' data-i='"+i+"'>↓</button><button"+a+" data-a='ren' data-i='"+i+"'>✎</button><button class='x'"+a+" data-a='del' data-i='"+i+"'>✕</button></div>"}
 function listPage(P,ico,withHtml){
-  var arr=arrAt(P),base=P.join("/"),h="";
+  var arr=arrAt(P),base=P.join("/"),h="",dr=P[0]==="materi"&&P[1]==="drive";
   if(!arr)return "<div class='empty'>Tidak ditemukan.</div>";
   if(!arr.length)h+="<div class='pn g empty'>Belum ada isi.</div>";
   arr.forEach(function(x,i){
-    h+="<div class='row'><a class='card g' href='#/"+base+"/"+i+"'><span class='i'>"+(x.h?"📄":ico)+"</span><span class='t'>"+esc(x.n)+"</span><span class='a'>›</span></a>";
-    if(S.admin)h+="<div class='ctl'><button data-a='up' data-i='"+i+"'>↑</button><button data-a='dn' data-i='"+i+"'>↓</button><button class='x' data-a='del' data-i='"+i+"'>✕</button></div>";
+    var ext=x.u&&(dr||isFolder(x.u)),a=ext?"<a class='card g' href=\""+esc(x.u)+"\" target='_blank' rel='noopener noreferrer'>":"<a class='card g' href='#/"+base+"/"+i+"'>";
+    h+="<div class='row'>"+a+"<span class='i'>"+(x.h?"📄":ico)+"</span><span class='t'>"+esc(x.n)+"</span><span class='a'>"+(ext?"↗":"›")+"</span></a>";
+    if(S.admin)h+=ctl(i);
     h+="</div>"});
-  if(S.admin)h+="<div class='pn g'><b>＋ Tambah</b><label>Judul</label><input id='aN'><label>URL (YouTube, Drive, Docs, dll.)</label><input id='aU' placeholder='https://...'>"+(withHtml?"<label>Atau tempel kode HTML materi (opsional, dipakai jika URL kosong)</label><textarea id='aH' rows='4'></textarea>":"")+"<button class='btn' data-a='add'>Tambah</button></div>";
+  if(S.admin)h+="<div class='pn g'><b>＋ Tambah</b><label>Judul</label><input id='aN'><label>URL (YouTube, Drive, Docs, dll.)</label><input id='aU' placeholder='https://...'>"+(withHtml?"<label>Atau tempel kode HTML materi (opsional, dipakai jika URL kosong)</label><textarea id='aH' rows='4'></textarea>":"")+"<button class='btn' data-a='add'>Tambah</button><div class='hint'>Item baru muncul paling atas. Urutkan dengan tombol ↑ ↓.</div></div>";
+  return h}
+function topList(k,ico,sub,ph){
+  var arr=S.data[k],h="";
+  arr.forEach(function(b,i){
+    h+="<div class='row'><a class='card g' href='#/"+k+"/"+i+"'><span class='i'>"+ico+"</span><span class='t'>"+esc(b.n)+"<small>"+esc(sub(b))+"</small></span><span class='a'>›</span></a>"+(S.admin?ctl(i,k):"")+"</div>"});
+  if(S.admin)h+="<div class='pn g'><b>＋ Tambah</b><label>Nama</label><input id='tN' placeholder='"+esc(ph)+"'><button class='btn' data-a='addtop' data-k='"+k+"'>Tambah</button><div class='hint'>Yang baru muncul paling atas. Urutkan dengan ↑ ↓, ganti nama dengan ✎, hapus dengan ✕.</div></div>";
   return h}
 function cards(items){return items.map(function(c){return "<a class='card g' href='"+c[0]+"'><span class='i'>"+c[1]+"</span><span class='t'>"+esc(c[2])+(c[3]?"<small>"+esc(c[3])+"</small>":"")+"</span><span class='a'>›</span></a>"}).join("")}
 
@@ -185,21 +213,21 @@ function pHome(){
   (S.admin?"<div class='sec'>ADMIN</div><div class='pn g'><b>Reset password mahasiswa</b><div class='hint'>Mengembalikan password ke username (mahasiswa wajib membuat password baru saat login).</div><input id='rU' class='in' placeholder='G0025001'><button class='btn' data-a='reset'>Reset</button></div>":"")}
 async function todayFill(){
   var el=$("today");if(!el)return;
-  try{var g=S.data.sheet.tabs[0].g,r=await api("schedule?g="+g);if(!$("today"))return;
+  try{var tabs=await getTabs(),r=await api("schedule?g="+tabs[0].g);if(!$("today"))return;
     if(!r.ok){el.textContent="Jadwal belum bisa dimuat.";return}
     var iso=new Date().toLocaleDateString("en-CA",{timeZone:"Asia/Jakarta"}),d=r.j.filter(function(x){return x.iso===iso})[0];
     el.className="day g";el.innerHTML=d&&d.items.length?"<h3>"+esc(d.d)+"</h3>"+d.items.map(slot).join(""):"<div class='empty'>Tidak ada jadwal hari ini 🎉</div>"
   }catch(e){}}
 function pMateri(P){
   var d=S.data;
-  if(!P[1])return "<div class='sec'>PILIH BLOK</div>"+cards(d.materi.map(function(b,i){return["#/materi/"+i,"📘",b.n,(b.lab.length+b.all.length)+" materi"]}))+"<div class='sec'>DRIVE</div>"+cards([["#/materi/drive","🗂️","Google Drive Materi",d.drive.length+" folder"]]);
+  if(!P[1])return "<div class='sec'>PILIH BLOK</div>"+topList("materi","📘",function(b){return(b.lab.length+b.all.length)+" materi"},"mis. Blok 4.1")+"<div class='sec'>DRIVE</div>"+cards([["#/materi/drive","🗂️","Google Drive Materi",d.drive.length+" folder"]]);
   if(P[1]==="drive")return P[2]!==undefined?viewer(d.drive[+P[2]]||{n:"?"}):listPage(P,"🗂️",false);
   var b=d.materi[+P[1]];if(!b)return "<div class='empty'>Tidak ditemukan.</div>";
   if(!P[2])return "<div class='sec'>"+esc(b.n)+"</div>"+cards([["#/materi/"+P[1]+"/all","📖","Seluruh Blok",b.all.length+" materi"],["#/materi/"+P[1]+"/lab","🔬","Lab",b.lab.length+" materi"]]);
   return P[3]!==undefined?viewer((arrAt(P)||[])[+P[3]]||{n:"?"}):listPage(P.slice(0,3),"📄",true)}
 function pRekaman(P){
   var d=S.data;
-  if(!P[1])return "<div class='sec'>PILIH TAHUN</div>"+cards(d.rekaman.map(function(t,i){return["#/rekaman/"+i,"🎓",t.n,(t.kl.length+t.blok.length+t.lab.length)+" playlist"]}));
+  if(!P[1])return "<div class='sec'>PILIH TAHUN</div>"+topList("rekaman","🎓",function(t){return(t.kl.length+t.blok.length+t.lab.length)+" playlist"},"mis. Tahun 4");
   var t=d.rekaman[+P[1]];if(!t)return "<div class='empty'>Tidak ditemukan.</div>";
   if(!P[2])return "<div class='sec'>"+esc(t.n)+"</div>"+cards([["#/rekaman/"+P[1]+"/kl","📝","Kuliah Lain",t.kl.length+" playlist"],["#/rekaman/"+P[1]+"/blok","🧠","Blok",t.blok.length+" playlist"],["#/rekaman/"+P[1]+"/lab","🔬","Lab",t.lab.length+" playlist"]]);
   return P[3]!==undefined?viewer((arrAt(P)||[])[+P[3]]||{n:"?"}):listPage(P.slice(0,3),"▶️",false)}
@@ -214,19 +242,34 @@ function slot(x){
   if(x.rk)h+="<small>🎬 "+(/^https?:/.test(x.rk)?"<a href=\""+esc(x.rk)+"\" target='_blank' rel='noopener noreferrer'>Rekaman</a>":esc(x.rk))+"</small>";
   if(x.ke)h+="<small>"+esc(x.ke)+"</small>";
   return h+"</div></div>"}
+function chipsHtml(tabs,ti){return tabs.map(function(t,i){return"<a class='chip g"+(i===ti?" on":"")+"' href='#/jadwal/"+i+"'>"+esc(t.n)+"</a>"}).join("")}
+async function getTabs(){
+  try{var r=await api("tabs");if(r.ok&&r.j&&r.j.tabs&&r.j.tabs.length)S.tabs=r.j.tabs}catch(e){}
+  return S.tabs||S.data.sheet.tabs}
 function pJadwal(P){
-  var tabs=S.data.sheet.tabs,ti=+P[1]||0,h="<div class='chips'>"+tabs.map(function(t,i){return"<a class='chip g"+(i===ti?" on":"")+"' href='#/jadwal/"+i+"'>"+esc(t.n)+"</a>"}).join("")+"</div><div id='sch'><div class='empty'>Memuat jadwal…</div></div>";
-  if(S.admin)h+="<div class='pn g'><b>Pengaturan spreadsheet</b><label>ID spreadsheet</label><input id='sId' value=\""+esc(S.data.sheet.id)+"\"><label>Tab (satu per baris: Nama|gid)</label><textarea id='sTabs' rows='4'>"+esc(tabs.map(function(t){return t.n+"|"+t.g}).join("\n"))+"</textarea><div class='hint'>gid ada di URL spreadsheet setelah <code>#gid=</code> saat tab dibuka. Spreadsheet harus dibagikan “siapa saja yang memiliki link”.</div><button class='btn' data-a='sheet'>Simpan</button></div>";
-  setTimeout(function(){schFill(tabs[ti])},0);return h}
-async function schFill(tab){
-  var el=$("sch");if(!el||!tab)return;
-  try{var r=await api("schedule?g="+tab.g);if(!$("sch"))return;
-    if(!r.ok){el.innerHTML="<div class='pn g empty'>"+esc((r.j&&r.j.err)||"Gagal memuat jadwal.")+"</div>";return}
-    var iso=new Date().toLocaleDateString("en-CA",{timeZone:"Asia/Jakarta"});
-    el.innerHTML=r.j.length?r.j.map(function(d){return"<div class='day g"+(d.iso===iso?" today":"")+"' id='"+(d.iso===iso?"tdy":"")+"'><h3>"+esc(d.d)+(d.iso===iso?"<span class='badge'>HARI INI</span>":"")+"</h3>"+
+  var ti=+P[1]||0,h="<div class='chips' id='chips'>"+chipsHtml(S.tabs||S.data.sheet.tabs,ti)+"</div><div id='sch'><div class='empty'>Memuat jadwal…</div></div>";
+  if(S.admin)h+="<div class='pn g'><b>Pengaturan spreadsheet</b><label>ID spreadsheet</label><input id='sId' value=\""+esc(S.data.sheet.id)+"\"><div class='hint'>Semua tab spreadsheet otomatis muncul, urut dari paling kiri. Spreadsheet harus dibagikan “siapa saja yang memiliki link”.</div><button class='btn' data-a='sheet'>Simpan</button></div>";
+  setTimeout(function(){jInit(ti)},0);return h}
+async function jInit(ti){
+  var my=S.jt=(S.jt||0)+1,tabs=await getTabs();
+  if(my!==S.jt||!$("sch"))return;
+  var c=$("chips");if(c)c.innerHTML=chipsHtml(tabs,ti);
+  S.cur=tabs[ti]||tabs[0];schFill(S.cur,my)}
+async function schFill(tab,my){
+  if(!$("sch")||!tab)return;
+  try{var r=await api("schedule?g="+tab.g),el=$("sch");if(!el||my!==S.jt)return;
+    if(!r.ok){if(!el.dataset.ok)el.innerHTML="<div class='pn g empty'>"+esc((r.j&&r.j.err)||"Gagal memuat jadwal.")+"</div>";return}
+    var iso=new Date().toLocaleDateString("en-CA",{timeZone:"Asia/Jakarta"}),y=window.scrollY;
+    el.dataset.ok=1;
+    el.innerHTML=r.j.length?r.j.map(function(d){return"<div class='day g"+(d.iso===iso?" today":"")+"'><h3>"+esc(d.d)+(d.iso===iso?"<span class='badge'>HARI INI</span>":"")+"</h3>"+
       (d.items.length?d.items.map(slot).join(""):"<div class='empty'>Tidak ada kegiatan</div>")+d.notes.map(function(n){return"<div class='note'>📌 "+esc(n)+"</div>"}).join("")+"</div>"}).join(""):"<div class='pn g empty'>Jadwal kosong.</div>";
-    var t=$("tdy");if(t)t.scrollIntoView({block:"start"})
+    window.scrollTo(0,y)
   }catch(e){}}
+function jRefresh(){
+  if(!S.t||!S.data||document.hidden||location.hash.indexOf("#/jadwal")!==0)return;
+  var ti=+location.hash.split("/")[2]||0;
+  getTabs().then(function(tabs){var c=$("chips");if(c)c.innerHTML=chipsHtml(tabs,ti);if(tabs[ti]){S.cur=tabs[ti];schFill(S.cur,S.jt)}})}
+setInterval(jRefresh,60000);document.addEventListener("visibilitychange",jRefresh);
 
 /* ---------- router ---------- */
 var TT={home:"ASTERION",materi:"MATERI & RANGKUMAN",rekaman:"REKAMAN KULIAH",jadwal:"JADWAL KULIAH"};
@@ -241,16 +284,17 @@ function route(){
 window.addEventListener("hashchange",route);
 
 $("main").addEventListener("click",async function(e){
-  var b=e.target.closest("[data-a]");if(!b)return;var a=b.dataset.a,P=location.hash.replace(/^#\/?/,"").split("/").filter(Boolean),arr=arrAt(P),i=+b.dataset.i;
+  var b=e.target.closest("[data-a]");if(!b)return;var a=b.dataset.a,P=location.hash.replace(/^#\/?/,"").split("/").filter(Boolean),arr=b.dataset.k?S.data[b.dataset.k]:arrAt(P),i=+b.dataset.i;
   if(a==="up"&&i>0){arr.splice(i-1,0,arr.splice(i,1)[0])}
   else if(a==="dn"&&i<arr.length-1){arr.splice(i+1,0,arr.splice(i,1)[0])}
   else if(a==="del"){if(b.dataset.arm){arr.splice(i,1)}else{b.dataset.arm=1;b.textContent="?";setTimeout(function(){b.textContent="✕";delete b.dataset.arm},2500);return}}
   else if(a==="add"){var n=$("aN").value.trim(),u=$("aU").value.trim(),hh=$("aH")?$("aH").value.trim():"";
     if(!n||(!u&&!hh)){toast("Isi judul dan URL/HTML");return}
-    var o={n:n};if(u){o.u=/^https?:\/\//i.test(u)?u:"https://"+u}else o.h=hh;arr.push(o)}
+    var o={n:n};if(u){o.u=/^https?:\/\//i.test(u)?u:"https://"+u}else o.h=hh;arr.unshift(o)}
+  else if(a==="ren"){var nn=prompt("Nama baru:",arr[i].n);if(!nn||!nn.trim())return;arr[i].n=nn.trim().slice(0,200)}
+  else if(a==="addtop"){var nm=$("tN").value.trim();if(!nm){toast("Isi nama dulu");return}arr.unshift(b.dataset.k==="materi"?{n:nm,lab:[],all:[]}:{n:nm,kl:[],blok:[],lab:[]})}
   else if(a==="reset"){var r=await api("reset",{m:"POST",b:{u:$("rU").value}});toast(r.ok?"Password direset ✓":"Username tidak valid");return}
-  else if(a==="sheet"){var tabs=$("sTabs").value.split("\n").map(function(l){var p=l.split("|");return{n:(p[0]||"").trim(),g:(p[1]||"").trim()}}).filter(function(t){return t.n&&/^\d+$/.test(t.g)});
-    if(!tabs.length){toast("Format tab: Nama|gid");return}S.data.sheet={id:$("sId").value.trim(),tabs:tabs}}
+  else if(a==="sheet"){var sid=$("sId").value.trim();if(!sid){toast("Isi ID spreadsheet");return}S.data.sheet={id:sid,tabs:S.data.sheet.tabs};S.tabs=null}
   else return;
   save();route()});
 
