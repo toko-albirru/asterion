@@ -96,16 +96,21 @@ async function sheetTabs(env, id) {
         tabs = (j.sheets || []).map((x) => x.properties).filter((p) => !p.hidden).sort((a, b) => a.index - b.index).map((p) => ({ n: p.title, g: String(p.sheetId) }));
       }
     }
-    if (!tabs.length) {
-      const r = await fetch(`https://docs.google.com/spreadsheets/d/${id}/htmlview`, { headers: UA });
-      if (r.ok) {
-        const t = await r.text(), re = /items\.push\(\{name:\s*"((?:[^"\\]|\\.)*)",\s*pageUrl:\s*"(?:[^"\\]|\\.)*",\s*gid:\s*"(\d+)"/g;
-        let m;
-        while ((m = re.exec(t))) {
-          let n = m[1];
-          try { n = JSON.parse('"' + n + '"'); } catch {}
-          if (!tabs.some((x) => x.g === m[2])) tabs.push({ n, g: m[2] });
-        }
+    for (const page of ["htmlview", "pubhtml"]) {
+      if (tabs.length) break;
+      const r = await fetch(`https://docs.google.com/spreadsheets/d/${id}/${page}`, { headers: UA });
+      if (!r.ok) continue;
+      const t = await r.text();
+      const add = (n, g) => { if (g && !tabs.some((x) => x.g === g)) tabs.push({ n: n.trim(), g }); };
+      let m;
+      const re1 = /items\.push\(\{([^}]*)\}\)/g; // urutan = urutan tab dari kiri
+      while ((m = re1.exec(t))) {
+        const nm = m[1].match(/name:\s*"((?:[^"\\]|\\.)*)"/), gd = m[1].match(/gid:\s*"(\d+)"/);
+        if (nm && gd) { let n = nm[1]; try { n = JSON.parse('"' + n + '"'); } catch {} add(n, gd[1]); }
+      }
+      if (!tabs.length) {
+        const re2 = /id="sheet-button-(\d+)"[^>]*>[\s\S]*?<a[^>]*>([\s\S]*?)<\/a>/g;
+        while ((m = re2.exec(t))) add(m[2].replace(/<[^>]+>/g, "").replace(/&amp;/g, "&").replace(/&#39;/g, "'").replace(/&quot;/g, '"'), m[1]);
       }
     }
   } catch {}
@@ -126,14 +131,22 @@ function ytWalk(o, out) {
   }
   for (const k in o) ytWalk(o[k], out);
 }
-async function ytList(id, env) {
+const INNER_KEY = "AIzaSyAO_FJ2SlqU8Q4STEHLGCilw_Y9_11qcW8";
+async function inner(body, client, dbg) {
+  try {
+    const r = await fetch("https://www.youtube.com/youtubei/v1/browse?prettyPrint=false&key=" + INNER_KEY, { method: "POST", headers: { ...UA, "content-type": "application/json", origin: "https://www.youtube.com" }, body: JSON.stringify({ context: { client }, ...body }) });
+    if (!r.ok) { dbg.push("browse " + client.clientName + ":" + r.status); return null; }
+    return await r.json();
+  } catch { dbg.push("browse " + client.clientName + ":err"); return null; }
+}
+async function ytList(id, env, dbg) {
   const out = { v: [], c: "" };
   let partial = false;
-  if (env.YT_API_KEY) { // jalur resmi (opsional, paling stabil)
+  if (env.YT_API_KEY) { // jalur resmi (paling stabil)
     let pt = "";
     for (let i = 0; i < 10; i++) {
       const r = await fetch(`https://www.googleapis.com/youtube/v3/playlistItems?part=snippet&maxResults=50&playlistId=${id}&key=${env.YT_API_KEY}` + (pt ? "&pageToken=" + pt : ""));
-      if (!r.ok) break;
+      if (!r.ok) { dbg.push("ytapi:" + r.status); break; }
       const j = await r.json();
       for (const it of j.items || []) {
         const s = it.snippet;
@@ -144,23 +157,30 @@ async function ytList(id, env) {
     }
     if (out.v.length) return { v: out.v.slice(0, 500) };
   }
-  try {
-    const r = await fetch(`https://www.youtube.com/playlist?list=${id}&hl=id`, { headers: UA });
-    const t = await r.text(), m = t.match(/var ytInitialData\s*=\s*(\{[\s\S]+?\});\s*<\/script>/);
-    if (m) {
-      ytWalk(JSON.parse(m[1]), out);
-      const key = (t.match(/"INNERTUBE_API_KEY":"([^"]+)"/) || [])[1], ver = (t.match(/"INNERTUBE_CONTEXT_CLIENT_VERSION":"([^"]+)"/) || [])[1] || "2.20240101.00.00";
-      for (let i = 0; i < 20 && out.c && key && out.v.length < 500; i++) {
-        const tok = out.c; out.c = "";
-        const r2 = await fetch(`https://www.youtube.com/youtubei/v1/browse?key=${key}`, { method: "POST", headers: { ...UA, "content-type": "application/json" }, body: JSON.stringify({ context: { client: { clientName: "WEB", clientVersion: ver, hl: "id", gl: "ID" } }, continuation: tok }) });
-        if (!r2.ok) break;
-        ytWalk(await r2.json(), out);
-      }
+  const web = { clientName: "WEB", clientVersion: "2.20250101.00.00", hl: "id", gl: "ID" };
+  const and = { clientName: "ANDROID", clientVersion: "19.09.37", androidSdkVersion: 30, hl: "id", gl: "ID" };
+  for (const cl of [web, and]) {
+    if (out.v.length) break;
+    let j = await inner({ browseId: "VL" + id }, cl, dbg);
+    for (let i = 0; j && i < 20; i++) {
+      out.c = ""; ytWalk(j, out);
+      if (!out.c || out.v.length >= 500) break;
+      j = await inner({ continuation: out.c }, cl, dbg);
     }
-  } catch {}
+    if (!out.v.length) dbg.push(cl.clientName + ":kosong");
+  }
+  if (!out.v.length) {
+    try {
+      const r = await fetch(`https://www.youtube.com/playlist?list=${id}&hl=id`, { headers: UA });
+      const t = await r.text(), m = t.match(/var ytInitialData\s*=\s*(\{[\s\S]+?\});\s*<\/script>/);
+      dbg.push("page:" + r.status + (m ? "" : " tanpa-data"));
+      if (m) ytWalk(JSON.parse(m[1]), out);
+    } catch { dbg.push("page:err"); }
+  }
   if (!out.v.length) { // cadangan: RSS (hanya ~15 video terbaru)
     try {
       const r = await fetch("https://www.youtube.com/feeds/videos.xml?playlist_id=" + id, { headers: UA });
+      dbg.push("rss:" + r.status);
       if (r.ok) {
         for (const e of (await r.text()).split("<entry>").slice(1)) {
           const i = e.match(/<yt:videoId>([^<]+)/), t = e.match(/<title>([^<]*)/);
@@ -168,9 +188,61 @@ async function ytList(id, env) {
         }
         partial = true;
       }
-    } catch {}
+    } catch { dbg.push("rss:err"); }
   }
   return out.v.length ? { v: out.v.slice(0, 500), partial } : null;
+}
+
+// ---- isi folder Google Drive ----
+const dec = (s) => s.replace(/&quot;/g, '"').replace(/&#39;/g, "'").replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&amp;/g, "&");
+async function driveList(id, env, dbg) {
+  if (env.DRIVE_API_KEY) { // jalur resmi (opsional)
+    try {
+      const v = []; let pt = "", name = "";
+      const nr = await fetch(`https://www.googleapis.com/drive/v3/files/${id}?fields=name&supportsAllDrives=true&key=${env.DRIVE_API_KEY}`);
+      if (nr.ok) name = (await nr.json()).name || "";
+      for (let i = 0; i < 10; i++) {
+        const q = encodeURIComponent(`'${id}' in parents and trashed=false`);
+        const r = await fetch(`https://www.googleapis.com/drive/v3/files?q=${q}&fields=nextPageToken,files(id,name,mimeType,webViewLink)&orderBy=folder,name&pageSize=200&supportsAllDrives=true&includeItemsFromAllDrives=true&key=${env.DRIVE_API_KEY}` + (pt ? "&pageToken=" + pt : ""));
+        if (!r.ok) { dbg.push("driveapi:" + r.status); break; }
+        const j = await r.json();
+        for (const f of j.files || []) {
+          const fo = f.mimeType === "application/vnd.google-apps.folder";
+          v.push({ n: f.name, f: fo, id: f.id, u: fo ? "https://drive.google.com/drive/folders/" + f.id : f.webViewLink || "https://drive.google.com/file/d/" + f.id + "/view" });
+        }
+        pt = j.nextPageToken;
+        if (!pt) break;
+      }
+      if (v.length || name) return { t: name, v };
+    } catch { dbg.push("driveapi:err"); }
+  }
+  try {
+    const r = await fetch(`https://drive.google.com/embeddedfolderview?id=${id}`, { headers: UA });
+    if (!r.ok) { dbg.push("embed:" + r.status); return null; }
+    const t = await r.text(), tt = (t.match(/<title>([^<]*)<\/title>/) || [])[1] || "", v = [];
+    for (const p of t.split('<div class="flip-entry"').slice(1)) {
+      const h = p.match(/<a href="([^"]+)"/), n = p.match(/class="flip-entry-title">([^<]*)</) || p.match(/aria-label="([^"]*)"/);
+      if (!h || !n) continue;
+      const u = dec(h[1]);
+      if (!/^https:\/\/(drive|docs)\.google\.com\//.test(u)) continue;
+      const fm = u.match(/\/folders\/([\w-]+)/);
+      v.push({ n: dec(n[1]).trim(), f: !!fm, id: fm ? fm[1] : "", u });
+    }
+    if (!v.length && !/flip-/.test(t)) { dbg.push("embed:tanpa-daftar"); return null; }
+    v.sort((a, b) => (b.f ? 1 : 0) - (a.f ? 1 : 0));
+    return { t: /^google drive$/i.test(tt.trim()) ? "" : dec(tt).trim(), v };
+  } catch { dbg.push("embed:err"); return null; }
+}
+async function shortFolder(u) {
+  let cur = u;
+  for (let i = 0; i < 4; i++) {
+    const r = await fetch(cur, { redirect: "manual", headers: UA }), l = r.headers.get("location");
+    if (!l) break;
+    cur = new URL(l, cur).href;
+    const m = cur.match(/drive\.google\.com\/drive\/(?:u\/\d+\/)?folders\/([\w-]+)/);
+    if (m) return { id: m[1] };
+  }
+  return null;
 }
 
 function csv(t) {
@@ -269,20 +341,31 @@ export default {
     }
     if (path === "tabs" && M === "GET") {
       const site = await getSite(env);
-      const t = await cached("tabs/" + site.sheet.id, 120, () => sheetTabs(env, site.sheet.id));
+      const t = await cached("tabs/" + site.sheet.id, 30, () => sheetTabs(env, site.sheet.id));
       return J({ tabs: t || site.sheet.tabs, auto: !!t });
     }
     if (path === "playlist" && M === "GET") {
-      const id = url.searchParams.get("id") || "";
+      const id = url.searchParams.get("id") || "", dbg = [];
       if (!/^[\w-]{10,80}$/.test(id)) return J({ err: 1 }, 400);
-      const r = await cached("yt/" + id, 600, () => ytList(id, env));
-      return r ? J(r) : J({ err: "Daftar video tidak bisa dimuat." }, 502);
+      const r = await cached("yt/" + id, 600, () => ytList(id, env, dbg));
+      return r ? J(r) : J({ err: "Daftar video tidak bisa dimuat.", dbg: a.admin ? dbg.join("; ") : undefined }, 502);
+    }
+    if (path === "folder" && M === "GET") {
+      let id = url.searchParams.get("id") || "";
+      const u = url.searchParams.get("u") || "", dbg = [];
+      if (!id && /^https:\/\/uns\.id\/[\w-]+$/.test(u)) {
+        const s = await cached("short/" + encodeURIComponent(u), 3600, () => shortFolder(u));
+        id = s ? s.id : "";
+      }
+      if (!/^[\w-]{10,80}$/.test(id)) return J({ err: "Bukan folder Google Drive.", dbg: a.admin ? "tautan tidak dikenali" : undefined }, 400);
+      const r = await cached("fd/" + id, 20, () => driveList(id, env, dbg));
+      return r ? J(r) : J({ err: "Isi folder tidak bisa dimuat.", dbg: a.admin ? dbg.join("; ") : undefined }, 502);
     }
     if (path === "schedule" && M === "GET") {
       const g = url.searchParams.get("g") || "0";
       if (!/^\d{1,12}$/.test(g)) return J({ err: 1 }, 400);
       const id = (await getSite(env)).sheet.id;
-      const days = await cached(`sched/${id}/${g}`, 45, async () => {
+      const days = await cached(`sched/${id}/${g}`, 15, async () => {
         const r = await fetch(`https://docs.google.com/spreadsheets/d/${id}/export?format=csv&gid=${g}`, { headers: { "cache-control": "no-cache" } });
         return r.ok ? sched(csv(await r.text())) : null;
       });
