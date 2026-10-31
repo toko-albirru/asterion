@@ -4,7 +4,8 @@ const YT = (n, id) => ({ n, u: "https://www.youtube.com/playlist?list=" + id });
 const BLOK = ["1.1", "1.2", "1.3", "2.1", "2.2", "2.3", "3.1", "3.2", "3.3"];
 
 const SEED = {
-  materi: BLOK.map((b) => ({ n: "Blok " + b, lab: [], all: [] })),
+  v: 2,
+  materi: BLOK.slice().reverse().map((b) => ({ n: "Blok " + b, lab: [], all: [] })),
   drive: [
     { n: "ASTERION 2025 - Google Drive 📚", u: "https://drive.google.com/drive/folders/1Q3J2dbVBXlP-XjL6b5e576w3iXMycKwK" },
     { n: "PENDPRODUKTIF - Google Drive 📚", u: "https://uns.id/PENDPRODUKTIF" },
@@ -38,6 +39,8 @@ const SEED = {
   sheet: { id: SHEET_ID, tabs: [{ n: "Jadwal", g: "0" }] },
 };
 
+SEED.rekaman.reverse(); // Tahun tertinggi dulu
+
 const enc = new TextEncoder();
 const J = (o, s = 200) => new Response(JSON.stringify(o), { status: s, headers: { "content-type": "application/json", "cache-control": "no-store" } });
 const b64 = (b) => btoa(String.fromCharCode(...new Uint8Array(b))).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
@@ -61,7 +64,114 @@ async function auth(req, env) {
   const admin = u === "admin";
   return { u, admin, mc: !admin && !(await env.LINKS.get("u:" + u)) };
 }
-const getSite = async (env) => (await env.LINKS.get("site", "json")) || SEED;
+const getSite = async (env) => {
+  const s = await env.LINKS.get("site", "json");
+  if (!s) return SEED;
+  if (!s.v) { // migrasi sekali: urutkan blok & tahun dari yang terbaru
+    const cmp = (x, y) => y.n.localeCompare(x.n, "en", { numeric: true });
+    s.materi.sort(cmp); s.rekaman.sort(cmp); s.v = 2;
+    await env.LINKS.put("site", JSON.stringify(s));
+  }
+  return s;
+};
+
+async function cached(key, ttl, fn) {
+  const c = typeof caches !== "undefined" ? caches.default : null, ck = new Request("https://cache.local/" + key);
+  const hit = c && (await c.match(ck));
+  if (hit) return hit.json();
+  const v = await fn();
+  if (v && c) await c.put(ck, new Response(JSON.stringify(v), { headers: { "cache-control": "max-age=" + ttl } }));
+  return v;
+}
+const UA = { "user-agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36", "accept-language": "id,en;q=0.8", cookie: "CONSENT=YES+1; SOCS=CAI" };
+
+// ---- daftar tab spreadsheet (urut dari paling kiri) ----
+async function sheetTabs(env, id) {
+  let tabs = [];
+  try {
+    if (env.GOOGLE_API_KEY) {
+      const r = await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${id}?fields=sheets.properties(sheetId,title,index,hidden)&key=${env.GOOGLE_API_KEY}`);
+      if (r.ok) {
+        const j = await r.json();
+        tabs = (j.sheets || []).map((x) => x.properties).filter((p) => !p.hidden).sort((a, b) => a.index - b.index).map((p) => ({ n: p.title, g: String(p.sheetId) }));
+      }
+    }
+    if (!tabs.length) {
+      const r = await fetch(`https://docs.google.com/spreadsheets/d/${id}/htmlview`, { headers: UA });
+      if (r.ok) {
+        const t = await r.text(), re = /items\.push\(\{name:\s*"((?:[^"\\]|\\.)*)",\s*pageUrl:\s*"(?:[^"\\]|\\.)*",\s*gid:\s*"(\d+)"/g;
+        let m;
+        while ((m = re.exec(t))) {
+          let n = m[1];
+          try { n = JSON.parse('"' + n + '"'); } catch {}
+          if (!tabs.some((x) => x.g === m[2])) tabs.push({ n, g: m[2] });
+        }
+      }
+    }
+  } catch {}
+  return tabs.length ? tabs : null;
+}
+
+// ---- isi playlist YouTube ----
+const ytTitle = (x) => (x ? x.simpleText || (x.runs || []).map((r) => r.text).join("") : "");
+function ytWalk(o, out) {
+  if (!o || typeof o !== "object") return;
+  const v = o.playlistVideoRenderer;
+  if (v) { if (v.videoId && v.isPlayable !== false) out.v.push({ id: v.videoId, t: ytTitle(v.title), d: ytTitle(v.lengthText) }); return; }
+  const c = o.continuationItemRenderer;
+  if (c) {
+    const e = c.continuationEndpoint, t = e && e.continuationCommand && e.continuationCommand.token;
+    if (t) out.c = t;
+    return;
+  }
+  for (const k in o) ytWalk(o[k], out);
+}
+async function ytList(id, env) {
+  const out = { v: [], c: "" };
+  let partial = false;
+  if (env.YT_API_KEY) { // jalur resmi (opsional, paling stabil)
+    let pt = "";
+    for (let i = 0; i < 10; i++) {
+      const r = await fetch(`https://www.googleapis.com/youtube/v3/playlistItems?part=snippet&maxResults=50&playlistId=${id}&key=${env.YT_API_KEY}` + (pt ? "&pageToken=" + pt : ""));
+      if (!r.ok) break;
+      const j = await r.json();
+      for (const it of j.items || []) {
+        const s = it.snippet;
+        if (s && s.resourceId && s.title !== "Private video" && s.title !== "Deleted video") out.v.push({ id: s.resourceId.videoId, t: s.title, d: "" });
+      }
+      pt = j.nextPageToken;
+      if (!pt) break;
+    }
+    if (out.v.length) return { v: out.v.slice(0, 500) };
+  }
+  try {
+    const r = await fetch(`https://www.youtube.com/playlist?list=${id}&hl=id`, { headers: UA });
+    const t = await r.text(), m = t.match(/var ytInitialData\s*=\s*(\{[\s\S]+?\});\s*<\/script>/);
+    if (m) {
+      ytWalk(JSON.parse(m[1]), out);
+      const key = (t.match(/"INNERTUBE_API_KEY":"([^"]+)"/) || [])[1], ver = (t.match(/"INNERTUBE_CONTEXT_CLIENT_VERSION":"([^"]+)"/) || [])[1] || "2.20240101.00.00";
+      for (let i = 0; i < 20 && out.c && key && out.v.length < 500; i++) {
+        const tok = out.c; out.c = "";
+        const r2 = await fetch(`https://www.youtube.com/youtubei/v1/browse?key=${key}`, { method: "POST", headers: { ...UA, "content-type": "application/json" }, body: JSON.stringify({ context: { client: { clientName: "WEB", clientVersion: ver, hl: "id", gl: "ID" } }, continuation: tok }) });
+        if (!r2.ok) break;
+        ytWalk(await r2.json(), out);
+      }
+    }
+  } catch {}
+  if (!out.v.length) { // cadangan: RSS (hanya ~15 video terbaru)
+    try {
+      const r = await fetch("https://www.youtube.com/feeds/videos.xml?playlist_id=" + id, { headers: UA });
+      if (r.ok) {
+        for (const e of (await r.text()).split("<entry>").slice(1)) {
+          const i = e.match(/<yt:videoId>([^<]+)/), t = e.match(/<title>([^<]*)/);
+          if (i) out.v.push({ id: i[1], t: (t ? t[1] : "").replace(/&quot;/g, '"').replace(/&#39;/g, "'").replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&amp;/g, "&"), d: "" });
+        }
+        partial = true;
+      }
+    } catch {}
+  }
+  return out.v.length ? { v: out.v.slice(0, 500), partial } : null;
+}
 
 function csv(t) {
   const R = []; let r = [], f = "", q = false;
@@ -96,7 +206,8 @@ function sched(rows) {
     const it = { j: g(r, C.j), k: g(r, C.k), r: g(r, C.r), s: g(r, C.s), rs: g(r, C.rs), d: g(r, C.d), st: g(r, C.st), rk: g(r, C.rk), ke: g(r, C.ke) };
     if (it.k || it.s || it.rs || it.d || it.st || it.rk || it.ke) cur.items.push(it);
   }
-  return days;
+  // tanggal terbaru di paling atas (yang tanpa tanggal valid di paling bawah)
+  return days.map((d, i) => [d, i]).sort((a, b) => (a[0].iso < b[0].iso ? 1 : a[0].iso > b[0].iso ? -1 : a[1] - b[1])).map((x) => x[0]);
 }
 
 function valid(d) {
@@ -156,17 +267,26 @@ export default {
       await env.LINKS.delete("u:" + u);
       return J({ ok: 1 });
     }
+    if (path === "tabs" && M === "GET") {
+      const site = await getSite(env);
+      const t = await cached("tabs/" + site.sheet.id, 120, () => sheetTabs(env, site.sheet.id));
+      return J({ tabs: t || site.sheet.tabs, auto: !!t });
+    }
+    if (path === "playlist" && M === "GET") {
+      const id = url.searchParams.get("id") || "";
+      if (!/^[\w-]{10,80}$/.test(id)) return J({ err: 1 }, 400);
+      const r = await cached("yt/" + id, 600, () => ytList(id, env));
+      return r ? J(r) : J({ err: "Daftar video tidak bisa dimuat." }, 502);
+    }
     if (path === "schedule" && M === "GET") {
       const g = url.searchParams.get("g") || "0";
       if (!/^\d{1,12}$/.test(g)) return J({ err: 1 }, 400);
       const id = (await getSite(env)).sheet.id;
-      const ck = new Request(`https://sched.local/${id}/${g}`), c = typeof caches !== "undefined" ? caches.default : null;
-      const hit = c && (await c.match(ck));
-      if (hit) return J(await hit.json());
-      const r = await fetch(`https://docs.google.com/spreadsheets/d/${id}/export?format=csv&gid=${g}`);
-      if (!r.ok) return J({ err: "Spreadsheet tidak bisa dibaca. Pastikan dibagikan 'siapa saja yang memiliki link'." }, 502);
-      const days = sched(csv(await r.text()));
-      if (c) await c.put(ck, new Response(JSON.stringify(days), { headers: { "cache-control": "max-age=180" } }));
+      const days = await cached(`sched/${id}/${g}`, 45, async () => {
+        const r = await fetch(`https://docs.google.com/spreadsheets/d/${id}/export?format=csv&gid=${g}`, { headers: { "cache-control": "no-cache" } });
+        return r.ok ? sched(csv(await r.text())) : null;
+      });
+      if (!days) return J({ err: "Spreadsheet tidak bisa dibaca. Pastikan dibagikan 'siapa saja yang memiliki link'." }, 502);
       return J(days);
     }
     return J({ err: "not found" }, 404);
