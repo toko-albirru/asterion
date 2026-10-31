@@ -34,12 +34,28 @@ h1{margin:0;font-family:Cinzel,Georgia,serif;font-weight:900;font-size:clamp(30p
 .link a.pressed::before{animation:sheen .7s ease}
 @keyframes sheen{from{left:-70%}to{left:130%}}
 .link a:active{transform:scale(.975)}
-.grab,.x,.xs{border:1px solid var(--line);color:#fff;cursor:pointer;background:rgba(255,255,255,.12);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px)}
+.grab,.x,.xs,.mvb{border:1px solid var(--line);color:#fff;cursor:pointer;background:rgba(255,255,255,.12);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px)}
 .grab{width:36px;height:36px;border-radius:10px;flex:none;font-size:18px;cursor:grab;touch-action:none;user-select:none;display:flex;align-items:center;justify-content:center}
 .x{width:36px;height:36px;border-radius:10px;flex:none;font-size:15px;background:rgba(239,68,68,.35)}
 .xs{border-radius:10px;padding:7px 10px;font-size:12px;flex:none}
-.mv{flex:none;width:84px;height:36px;border-radius:10px;border:1px solid var(--line);background:rgba(255,255,255,.12);color:#fff;font-size:12px;padding:0 4px;cursor:pointer;outline:none}
-.mv option{color:#111}
+.mvb{width:36px;height:36px;border-radius:10px;flex:none;font-size:17px;display:flex;align-items:center;justify-content:center;transition:background .2s,border-color .2s}
+.mvb:hover,.mvb:active{background:rgba(245,192,74,.25);border-color:rgba(245,192,74,.7)}
+.sbg{position:fixed;inset:0;z-index:100;display:flex;align-items:flex-end;justify-content:center;background:rgba(10,6,24,.6);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);opacity:0;pointer-events:none;transition:opacity .2s}
+.sbg.on{opacity:1;pointer-events:auto}
+.sheet{width:100%;max-width:560px;max-height:82vh;overflow-y:auto;padding:12px 16px calc(18px + env(safe-area-inset-bottom,0px));border-radius:26px 26px 0 0;background:linear-gradient(160deg,rgba(70,50,125,.97),rgba(30,22,56,.98));border:1px solid var(--line);border-bottom:0;box-shadow:0 -14px 50px rgba(0,0,0,.5),inset 0 1px 0 rgba(255,255,255,.35);transform:translateY(40px);transition:transform .28s cubic-bezier(.2,.8,.2,1)}
+.sbg.on .sheet{transform:none}
+@media(min-width:600px){.sbg{align-items:center}.sheet{border-radius:26px;border-bottom:1px solid var(--line)}}
+.sheet .grip{width:42px;height:4px;border-radius:4px;background:rgba(255,255,255,.3);margin:0 auto 14px}
+.sheet h4{margin:0;text-align:center;font-family:Cinzel,Georgia,serif;font-size:16px;letter-spacing:.12em;color:var(--gold)}
+.sheet .who{margin:8px 0 16px;text-align:center;font-size:13px;color:var(--mut);line-height:1.4}
+.sheet .who b{display:block;color:#fff;font-weight:600;font-size:14px;margin-top:2px}
+.opt{display:flex;align-items:center;gap:10px;width:100%;margin-bottom:9px;padding:14px 16px;text-align:left;color:#fff;font:600 14px Inter,system-ui,sans-serif;border-radius:16px;cursor:pointer;background:linear-gradient(135deg,rgba(255,255,255,.12),rgba(255,255,255,.03));border:1px solid rgba(255,255,255,.2);box-shadow:inset 0 1px 0 rgba(255,255,255,.25);transition:transform .15s,border-color .15s,background .15s}
+.opt:hover,.opt:active{border-color:rgba(245,192,74,.7);background:linear-gradient(135deg,rgba(245,192,74,.22),rgba(255,255,255,.05));transform:translateY(-1px)}
+.opt .n{flex:1;letter-spacing:.03em}
+.opt .c{font-size:11px;font-weight:600;padding:3px 9px;border-radius:999px;background:rgba(255,255,255,.14);color:var(--mut)}
+.opt .a{color:var(--gold);font-size:16px}
+.opt[disabled]{opacity:.4;cursor:default;transform:none;border-color:rgba(255,255,255,.2)}
+.sheet .cancel{width:100%;margin-top:6px;padding:13px;border-radius:16px;font-size:14px;font-weight:600;color:#fff;cursor:pointer;background:transparent;border:1px solid var(--line)}
 .drag{opacity:.88;outline:1px solid rgba(245,192,74,.7);outline-offset:2px;border-radius:20px;box-shadow:0 16px 40px rgba(0,0,0,.5);position:relative;z-index:5;will-change:transform}
 .panel{margin:14px 0;padding:18px;border-radius:22px;background:linear-gradient(135deg,rgba(255,255,255,.16),rgba(255,255,255,.05));border:1px solid var(--line);backdrop-filter:blur(22px);-webkit-backdrop-filter:blur(22px);box-shadow:0 10px 34px rgba(8,4,24,.45),inset 0 1px 0 rgba(255,255,255,.4)}
 .panel h3{margin:0 0 8px;font-family:Cinzel,Georgia,serif;font-size:17px;color:var(--gold)}
@@ -85,7 +101,7 @@ h1{margin:0;font-family:Cinzel,Georgia,serif;font-weight:900;font-size:clamp(30p
     <label for="nsec">Atau buat kategori baru</label>
     <input id="nsec" placeholder="mis. RECORD KULIAH THN 3">
     <div class="row"><button class="btn" id="addSec">+ Tambah kategori</button><button class="btn g" id="logout">Keluar admin</button></div>
-    <div class="tip">Geser urutan dengan menahan dan menarik tombol ⠿ di sebelah kategori atau link. Pakai dropdown "↪ Pindah" untuk memindah link ke kategori lain.</div>
+    <div class="tip">Geser urutan dengan menahan dan menarik tombol ⠿ di sebelah kategori atau link. Tekan tombol ⇄ di link untuk memindahnya ke kategori lain.</div>
     <div class="msg" id="msg"></div>
   </div>
 
@@ -124,14 +140,8 @@ function render(){
       if(isAdmin){var g2=mk("div","grab","⠿");g2.dataset.k="l";g2.title="Geser link";d.appendChild(g2)}
       var a=mk("a",null,k.n);a.href=k.u;a.target="_blank";a.rel="noopener noreferrer";d.appendChild(a);
       if(isAdmin&&data.length>1){
-        var mv=mk("select","mv");mv.title="Pindah ke kategori lain";
-        var o0=mk("option",null,"↪ Pindah");o0.value="";mv.appendChild(o0);
-        data.forEach(function(t,ti){if(ti===si)return;var o=mk("option",null,t.t);o.value=ti;mv.appendChild(o)});
-        mv.onchange=function(){
-          var to=mv.value;if(to==="")return;
-          var item=s.l.splice(li,1)[0];data[+to].l.push(item);
-          msg("Dipindah ke "+data[+to].t+" ✓");save();
-        };
+        var mv=mk("button","mvb","⇄");mv.title="Pindah ke kategori lain";
+        mv.onclick=function(){openMove(si,li)};
         d.appendChild(mv);
       }
       if(isAdmin){var x=mk("button","x","✕");x.title="Hapus link";x.onclick=function(){s.l.splice(li,1);save()};d.appendChild(x)}
@@ -183,6 +193,38 @@ $("list").addEventListener("pointerdown",function(e){
   h.addEventListener("pointermove",move);h.addEventListener("pointerup",up);h.addEventListener("pointercancel",up);
   tick();
 });
+
+var sheetBg=null;
+function closeMove(){if(sheetBg)sheetBg.classList.remove("on")}
+function openMove(si,li){
+  if(!sheetBg){
+    sheetBg=mk("div","sbg");document.body.appendChild(sheetBg);
+    sheetBg.addEventListener("pointerdown",function(e){if(e.target===sheetBg)closeMove()});
+    document.addEventListener("keydown",function(e){if(e.key==="Escape")closeMove()});
+  }
+  var link=data[si].l[li];
+  sheetBg.innerHTML="";
+  var sh=mk("div","sheet");
+  sh.appendChild(mk("div","grip"));
+  sh.appendChild(mk("h4",null,"PINDAH KE KATEGORI"));
+  var who=mk("div","who","Memindahkan:");who.appendChild(mk("b",null,link.n));sh.appendChild(who);
+  data.forEach(function(t,ti){
+    var o=mk("button","opt");o.appendChild(mk("span","n",t.t));
+    o.appendChild(mk("span","c",ti===si?"Saat ini":t.l.length+" link"));
+    if(ti===si){o.disabled=true}
+    else{
+      o.appendChild(mk("span","a","→"));
+      o.onclick=function(){
+        var it=data[si].l.splice(li,1)[0];data[ti].l.push(it);
+        closeMove();msg("Dipindah ke "+t.t+" ✓");save();
+      };
+    }
+    sh.appendChild(o);
+  });
+  var c=mk("button","cancel","Batal");c.onclick=closeMove;sh.appendChild(c);
+  sheetBg.appendChild(sh);
+  requestAnimationFrame(function(){sheetBg.classList.add("on")});
+}
 
 function save(){
   render();
