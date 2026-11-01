@@ -229,7 +229,7 @@ function pHome(){
   "<div class='sec'>MENU</div>"+cards([["#/materi","📚","Materi & Rangkuman","Per blok, lab, dan Google Drive"],["#/rekaman","🎬","Rekaman Kuliah","Putar langsung per tahun"],["#/jadwal","🗓️","Jadwal Kuliah","Terhubung ke spreadsheet"]])+
   (S.admin?"<div class='sec'>ADMIN</div><div class='pn g'><b>Reset password mahasiswa</b><div class='hint'>Mengembalikan password ke username (mahasiswa wajib membuat password baru saat login).</div><input id='rU' class='in' placeholder='G0025001'><button class='btn' data-a='reset'>Reset</button></div>":"")}
 function jkt(){return new Date().toLocaleDateString("en-CA",{timeZone:"Asia/Jakarta"})}
-function pickTab(tabs){var g=localStorage.getItem("jg");return tabs.filter(function(t){return t.g===g})[0]||tabs[0]}
+function pickTab(tabs){return tabs[Math.min(S.def||0,tabs.length-1)]||tabs[0]}
 async function todayFill(){
   var el=$("today");if(!el)return;
   try{var tabs=await getTabs(),tb=pickTab(tabs),r=await api("schedule?g="+tb.g);if(!$("today"))return;
@@ -268,10 +268,10 @@ function slot(x){
   if(x.ke)h+="<small>"+esc(x.ke)+"</small>";
   return h+"</div></div>"}
 function selHtml(tabs,ti){return"<select id='tabSel' class='in' aria-label='Pilih jadwal'>"+tabs.map(function(t,i){return"<option value='"+i+"'"+(i===ti?" selected":"")+">"+esc(t.n)+"</option>"}).join("")+"</select>"}
-function curTi(tabs){var p=location.hash.replace(/^#\/?/,"").split("/")[1];if(p!==undefined&&p!=="")return Math.max(0,Math.min(+p||0,tabs.length-1));var g=localStorage.getItem("jg");for(var i=0;i<tabs.length;i++)if(tabs[i].g===g)return i;return 0}
+function curTi(tabs){var p=location.hash.replace(/^#\/?/,"").split("/")[1];if(p!==undefined&&p!=="")return Math.max(0,Math.min(+p||0,tabs.length-1));return Math.max(0,Math.min(S.def||0,tabs.length-1))}
 function setSel(tabs,ti){var c=$("chips");if(!c)return;var sig=JSON.stringify(tabs);if(c.dataset.sig!==sig||!$("tabSel")){c.innerHTML=selHtml(tabs,ti);c.dataset.sig=sig}else $("tabSel").value=ti}
 async function getTabs(){
-  try{var r=await api("tabs");if(r.ok&&r.j&&r.j.tabs&&r.j.tabs.length){S.tabs=r.j.tabs;S.auto=!!r.j.auto}}catch(e){}
+  try{var r=await api("tabs");if(r.ok&&r.j&&r.j.tabs&&r.j.tabs.length){S.tabs=r.j.tabs;S.auto=!!r.j.auto;S.def=+r.j.def||0;S.grp=r.j.grp||""}}catch(e){}
   return S.tabs||S.data.sheet.tabs}
 function pJadwal(P){
   var h="<div id='chips'></div><div id='sch'><div class='empty'>Memuat jadwal…</div></div>";
@@ -297,7 +297,7 @@ function jRefresh(){
   if(!S.t||!S.data||document.hidden||location.hash.indexOf("#/jadwal")!==0)return;
   getTabs().then(function(tabs){var ti=curTi(tabs);setSel(tabs,ti);S.cur=tabs[ti];if(S.cur)schFill(S.cur,S.jt)})}
 setInterval(jRefresh,20000);window.addEventListener("focus",jRefresh);document.addEventListener("visibilitychange",jRefresh);
-$("main").addEventListener("change",function(e){if(e.target.id!=="tabSel")return;var tabs=S.tabs||S.data.sheet.tabs,t=tabs[+e.target.value];if(t)localStorage.setItem("jg",t.g);location.hash="#/jadwal/"+e.target.value});
+$("main").addEventListener("change",function(e){if(e.target.id!=="tabSel")return;var tabs=S.tabs||S.data.sheet.tabs,t=tabs[+e.target.value];location.hash="#/jadwal/"+e.target.value});
 
 /* ---------- router ---------- */
 var TT={home:"ASTERION",materi:"MATERI & RANGKUMAN",rekaman:"REKAMAN KULIAH",jadwal:"JADWAL KULIAH"};
