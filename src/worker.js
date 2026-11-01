@@ -319,7 +319,7 @@ function sched(rows) {
 }
 
 function valid(d) {
-  const L = (a) => Array.isArray(a) && a.length <= 500 && a.every((x) => x && typeof x.n === "string" && x.n.length <= 200 && (x.u === undefined || (typeof x.u === "string" && x.u.length <= 2000)) && (x.h === undefined || (typeof x.h === "string" && x.h.length <= 100000)));
+  const L = (a) => Array.isArray(a) && a.length <= 500 && a.every((x) => x && typeof x.n === "string" && x.n.length <= 200 && (x.u === undefined || (typeof x.u === "string" && x.u.length <= 2000)) && (x.h === undefined || (typeof x.h === "string" && x.h.length <= 100000)) && (x.hid === undefined || (typeof x.hid === "string" && /^[\w-]{6,40}$/.test(x.hid))));
   return d && L(d.drive) && Array.isArray(d.materi) && d.materi.length <= 60 && d.materi.every((b) => typeof b.n === "string" && L(b.lab) && L(b.all)) &&
     Array.isArray(d.rekaman) && d.rekaman.length <= 20 && d.rekaman.every((t) => typeof t.n === "string" && L(t.kl) && L(t.blok) && L(t.lab)) &&
     d.sheet && /^[\w-]{20,80}$/.test(d.sheet.id) && Array.isArray(d.sheet.tabs) && d.sheet.tabs.length <= 30 && d.sheet.tabs.every((t) => typeof t.n === "string" && /^\d{1,12}$/.test(t.g));
@@ -366,7 +366,28 @@ export default {
         if (!a.admin) return J({ err: "admin" }, 403);
         if (!valid(body)) return J({ err: "invalid" }, 400);
         await env.LINKS.put("site", JSON.stringify(body));
+        try { // bersihkan file HTML yatim (lebih dari 1 jam & tidak dipakai lagi)
+          const ref = new Set(), col = (a) => (a || []).forEach((x) => x.hid && ref.add(x.hid));
+          col(body.drive); body.materi.forEach((b) => { col(b.lab); col(b.all); }); body.rekaman.forEach((t) => { col(t.kl); col(t.blok); col(t.lab); });
+          for (const k of (await env.LINKS.list({ prefix: "h:" })).keys) if (!ref.has(k.name.slice(2)) && (!k.metadata || Date.now() - k.metadata.t > 36e5)) await env.LINKS.delete(k.name);
+        } catch {}
         return J({ ok: 1 });
+      }
+    }
+    if (path === "html") { // file HTML materi hasil upload
+      if (M === "GET") {
+        const id = url.searchParams.get("id") || "";
+        if (!/^[\w-]{6,40}$/.test(id)) return J({ err: 1 }, 400);
+        const t = await env.LINKS.get("h:" + id);
+        return t === null ? J({ err: "tidak ada" }, 404) : J({ h: t });
+      }
+      if (M === "POST") {
+        if (!a.admin) return J({ err: "admin" }, 403);
+        const h = typeof body.h === "string" ? body.h : "";
+        if (!h || h.length > 5e6) return J({ err: "File kosong atau lebih dari 5 MB." }, 400);
+        const id = b64(crypto.getRandomValues(new Uint8Array(9)));
+        await env.LINKS.put("h:" + id, h, { metadata: { t: Date.now() } });
+        return J({ id });
       }
     }
     if (path === "reset" && M === "POST") {
