@@ -52,6 +52,8 @@ async function pbk(p, salt) {
   const key = await crypto.subtle.importKey("raw", enc.encode(p), "PBKDF2", false, ["deriveBits"]);
   return b64(await crypto.subtle.deriveBits({ name: "PBKDF2", hash: "SHA-256", salt: enc.encode(salt), iterations: 10000 }, key, 256));
 }
+const GRP_EXC = { G0025182: "A" }; // pengecualian: username -> kelompok
+const grp = (u) => (/^G0025\d{3}$/.test(u) ? GRP_EXC[u] || (+u.slice(5) % 2 ? "A" : "B") : null);
 const isStu = (u) => /^G0025\d{3}$/.test(u) && +u.slice(5) >= 1 && +u.slice(5) <= 240;
 const K = (env) => "s|" + env.ADMIN_PASSWORD;
 async function mint(u, env) {
@@ -119,10 +121,27 @@ async function sheetTabs(env, id) {
 
 // ---- isi playlist YouTube ----
 const ytTitle = (x) => (x ? x.simpleText || (x.runs || []).map((r) => r.text).join("") : "");
+function ytDur(o, n = 0) {
+  if (!o || typeof o !== "object" || n > 10) return "";
+  if (typeof o.text === "string" && /^\d+(:\d\d)+$/.test(o.text)) return o.text;
+  for (const k in o) { const r = ytDur(o[k], n + 1); if (r) return r; }
+  return "";
+}
 function ytWalk(o, out) {
   if (!o || typeof o !== "object") return;
+  const add = (id, t, d) => { if (typeof id === "string" && /^[\w-]{11}$/.test(id) && !out.s.has(id)) { out.s.add(id); out.v.push({ id, t: t || "", d: d || "" }); } };
   const v = o.playlistVideoRenderer;
-  if (v) { if (v.videoId && v.isPlayable !== false) out.v.push({ id: v.videoId, t: ytTitle(v.title), d: ytTitle(v.lengthText) }); return; }
+  if (v) { if (v.isPlayable !== false) add(v.videoId, ytTitle(v.title), ytTitle(v.lengthText)); return; }
+  const l = o.lockupViewModel; // format baru YouTube
+  if (l && typeof l.contentId === "string" && /VIDEO/.test(l.contentType || "")) {
+    const md = l.metadata && l.metadata.lockupMetadataViewModel;
+    add(l.contentId, md && md.title && (md.title.content || ytTitle(md.title)), ytDur(l.contentImage));
+    return;
+  }
+  if (out.loose) {
+    const r = o.videoRenderer || o.gridVideoRenderer || o.compactVideoRenderer || o.playlistPanelVideoRenderer;
+    if (r) { add(r.videoId, ytTitle(r.title), ytTitle(r.lengthText)); return; }
+  }
   const c = o.continuationItemRenderer;
   if (c) {
     const e = c.continuationEndpoint, t = e && e.continuationCommand && e.continuationCommand.token;
@@ -130,6 +149,22 @@ function ytWalk(o, out) {
     return;
   }
   for (const k in o) ytWalk(o[k], out);
+}
+function ytInfo(j) { // ringkasan isi respons untuk diagnosis
+  const ks = new Set(); let al = "";
+  (function f(o, n) {
+    if (!o || typeof o !== "object" || n > 40) return;
+    for (const k in o) {
+      if (/(Renderer|ViewModel)$/.test(k) && ks.size < 10) ks.add(k);
+      if (!al && (k === "alertRenderer" || k === "alertWithButtonRenderer")) al = ytTitle(o[k].text);
+      f(o[k], n + 1);
+    }
+  })(j, 0);
+  return ((al ? "alert=" + al + " " : "") + [...ks].join(",")).slice(0, 300);
+}
+function ytAll(j, out) { // jalankan walk; kalau kosong coba mode longgar
+  ytWalk(j, out);
+  if (!out.v.length) { out.loose = true; ytWalk(j, out); out.loose = false; }
 }
 const INNER_KEY = "AIzaSyAO_FJ2SlqU8Q4STEHLGCilw_Y9_11qcW8";
 async function inner(body, client, dbg) {
@@ -140,7 +175,7 @@ async function inner(body, client, dbg) {
   } catch { dbg.push("browse " + client.clientName + ":err"); return null; }
 }
 async function ytList(id, env, dbg) {
-  const out = { v: [], c: "" };
+  const out = { v: [], c: "", s: new Set() };
   let partial = false;
   if (env.YT_API_KEY) { // jalur resmi (paling stabil)
     let pt = "";
@@ -157,24 +192,25 @@ async function ytList(id, env, dbg) {
     }
     if (out.v.length) return { v: out.v.slice(0, 500) };
   }
-  const web = { clientName: "WEB", clientVersion: "2.20250101.00.00", hl: "id", gl: "ID" };
-  const and = { clientName: "ANDROID", clientVersion: "19.09.37", androidSdkVersion: 30, hl: "id", gl: "ID" };
-  for (const cl of [web, and]) {
+  const web = { clientName: "WEB", clientVersion: "2.20250925.01.00", hl: "id", gl: "ID" };
+  const mweb = { clientName: "MWEB", clientVersion: "2.20250925.01.00", hl: "id", gl: "ID" };
+  for (const cl of [web, mweb]) {
     if (out.v.length) break;
     let j = await inner({ browseId: "VL" + id }, cl, dbg);
+    const first = j;
     for (let i = 0; j && i < 20; i++) {
-      out.c = ""; ytWalk(j, out);
+      out.c = ""; ytAll(j, out);
       if (!out.c || out.v.length >= 500) break;
       j = await inner({ continuation: out.c }, cl, dbg);
     }
-    if (!out.v.length) dbg.push(cl.clientName + ":kosong");
+    if (!out.v.length && first) dbg.push(cl.clientName + ":kosong [" + ytInfo(first) + "]");
   }
   if (!out.v.length) {
     try {
       const r = await fetch(`https://www.youtube.com/playlist?list=${id}&hl=id`, { headers: UA });
       const t = await r.text(), m = t.match(/var ytInitialData\s*=\s*(\{[\s\S]+?\});\s*<\/script>/);
       dbg.push("page:" + r.status + (m ? "" : " tanpa-data"));
-      if (m) ytWalk(JSON.parse(m[1]), out);
+      if (m) { const d = JSON.parse(m[1]); ytAll(d, out); if (!out.v.length) dbg.push("page:kosong [" + ytInfo(d) + "]"); }
     } catch { dbg.push("page:err"); }
   }
   if (!out.v.length) { // cadangan: RSS (hanya ~15 video terbaru)
@@ -342,7 +378,13 @@ export default {
     if (path === "tabs" && M === "GET") {
       const site = await getSite(env);
       const t = await cached("tabs/" + site.sheet.id, 30, () => sheetTabs(env, site.sheet.id));
-      return J({ tabs: t || site.sheet.tabs, auto: !!t });
+      const tabs = t || site.sheet.tabs, g = grp(a.u);
+      let def = 0;
+      if (g) { // tab terbaru (paling kiri) yang namanya diawali "A." / "B."
+        const re = new RegExp("^\\s*" + g + "\\s*\\.", "i"), i = tabs.findIndex((x) => re.test(x.n));
+        if (i >= 0) def = i;
+      }
+      return J({ tabs, auto: !!t, def, grp: g });
     }
     if (path === "playlist" && M === "GET") {
       const id = url.searchParams.get("id") || "", dbg = [];
