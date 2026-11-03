@@ -325,14 +325,389 @@ function valid(d) {
     d.sheet && /^[\w-]{20,80}$/.test(d.sheet.id) && Array.isArray(d.sheet.tabs) && d.sheet.tabs.length <= 30 && d.sheet.tabs.every((t) => typeof t.n === "string" && /^\d{1,12}$/.test(t.g));
 }
 
+// ===== ASTERION RUN (mulai) =====================================================
+// API game edukasi 3D. Memakai Cloudflare D1 (binding: DB). Bila DB belum terpasang, hanya /api/run/* yang
+// menjawab 503 — seluruh fitur lama tetap berjalan. Skema: migrations/0001_asterion_run.sql (dibuat otomatis
+// bila belum ada, aman dijalankan berulang).
+const RUN_DDL = [
+  "CREATE TABLE IF NOT EXISTS run_cats ( id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL, descr TEXT NOT NULL DEFAULT '', active INTEGER NOT NULL DEFAULT 1, per_session INTEGER NOT NULL DEFAULT 20, q_time INTEGER NOT NULL DEFAULT 60, show_explain INTEGER NOT NULL DEFAULT 1, sort INTEGER NOT NULL DEFAULT 0, created INTEGER NOT NULL )",
+  "CREATE TABLE IF NOT EXISTS run_questions ( id INTEGER PRIMARY KEY AUTOINCREMENT, cat_id INTEGER NOT NULL, num INTEGER, q TEXT NOT NULL, a TEXT NOT NULL DEFAULT '', b TEXT NOT NULL DEFAULT '', c TEXT NOT NULL DEFAULT '', d TEXT NOT NULL DEFAULT '', e TEXT NOT NULL DEFAULT '', ans TEXT NOT NULL, expl TEXT NOT NULL DEFAULT '', diff INTEGER NOT NULL DEFAULT 2, img TEXT NOT NULL DEFAULT '', active INTEGER NOT NULL DEFAULT 1, verified INTEGER NOT NULL DEFAULT 0, src TEXT NOT NULL DEFAULT '', hash TEXT NOT NULL, imported INTEGER NOT NULL, updated INTEGER NOT NULL, UNIQUE (cat_id, hash) )",
+  "CREATE INDEX IF NOT EXISTS ix_rq_cat ON run_questions (cat_id, active, verified)",
+  "CREATE TABLE IF NOT EXISTS run_sessions ( id TEXT PRIMARY KEY, u TEXT NOT NULL, cat_id INTEGER NOT NULL, cat_name TEXT NOT NULL, status TEXT NOT NULL, total INTEGER NOT NULL, requested INTEGER NOT NULL DEFAULT 0, q_time INTEGER NOT NULL, show_explain INTEGER NOT NULL DEFAULT 1, cur INTEGER NOT NULL DEFAULT 0, qstart INTEGER, paused_at INTEGER, pause_used INTEGER NOT NULL DEFAULT 0, started INTEGER NOT NULL, began INTEGER, fin INTEGER, score INTEGER NOT NULL DEFAULT 0, correct INTEGER NOT NULL DEFAULT 0, wrong INTEGER NOT NULL DEFAULT 0, blank INTEGER NOT NULL DEFAULT 0, acc REAL NOT NULL DEFAULT 0, dur INTEGER NOT NULL DEFAULT 0, rank INTEGER )",
+  "CREATE INDEX IF NOT EXISTS ix_rs_user ON run_sessions (u, status)",
+  "CREATE INDEX IF NOT EXISTS ix_rs_cat ON run_sessions (cat_id, status, fin)",
+  "CREATE TABLE IF NOT EXISTS run_answers ( sid TEXT NOT NULL, idx INTEGER NOT NULL, qid INTEGER, snap TEXT NOT NULL, chosen TEXT, correct INTEGER NOT NULL DEFAULT 0, ms INTEGER, answered INTEGER NOT NULL DEFAULT 0, PRIMARY KEY (sid, idx) )",
+  "CREATE TABLE IF NOT EXISTS run_images ( id TEXT PRIMARY KEY, mime TEXT NOT NULL, data TEXT NOT NULL, created INTEGER NOT NULL )",
+  "CREATE TABLE IF NOT EXISTS run_settings ( k TEXT PRIMARY KEY, v TEXT NOT NULL )",
+  "CREATE TABLE IF NOT EXISTS run_audit ( id INTEGER PRIMARY KEY AUTOINCREMENT, t INTEGER NOT NULL, u TEXT NOT NULL, act TEXT NOT NULL, detail TEXT NOT NULL DEFAULT '' )"
+];
+let runReady = false;
+async function runDb(env) {
+  if (!env.DB) return null;
+  if (!runReady) { await env.DB.batch(RUN_DDL.map((s) => env.DB.prepare(s))); runReady = true; }
+  return env.DB;
+}
+const RUN_L = ["A", "B", "C", "D", "E"];
+const RUN_GRACE = 3000;      // toleransi jaringan setelah waktu soal habis (ms)
+const RUN_EARLY = 2000;      // "kosong/waktu habis" boleh dikirim paling cepat q_time - 2 dtk
+const RUN_PAUSE_MAX = 300000; // satu jeda maksimal 5 menit; selebihnya waktu berjalan lagi
+const RUN_SET = { sound: 1, fx: 1, gfx: "high", explain: 1, pause: 1 };
+const clip = (v, n) => String(v == null ? "" : v).replace(/\u0000/g, "").trim().slice(0, n);
+const b01 = (v) => (v === true || v === 1 || v === "1" || v === "true" ? 1 : 0);
+const rnd = (n) => { const x = new Uint32Array(1); crypto.getRandomValues(x); return x[0] % n; };
+const shuffle = (a) => { for (let i = a.length - 1; i > 0; i--) { const j = rnd(i + 1); [a[i], a[j]] = [a[j], a[i]]; } return a; };
+const sha = async (s) => b64(await crypto.subtle.digest("SHA-256", enc.encode(s))).slice(0, 32);
+const runErr = (m, s = 400, x = {}) => J({ err: m, ...x }, s);
+
+async function runSettings(db) {
+  const o = { ...RUN_SET };
+  try { for (const r of (await db.prepare("SELECT k, v FROM run_settings").all()).results) if (r.k in RUN_SET) { try { o[r.k] = JSON.parse(r.v); } catch {} } } catch {}
+  return o;
+}
+const runAudit = (db, u, act, detail) => db.prepare("INSERT INTO run_audit (t, u, act, detail) VALUES (?, ?, ?, ?)").bind(Date.now(), u, act, clip(detail, 500)).run();
+function runSince(p) { // minggu (mulai Senin) / bulan berjalan, zona WIB
+  if (p !== "week" && p !== "month") return 0;
+  const W = 7 * 36e5, d = new Date(Date.now() + W);
+  const start = p === "week" ? Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate() - ((d.getUTCDay() + 6) % 7)) : Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), 1);
+  return start - W;
+}
+async function runBoard(db, cat, since) { // skor terbaik tiap mahasiswa; seri → akurasi → durasi tercepat
+  const r = await db.prepare("SELECT u, score, total, acc, dur FROM (SELECT u, score, total, acc, dur, ROW_NUMBER() OVER (PARTITION BY u ORDER BY score DESC, acc DESC, dur ASC) rn FROM run_sessions WHERE cat_id = ? AND status = 'done' AND u <> 'admin' AND fin >= ?) WHERE rn = 1 ORDER BY score DESC, acc DESC, dur ASC").bind(cat, since).all();
+  return r.results.map((x, i) => ({ ...x, rank: i + 1 }));
+}
+async function runGlobal(db, since) { // rata-rata akurasi terbaik per kategori (adil untuk jumlah soal berbeda)
+  const best = (await db.prepare("SELECT u, cat_id, acc, dur FROM (SELECT u, cat_id, acc, dur, ROW_NUMBER() OVER (PARTITION BY u, cat_id ORDER BY acc DESC, dur ASC) rn FROM run_sessions WHERE status = 'done' AND u <> 'admin' AND fin >= ? AND cat_id IN (SELECT id FROM run_cats)) WHERE rn = 1").bind(since).all()).results;
+  const games = (await db.prepare("SELECT u, COUNT(*) n FROM run_sessions WHERE status = 'done' AND u <> 'admin' AND fin >= ? AND cat_id IN (SELECT id FROM run_cats) GROUP BY u").bind(since).all()).results;
+  const gm = new Map(games.map((x) => [x.u, x.n])), by = new Map();
+  for (const x of best) { const o = by.get(x.u) || { u: x.u, sum: 0, cats: 0, dur: 0 }; o.sum += x.acc; o.cats++; o.dur += x.dur; by.set(x.u, o); }
+  return [...by.values()].map((o) => ({ u: o.u, acc: o.sum / o.cats, cats: o.cats, games: gm.get(o.u) || 0, dur: o.dur }))
+    .sort((a, b) => b.acc - a.acc || a.dur - b.dur || (a.u < b.u ? -1 : 1)).map((x, i) => ({ ...x, rank: i + 1 }));
+}
+const runGet = (db, sid) => db.prepare("SELECT * FROM run_sessions WHERE id = ?").bind(String(sid || "")).first();
+
+async function runView(db, s, extra) { // keadaan sesi untuk klien — TANPA kunci & pembahasan
+  const rows = (await db.prepare("SELECT idx, snap FROM run_answers WHERE sid = ? ORDER BY idx").bind(s.id).all()).results;
+  const qs = rows.map((r) => { const q = JSON.parse(r.snap); return { idx: r.idx, q: q.q, o: { A: q.a, B: q.b, C: q.c, D: q.d, E: q.e }, img: q.img || "" }; });
+  const t = Date.now();
+  return { sid: s.id, status: s.status, total: s.total, requested: s.requested, adjusted: s.requested > 0 && s.total < s.requested, q_time: s.q_time, cur: s.cur, score: s.score,
+    remaining: s.status === "active" ? Math.max(0, s.q_time * 1000 - ((s.paused_at || t) - s.qstart)) : null, paused: !!s.paused_at, qs, ...extra };
+}
+async function runFinish(db, s, t) {
+  const rows = (await db.prepare("SELECT chosen, correct FROM run_answers WHERE sid = ?").bind(s.id).all()).results;
+  const correct = rows.filter((r) => r.correct).length, blank = rows.filter((r) => r.chosen == null).length, wrong = rows.length - correct - blank;
+  const acc = s.total ? (correct / s.total) * 100 : 0, dur = Math.max(0, t - (s.began || s.started));
+  await db.prepare("UPDATE run_sessions SET status = 'done', fin = ?, score = ?, correct = ?, wrong = ?, blank = ?, acc = ?, dur = ?, cur = total, qstart = NULL, paused_at = NULL WHERE id = ?").bind(t, correct, correct, wrong, blank, acc, dur, s.id).run();
+  if (s.u !== "admin") {
+    const i = (await runBoard(db, s.cat_id, 0)).findIndex((x) => x.u === s.u);
+    if (i >= 0) await db.prepare("UPDATE run_sessions SET rank = ? WHERE id = ?").bind(i + 1, s.id).run();
+  }
+}
+// catat jawaban soal berjalan. Satu soal hanya bisa dijawab sekali (answered=0 → 1 diklaim secara atomik).
+async function runRecord(db, s, ans, t, expired) {
+  const row = await db.prepare("SELECT snap FROM run_answers WHERE sid = ? AND idx = ? AND answered = 0").bind(s.id, s.cur).first();
+  if (!row) return null;
+  const q = JSON.parse(row.snap), blank = !!expired || !ans;
+  const correct = !blank && q.ans === ans && !!q[ans.toLowerCase()];
+  const ms = Math.min(Math.max(0, t - s.qstart), s.q_time * 1000);
+  const u = await db.prepare("UPDATE run_answers SET chosen = ?, correct = ?, ms = ?, answered = 1 WHERE sid = ? AND idx = ? AND answered = 0").bind(blank ? null : ans, correct ? 1 : 0, ms, s.id, s.cur).run();
+  if (!u.meta.changes) return null;
+  if (s.cur + 1 >= s.total) await runFinish(db, s, t);
+  else await db.prepare("UPDATE run_sessions SET cur = cur + 1, qstart = ?, score = score + ? WHERE id = ? AND cur = ?").bind(t, correct ? 1 : 0, s.id, s.cur).run();
+  return { correct, blank, expired: !!expired };
+}
+// jeda yang terlalu lama berakhir sendiri (waktu soal berjalan lagi)
+async function runUnpause(db, s) {
+  if (s.status === "active" && s.paused_at && Date.now() - s.paused_at > RUN_PAUSE_MAX) {
+    await db.prepare("UPDATE run_sessions SET qstart = qstart + ?, began = began + ?, paused_at = NULL WHERE id = ? AND paused_at = ?").bind(RUN_PAUSE_MAX, RUN_PAUSE_MAX, s.id, s.paused_at).run();
+    return await runGet(db, s.id);
+  }
+  return s;
+}
+// sinkronkan sesi (saat dilanjutkan / dibuka ulang): soal yang waktunya lewat dicatat kosong, soal berikut mulai segar.
+async function runSync(db, s) {
+  s = await runUnpause(db, s);
+  if (s.status !== "active" || s.paused_at || !s.qstart) return s;
+  const t = Date.now();
+  if (t - s.qstart > s.q_time * 1000 + RUN_GRACE) { await runRecord(db, s, null, t, true); return await runGet(db, s.id); }
+  return s;
+}
+const RUN_MAXIMG = 6;
+// `img` menyimpan satu atau beberapa ID gambar dipisah koma (soal lama dengan satu ID tetap valid)
+function runImgs(v) {
+  const a = Array.isArray(v) ? v : String(v == null ? "" : v).split(",");
+  return [...new Set(a.map((x) => String(x).trim()).filter((x) => /^[\w-]{6,40}$/.test(x)))].slice(0, RUN_MAXIMG);
+}
+async function runImgMissing(db, ids) { // ID gambar yang belum ada di run_images
+  const miss = new Set(ids);
+  for (let i = 0; i < ids.length; i += 80) {
+    const part = ids.slice(i, i + 80);
+    for (const r of (await db.prepare("SELECT id FROM run_images WHERE id IN (" + part.map(() => "?").join(",") + ")").bind(...part).all()).results) miss.delete(r.id);
+  }
+  return [...miss];
+}
+function runQ(b, i) { // validasi satu soal (impor / edit)
+  const o = { q: clip(b.q, 4000), expl: clip(b.expl, 8000), ans: String(b.ans || "").toUpperCase(), diff: Math.min(3, Math.max(1, parseInt(b.diff, 10) || 2)), num: parseInt(b.num, 10) || null, img: runImgs(b.img).join(",") };
+  for (const L of RUN_L) o[L.toLowerCase()] = clip(b[L.toLowerCase()], 1000);
+  if (!o.q) return { err: "Pertanyaan kosong" };
+  if (!RUN_L.includes(o.ans)) return { err: "Kunci jawaban belum ditentukan" };
+  if (!o[o.ans.toLowerCase()]) return { err: "Pilihan " + o.ans + " (kunci) kosong" };
+  if (RUN_L.filter((L) => o[L.toLowerCase()]).length < 2) return { err: "Minimal dua pilihan jawaban" };
+  return { o };
+}
+const runHash = (o) => sha([o.q, o.a, o.b, o.c, o.d, o.e].join("␟").toLowerCase().replace(/\s+/g, " "));
+const RUN_QCOLS = "id, num, q, a, b, c, d, e, ans, expl, diff, img, active, verified, src";
+
+async function runApi(request, env, a, path, url, body, M) {
+  const db = await runDb(env).catch(() => null);
+  if (!db) return runErr(env.DB ? "Database ASTERION RUN belum siap." : "D1 belum terpasang. Ikuti PANDUAN.md (buat database & pasang binding DB).", 503);
+  const t = Date.now(), qp = (k) => url.searchParams.get(k) || "";
+
+  // ---------- pengaturan & kategori ----------
+  if (path === "settings" && M === "GET") return J(await runSettings(db));
+  if (path === "cats" && M === "GET") {
+    const set = await runSettings(db);
+    const cats = (await db.prepare("SELECT c.*, (SELECT COUNT(*) FROM run_questions q WHERE q.cat_id = c.id AND q.active = 1 AND q.verified = 1) AS aq, (SELECT COUNT(DISTINCT u) FROM run_sessions s WHERE s.cat_id = c.id AND s.status = 'done' AND s.u <> 'admin') AS players FROM run_cats c " + (a.admin ? "" : "WHERE c.active = 1 ") + "ORDER BY c.sort, c.id").all()).results;
+    const mine = (await db.prepare("SELECT cat_id, cur, total FROM run_sessions WHERE u = ? AND status IN ('ready', 'active')").bind(a.u).all()).results;
+    const best = (await db.prepare("SELECT cat_id, score, total, acc, dur FROM (SELECT cat_id, score, total, acc, dur, ROW_NUMBER() OVER (PARTITION BY cat_id ORDER BY score DESC, acc DESC, dur ASC) rn FROM run_sessions WHERE u = ? AND status = 'done') WHERE rn = 1").bind(a.u).all()).results;
+    const out = [];
+    for (const c of cats) {
+      const b = best.find((x) => x.cat_id === c.id), rs = mine.find((x) => x.cat_id === c.id);
+      let me = null;
+      if (b) { const i = a.admin ? -1 : (await runBoard(db, c.id, 0)).findIndex((x) => x.u === a.u); me = { score: b.score, total: b.total, acc: b.acc, dur: b.dur, rank: i + 1 }; }
+      out.push({ id: c.id, name: c.name, descr: c.descr, active: c.active, per_session: c.per_session, q_time: c.q_time, show_explain: c.show_explain, aq: c.aq, play: c.per_session > 0 ? Math.min(c.per_session, c.aq) : c.aq, players: c.players, me, resume: rs ? { cur: rs.cur, total: rs.total } : null });
+    }
+    return J({ cats: out, settings: set });
+  }
+
+  // ---------- sesi permainan ----------
+  if (path === "start" && M === "POST") {
+    const cat = await db.prepare("SELECT * FROM run_cats WHERE id = ?").bind(+body.cat || 0).first();
+    if (!cat) return runErr("Kategori tidak ditemukan.", 404);
+    if (!cat.active && !a.admin) return runErr("Kategori ini sedang dinonaktifkan.", 403);
+    // lanjutkan sesi yang belum selesai pada kategori yang sama; sesi kategori lain dihentikan
+    await db.prepare("UPDATE run_sessions SET status = 'abandoned' WHERE u = ? AND status IN ('ready', 'active') AND cat_id <> ?").bind(a.u, cat.id).run();
+    let old = await db.prepare("SELECT * FROM run_sessions WHERE u = ? AND cat_id = ? AND status IN ('ready', 'active') ORDER BY started DESC LIMIT 1").bind(a.u, cat.id).first();
+    if (old) { old = await runSync(db, old); if (old.status === "ready" || old.status === "active") return J(await runView(db, old, { resumed: true })); }
+    const pool = (await db.prepare("SELECT id, num, q, a, b, c, d, e, ans, expl, img FROM run_questions WHERE cat_id = ? AND active = 1 AND verified = 1").bind(cat.id).all()).results;
+    if (!pool.length) return runErr("Kategori ini belum memiliki soal aktif. Hubungi admin.", 409, { empty: true });
+    const total = cat.per_session > 0 ? Math.min(cat.per_session, pool.length) : pool.length, pick = shuffle(pool).slice(0, total);
+    const sid = b64(crypto.getRandomValues(new Uint8Array(12)));
+    await db.prepare("INSERT INTO run_sessions (id, u, cat_id, cat_name, status, total, requested, q_time, show_explain, started) VALUES (?, ?, ?, ?, 'ready', ?, ?, ?, ?, ?)").bind(sid, a.u, cat.id, cat.name, total, cat.per_session, cat.q_time, cat.show_explain, t).run();
+    const ins = pick.map((q, i) => db.prepare("INSERT INTO run_answers (sid, idx, qid, snap) VALUES (?, ?, ?, ?)").bind(sid, i, q.id, JSON.stringify({ q: q.q, a: q.a, b: q.b, c: q.c, d: q.d, e: q.e, ans: q.ans, expl: q.expl, img: q.img, num: q.num })));
+    for (let i = 0; i < ins.length; i += 40) await db.batch(ins.slice(i, i + 40));
+    return J(await runView(db, await runGet(db, sid)));
+  }
+  if (["begin", "answer", "pause", "resume", "abandon"].includes(path) && M === "POST" || (path === "session" && M === "GET")) {
+    let s = await runGet(db, body.sid || qp("sid"));
+    if (!s || s.u !== a.u) return runErr("Sesi tidak ditemukan.", 404);
+    if (path === "session") { s = await runSync(db, s); return J(s.status === "done" ? { sid: s.id, status: "done" } : await runView(db, s)); }
+    if (path === "abandon") { if (s.status === "ready" || s.status === "active") await db.prepare("UPDATE run_sessions SET status = 'abandoned' WHERE id = ?").bind(s.id).run(); return J({ ok: 1 }); }
+    if (path === "begin") {
+      if (s.status === "ready") { await db.prepare("UPDATE run_sessions SET status = 'active', qstart = ?, began = ? WHERE id = ? AND status = 'ready'").bind(t, t, s.id).run(); return J({ status: "active", remaining: s.q_time * 1000 }); }
+      if (s.status !== "active") return runErr("Sesi sudah berakhir.", 409);
+      s = await runSync(db, s); return J({ status: s.status, remaining: s.status === "active" ? Math.max(0, s.q_time * 1000 - ((s.paused_at || t) - s.qstart)) : null });
+    }
+    if (s.status === "ready") return runErr("Sesi belum dimulai.", 409);
+    if (path === "pause") {
+      if (s.status !== "active") return runErr("Sesi tidak aktif.", 409);
+      if (!(await runSettings(db)).pause) return runErr("Jeda dinonaktifkan oleh admin.", 403);
+      if (!s.paused_at) await db.prepare("UPDATE run_sessions SET paused_at = ?, pause_used = pause_used + 1 WHERE id = ? AND paused_at IS NULL").bind(t, s.id).run();
+      return J({ ok: 1 });
+    }
+    if (path === "resume") {
+      if (s.status !== "active") return runErr("Sesi tidak aktif.", 409);
+      if (s.paused_at) { const d = Math.min(t - s.paused_at, RUN_PAUSE_MAX); await db.prepare("UPDATE run_sessions SET qstart = qstart + ?, began = began + ?, paused_at = NULL WHERE id = ? AND paused_at = ?").bind(d, d, s.id, s.paused_at).run(); s = await runGet(db, s.id); }
+      s = await runSync(db, s);
+      return J({ status: s.status, cur: s.cur, score: s.score, remaining: s.status === "active" ? Math.max(0, s.q_time * 1000 - (t - s.qstart)) : null });
+    }
+    // path === "answer" — jawaban terlambat dicatat KOSONG pada soal yang sama (bukan benar)
+    s = await runUnpause(db, s);
+    if (s.status !== "active") return runErr("Sesi sudah berakhir.", 409, { done: s.status === "done" });
+    const idx = Number.isInteger(body.idx) ? body.idx : -1;
+    if (idx !== s.cur) return runErr("Urutan soal tidak sinkron.", 409, { cur: s.cur });
+    if (s.paused_at) return runErr("Sesi sedang dijeda.", 409);
+    const ans = body.ans == null ? null : String(body.ans).toUpperCase();
+    if (ans !== null && !RUN_L.includes(ans)) return runErr("Jawaban tidak valid.");
+    const el = t - s.qstart, lim = s.q_time * 1000;
+    if (ans === null && el < lim - RUN_EARLY) return runErr("Waktu soal belum habis.", 400, { remaining: lim - el });
+    const r = await runRecord(db, s, ans, t, el > lim + RUN_GRACE);
+    if (!r) return runErr("Soal ini sudah dijawab.", 409);
+    const n = await runGet(db, s.id);
+    return J({ ...r, score: n.score, done: n.status === "done", cur: n.cur });
+  }
+
+  // ---------- hasil, riwayat, leaderboard ----------
+  if (path === "result" && M === "GET") {
+    const s = await runGet(db, qp("sid"));
+    if (!s || (s.u !== a.u && !a.admin)) return runErr("Sesi tidak ditemukan.", 404);
+    if (s.status !== "done") return runErr("Hasil & pembahasan baru dibuka setelah seluruh sesi selesai.", 403);
+    const ex = (await runSettings(db)).explain && s.show_explain ? true : false;
+    const items = (await db.prepare("SELECT snap, chosen, correct FROM run_answers WHERE sid = ? ORDER BY idx").bind(s.id).all()).results.map((r) => {
+      const q = JSON.parse(r.snap);
+      return { num: q.num, q: q.q, o: { A: q.a, B: q.b, C: q.c, D: q.d, E: q.e }, img: q.img || "", ans: q.ans, expl: ex ? q.expl || "" : null, chosen: r.chosen, correct: !!r.correct };
+    });
+    return J({ s: { id: s.id, u: s.u, cat_id: s.cat_id, cat_name: s.cat_name, total: s.total, score: s.score, correct: s.correct, wrong: s.wrong, blank: s.blank, acc: s.acc, dur: s.dur, rank: s.rank, fin: s.fin }, items, explain: ex });
+  }
+  if (path === "history" && M === "GET") {
+    const r = await db.prepare("SELECT id, cat_id, cat_name, fin, score, total, correct, wrong, blank, acc, dur, rank FROM run_sessions WHERE u = ? AND status = 'done' ORDER BY fin DESC LIMIT 100").bind(a.u).all();
+    return J({ rows: r.results });
+  }
+  if (path === "lb" && M === "GET") {
+    const cat = qp("cat"), since = runSince(qp("p")), N = 50;
+    if (cat === "global") {
+      const all = await runGlobal(db, since), me = all.find((x) => x.u === a.u);
+      return J({ rows: all.slice(0, N), me: me ? { rank: me.rank } : null, count: all.length });
+    }
+    const all = await runBoard(db, +cat || 0, since), me = all.find((x) => x.u === a.u);
+    return J({ rows: all.slice(0, N), me: me ? { rank: me.rank } : null, count: all.length });
+  }
+
+  // ---------- admin ----------
+  if (path.startsWith("admin/")) {
+    if (!a.admin) return runErr("Khusus admin.", 403);
+    const ap = path.slice(6);
+    if (ap === "stats" && M === "GET") {
+      const one = async (sql) => (await db.prepare(sql).first()) || {};
+      const tot = await one("SELECT (SELECT COUNT(*) FROM run_cats) cats, (SELECT COUNT(*) FROM run_questions WHERE active = 1 AND verified = 1) qa, (SELECT COUNT(*) FROM run_questions) qt, (SELECT COUNT(DISTINCT u) FROM run_sessions WHERE status = 'done' AND u <> 'admin') players, (SELECT COUNT(*) FROM run_sessions WHERE status = 'done' AND u <> 'admin') games, (SELECT AVG(acc) FROM run_sessions WHERE status = 'done' AND u <> 'admin') acc");
+      const byCat = (await db.prepare("SELECT c.id, c.name, c.descr, c.active, c.per_session, c.q_time, c.show_explain, (SELECT COUNT(*) FROM run_questions q WHERE q.cat_id = c.id AND q.active = 1 AND q.verified = 1) aq, (SELECT COUNT(*) FROM run_questions q WHERE q.cat_id = c.id) tq, (SELECT COUNT(*) FROM run_sessions s WHERE s.cat_id = c.id AND s.status = 'done' AND s.u <> 'admin') games, (SELECT COUNT(DISTINCT u) FROM run_sessions s WHERE s.cat_id = c.id AND s.status = 'done' AND s.u <> 'admin') players, (SELECT AVG(acc) FROM run_sessions s WHERE s.cat_id = c.id AND s.status = 'done' AND s.u <> 'admin') acc FROM run_cats c ORDER BY c.sort, c.id").all()).results;
+      const recent = (await db.prepare("SELECT id, u, cat_name, fin, score, total FROM run_sessions WHERE status = 'done' AND u <> 'admin' ORDER BY fin DESC LIMIT 10").all()).results;
+      return J({ cats: tot.cats, qActive: tot.qa, qInactive: tot.qt - tot.qa, players: tot.players, games: tot.games, acc: tot.acc || 0, byCat, recent });
+    }
+    if (ap === "cat" && M === "POST") {
+      const name = clip(body.name, 120);
+      if (!name) return runErr("Nama kategori wajib diisi.");
+      const f = [name, clip(body.descr, 500), b01(body.active), Math.min(500, Math.max(0, parseInt(body.per_session, 10) || 0)), Math.min(600, Math.max(10, parseInt(body.q_time, 10) || 60)), b01(body.show_explain)];
+      if (body.id) {
+        const u = await db.prepare("UPDATE run_cats SET name = ?, descr = ?, active = ?, per_session = ?, q_time = ?, show_explain = ? WHERE id = ?").bind(...f, +body.id).run();
+        if (!u.meta.changes) return runErr("Kategori tidak ditemukan.", 404);
+        await runAudit(db, a.u, "kategori.ubah", "#" + body.id + " " + name);
+        return J({ id: +body.id });
+      }
+      const r = await db.prepare("INSERT INTO run_cats (name, descr, active, per_session, q_time, show_explain, created) VALUES (?, ?, ?, ?, ?, ?, ?)").bind(...f, t).run();
+      await runAudit(db, a.u, "kategori.buat", name);
+      return J({ id: r.meta.last_row_id });
+    }
+    if (ap === "cat/del" && M === "POST") {
+      const c = await db.prepare("SELECT name FROM run_cats WHERE id = ?").bind(+body.id || 0).first();
+      if (!c) return runErr("Kategori tidak ditemukan.", 404);
+      await db.batch([db.prepare("DELETE FROM run_questions WHERE cat_id = ?").bind(+body.id), db.prepare("DELETE FROM run_cats WHERE id = ?").bind(+body.id)]); // riwayat sesi tetap
+      await runAudit(db, a.u, "kategori.hapus", "#" + body.id + " " + c.name);
+      return J({ ok: 1 });
+    }
+    if (ap === "q" && M === "GET") {
+      const s = qp("s"), act = qp("active"), pg = Math.max(0, parseInt(qp("page"), 10) || 0), w = ["cat_id = ?"], bind = [+qp("cat") || 0];
+      if (s) { w.push("(q LIKE ? OR a LIKE ? OR b LIKE ? OR c LIKE ? OR d LIKE ? OR e LIKE ?)"); for (let i = 0; i < 6; i++) bind.push("%" + s.replace(/[%_]/g, "") + "%"); }
+      if (act === "1" || act === "0") { w.push("active = ?"); bind.push(+act); }
+      const total = (await db.prepare("SELECT COUNT(*) n FROM run_questions WHERE " + w.join(" AND ")).bind(...bind).first()).n;
+      const rows = (await db.prepare("SELECT " + RUN_QCOLS + " FROM run_questions WHERE " + w.join(" AND ") + " ORDER BY num IS NULL, num, id LIMIT 50 OFFSET ?").bind(...bind, pg * 50).all()).results;
+      return J({ rows, total });
+    }
+    if (ap === "q" && M === "POST") {
+      const v = runQ(body);
+      if (v.err) return runErr(v.err);
+      const o = v.o, active = b01(body.active);
+      if (o.img) { const miss = await runImgMissing(db, o.img.split(",")); if (miss.length) return runErr("Gambar tidak ditemukan di server (" + miss.length + "). Unggah ulang gambarnya."); }
+      try {
+        const u = await db.prepare("UPDATE run_questions SET num = ?, q = ?, a = ?, b = ?, c = ?, d = ?, e = ?, ans = ?, expl = ?, diff = ?, img = ?, active = ?, verified = 1, hash = ?, updated = ? WHERE id = ?").bind(o.num, o.q, o.a, o.b, o.c, o.d, o.e, o.ans, o.expl, o.diff, o.img, active, await runHash(o), t, +body.id || 0).run();
+        if (!u.meta.changes) return runErr("Soal tidak ditemukan.", 404);
+      } catch { return runErr("Soal yang sama sudah ada di kategori ini.", 409); }
+      await runAudit(db, a.u, "soal.ubah", "#" + body.id);
+      return J({ ok: 1 });
+    }
+    if (ap === "q/toggle" && M === "POST") {
+      const ids = (Array.isArray(body.ids) ? body.ids : []).map(Number).filter(Boolean).slice(0, 200), on = b01(body.active);
+      await db.batch(ids.map((id) => db.prepare("UPDATE run_questions SET active = ?, verified = CASE WHEN ? = 1 THEN 1 ELSE verified END, updated = ? WHERE id = ?").bind(on, on, t, id)));
+      await runAudit(db, a.u, on ? "soal.aktifkan" : "soal.nonaktifkan", ids.join(","));
+      return J({ ok: 1 });
+    }
+    if (ap === "q/del" && M === "POST") {
+      const ids = (Array.isArray(body.ids) ? body.ids : []).map(Number).filter(Boolean);
+      for (let i = 0; i < ids.length; i += 80) await db.batch(ids.slice(i, i + 80).map((id) => db.prepare("DELETE FROM run_questions WHERE id = ?").bind(id))); // snapshot sesi tidak terpengaruh
+      await runAudit(db, a.u, "soal.hapus", ids.length + " soal");
+      return J({ ok: 1 });
+    }
+    if (ap === "import" && M === "POST") {
+      const cat = await db.prepare("SELECT name FROM run_cats WHERE id = ?").bind(+body.cat || 0).first();
+      if (!cat) return runErr("Kategori tujuan tidak ditemukan.", 404);
+      const items = Array.isArray(body.items) ? body.items.slice(0, 100) : [], errors = [], rows = [];
+      for (let i = 0; i < items.length; i++) {
+        const v = runQ(items[i] || {});
+        if (v.err) { errors.push({ i, err: v.err }); continue; }
+        rows.push({ o: v.o, active: items[i].active === false ? 0 : 1 });
+      }
+      const allImg = [...new Set(rows.flatMap((r) => (r.o.img ? r.o.img.split(",") : [])))];
+      if (allImg.length) {
+        const miss = new Set(await runImgMissing(db, allImg));
+        if (miss.size) for (let k = rows.length - 1; k >= 0; k--) if (rows[k].o.img.split(",").some((x) => miss.has(x))) { errors.push({ i: k, err: "Gambar tidak ditemukan di server" }); rows.splice(k, 1); }
+      }
+      let added = 0, dup = 0, filled = 0;
+      const src = clip(body.src, 200);
+      for (let i = 0; i < rows.length; i += 40) {
+        const part = rows.slice(i, i + 40), st = [];
+        for (const r of part) st.push(db.prepare("INSERT OR IGNORE INTO run_questions (cat_id, num, q, a, b, c, d, e, ans, expl, diff, img, active, verified, src, hash, imported, updated) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?, ?, ?)").bind(+body.cat, r.o.num, r.o.q, r.o.a, r.o.b, r.o.c, r.o.d, r.o.e, r.o.ans, r.o.expl, r.o.diff, r.o.img, r.active, src, await runHash(r.o), t, t));
+        const res = await db.batch(st), fill = [];
+        for (let k = 0; k < res.length; k++) {
+          if (res[k].meta.changes) added++; else { dup++; if (part[k].o.img) fill.push(db.prepare("UPDATE run_questions SET img = ?, updated = ? WHERE cat_id = ? AND hash = ? AND (img IS NULL OR img = '')").bind(part[k].o.img, t, +body.cat, await runHash(part[k].o))); }
+        }
+        if (fill.length) for (const x of await db.batch(fill)) if (x.meta.changes) filled++;
+      }
+      await runAudit(db, a.u, "soal.impor", cat.name + " · +" + added + (dup ? " dup " + dup : "") + (filled ? " gambar+ " + filled : "") + (errors.length ? " gagal " + errors.length : "") + " · " + src);
+      return J({ added, dup, filled, errors });
+    }
+    if (ap === "export" && M === "GET") {
+      const rows = (await db.prepare("SELECT " + RUN_QCOLS + " FROM run_questions WHERE cat_id = ? ORDER BY num IS NULL, num, id").bind(+qp("cat") || 0).all()).results;
+      return J({ rows });
+    }
+    if (ap === "img" && M === "POST") {
+      const m = String(body.data || "").match(/^data:(image\/(?:jpeg|png|webp|gif));base64,([A-Za-z0-9+/=]+)$/);
+      if (!m || m[2].length > 900000) return runErr("Gambar tidak valid atau lebih dari ±650 KB.");
+      let head = ""; try { head = atob(m[2].slice(0, 16)); } catch { return runErr("Data gambar rusak."); }
+      const sig = { "image/jpeg": head.startsWith("\xFF\xD8"), "image/png": head.startsWith("\x89PNG"), "image/gif": head.startsWith("GIF8"), "image/webp": head.startsWith("RIFF") && head.slice(8, 12) === "WEBP" }[m[1]];
+      if (!sig) return runErr("Isi berkas tidak sesuai tipe gambar.");
+      const id = (await sha("img:" + m[2])).slice(0, 24); // ID dari isi → unggah ulang gambar yang sama tidak menggandakan data
+      await db.prepare("INSERT OR IGNORE INTO run_images (id, mime, data, created) VALUES (?, ?, ?, ?)").bind(id, m[1], m[2], t).run();
+      return J({ id });
+    }
+    if (ap === "settings" && M === "POST") {
+      const v = { sound: b01(body.sound), fx: b01(body.fx), explain: b01(body.explain), pause: b01(body.pause), gfx: body.gfx === "low" ? "low" : "high" };
+      await db.batch(Object.entries(v).map(([k, x]) => db.prepare("INSERT INTO run_settings (k, v) VALUES (?, ?) ON CONFLICT(k) DO UPDATE SET v = excluded.v").bind(k, JSON.stringify(x))));
+      await runAudit(db, a.u, "pengaturan", JSON.stringify(v));
+      return J({ ok: 1 });
+    }
+    if (ap === "audit" && M === "GET") return J({ rows: (await db.prepare("SELECT t, u, act, detail FROM run_audit ORDER BY id DESC LIMIT 200").all()).results });
+    if (ap === "sessions" && M === "GET") {
+      const rows = (await db.prepare("SELECT id, cat_id, cat_name, fin, score, total, acc, dur, rank FROM run_sessions WHERE u = ? AND status = 'done' ORDER BY fin DESC LIMIT 200").bind(qp("u").toUpperCase()).all()).results;
+      return J({ rows });
+    }
+    if (ap === "up/pdf" && M === "POST") { // arsip PDF asli (opsional; butuh R2 binding RUN_FILES)
+      if (!env.RUN_FILES) return runErr("R2 (RUN_FILES) belum dipasang — arsip PDF dilewati.", 501);
+      const len = +request.headers.get("content-length") || 0;
+      if (len > 30e6) return runErr("PDF lebih dari 30 MB.", 413);
+      const name = clip(qp("name"), 120).replace(/[^\w.\- ]/g, "_") || "soal.pdf", key = "pdf/" + t + "-" + name;
+      await env.RUN_FILES.put(key, request.body, { httpMetadata: { contentType: "application/pdf" }, customMetadata: { cat: qp("cat"), by: a.u } });
+      await runAudit(db, a.u, "pdf.arsip", key);
+      return J({ ok: 1, key });
+    }
+  }
+  return runErr("not found", 404);
+}
+// ===== ASTERION RUN (selesai) ===================================================
+
 export default {
   async fetch(request, env) {
     const url = new URL(request.url);
     if (!url.pathname.startsWith("/api/")) return env.ASSETS.fetch(request);
     if (!env.ADMIN_PASSWORD) return J({ err: "ADMIN_PASSWORD belum diatur" }, 500);
     const path = url.pathname.slice(5), M = request.method;
+    if (path.startsWith("run/img/") && M === "GET") { // gambar soal (ID acak, tanpa kunci jawaban)
+      const rdb = await runDb(env).catch(() => null), iid = path.slice(8);
+      if (!rdb || !/^[\w-]{6,40}$/.test(iid)) return new Response("", { status: rdb ? 400 : 503 });
+      const im = await rdb.prepare("SELECT mime, data FROM run_images WHERE id = ?").bind(iid).first();
+      if (!im) return new Response("", { status: 404 });
+      return new Response(Uint8Array.from(atob(im.data), (c) => c.charCodeAt(0)), { headers: { "content-type": im.mime, "cache-control": "public, max-age=31536000, immutable", "x-content-type-options": "nosniff" } });
+    }
     let body = {};
-    if (M !== "GET") { try { body = await request.json(); } catch { body = {}; } }
+    if (M !== "GET" && path !== "run/admin/up/pdf") { try { body = await request.json(); } catch { body = {}; } }
 
     if (path === "login" && M === "POST") {
       const raw = String(body.u || "").trim(), p = String(body.p || "");
@@ -359,6 +734,8 @@ export default {
       return J({ ok: 1 });
     }
     if (a.mc) return J({ mc: true }, 403);
+    if (path.startsWith("run/")) return runApi(request, env, a, path.slice(4), url, body, M);
+    if (path === "dokter" || path.startsWith("dokter/")) return dokter(env, a, path, M, body);
 
     if (path === "data") {
       if (M === "GET") return J(await getSite(env));
@@ -438,3 +815,33 @@ export default {
     return J({ err: "not found" }, 404);
   },
 };
+
+// ===== KONTAK DOKTER (terhubung ke Google Sheets via Apps Script) ================
+const DOKTER_URL = "https://script.google.com/macros/s/AKfycbyTdyhwjAF40-GUb8G1gnVaHGYJXbnj2kOvyllDDnOeUDbj5MomF57CHSpYpjXoi7p7/exec";
+const dkCall = async (env, b) => {
+  const r = await fetch(env.DOKTER_URL || DOKTER_URL, { method: "POST", redirect: "follow", headers: { "content-type": "text/plain" }, body: JSON.stringify({ secret: env.DOKTER_SECRET, ...b }) });
+  return r.json();
+};
+const dkDigits = (s) => String(s || "").replace(/\D/g, "").slice(0, 16);
+async function dokter(env, a, path, M, body) {
+  if (!env.DOKTER_SECRET) return J({ err: "DOKTER_SECRET belum diatur di Cloudflare." }, 500);
+  try {
+    if (path === "dokter" && M === "GET") {
+      const l = await cached("dokter/list", 30, async () => { const r = await dkCall(env, { act: "list" }); return Array.isArray(r) ? r : null; });
+      return l ? J(l) : J({ err: "Daftar dokter tidak bisa dimuat." }, 502);
+    }
+    if (path === "dokter/ajukan" && M === "POST") {
+      const n = String(body.n || "").trim().slice(0, 200), h1 = dkDigits(body.h1);
+      if (!n || !h1) return J({ err: "Nama dan Nomor HP 1 wajib diisi." }, 400);
+      const r = await dkCall(env, { act: "submit", tipe: body.tipe === "edit" ? "edit" : "baru", id: String(body.id || "").slice(0, 20), n, h1, h2: dkDigits(body.h2), cat: String(body.cat || "").slice(0, 300), oleh: a.u });
+      return r.ok ? J({ ok: 1 }) : J({ err: "Gagal mengirim." }, 502);
+    }
+    if (!a.admin) return J({ err: "Khusus admin." }, 403);
+    if (path === "dokter/pengajuan" && M === "GET") { const r = await dkCall(env, { act: "pending" }); return Array.isArray(r) ? J(r) : J({ err: "Gagal memuat." }, 502); }
+    if (path === "dokter/review" && M === "POST") {
+      const r = await dkCall(env, { act: "review", id: String(body.id || ""), aksi: body.aksi === "acc" ? "acc" : "tolak", n: String(body.n || "").slice(0, 200), h1: dkDigits(body.h1), h2: dkDigits(body.h2) });
+      return J(r, r.err ? 400 : 200);
+    }
+  } catch { return J({ err: "Gagal terhubung ke spreadsheet." }, 502); }
+  return J({ err: "not found" }, 404);
+}
