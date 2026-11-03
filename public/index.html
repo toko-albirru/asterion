@@ -5,11 +5,6 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>ASTERION 2025</title>
 <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@600;900&family=Inter:wght@400;600&display=swap" rel="stylesheet">
-<link rel="icon" type="image/svg+xml"
-      href="https://asterion.fk25.workers.dev/favicon-25-animated.svg?v=4">
-
-<link rel="shortcut icon"
-      href="https://asterion.fk25.workers.dev/favicon-25-animated.svg?v=4">
 <style>
 :root{color-scheme:dark;--bg0:#161222;--bg1:#241a3f;--bg2:#3a2a66;--gold:#f5c04a;--mut:#d9cdf5;--line:rgba(255,255,255,.24);--ok:#4ade80;--warn:#fbbf24;--bad:#f87171}
 *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
@@ -24,7 +19,7 @@ body::after{content:"";position:fixed;inset:0;z-index:90;pointer-events:none;opa
 .ttl{margin-top:-56px;text-align:center;position:relative}
 h1{margin:0;display:inline-block;padding:0 .12em;font-family:Cinzel,Georgia,serif;font-weight:900;font-size:clamp(30px,10vw,50px);letter-spacing:.05em;line-height:1.15;white-space:nowrap;background:linear-gradient(180deg,#fff 20%,var(--gold));-webkit-background-clip:text;background-clip:text;color:transparent;filter:drop-shadow(0 4px 18px rgba(0,0,0,.55))}
 .yr{font-family:Cinzel,serif;letter-spacing:.5em;font-size:13px;color:var(--gold);padding-left:.5em}
-.top{position:sticky;top:0;z-index:30;display:flex;align-items:center;gap:10px;padding:10px max(16px,calc((100% - 608px)/2));padding-top:calc(10px + env(safe-area-inset-top,0));background:rgba(26,18,48,.55);-webkit-backdrop-filter:blur(18px) saturate(140%);backdrop-filter:blur(18px) saturate(140%);border-bottom:1px solid rgba(255,255,255,.08);box-shadow:0 8px 24px rgba(8,4,24,.25)}
+.top{position:sticky;top:0;z-index:30;display:flex;align-items:center;gap:10px;padding:10px 16px;max-width:640px;margin:0 auto}
 .top h2{flex:1;margin:0;text-align:center;font:600 13px Cinzel,serif;letter-spacing:.14em;color:var(--gold);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .g{background:linear-gradient(135deg,rgba(255,255,255,.1),rgba(255,255,255,.02));border:1px solid var(--line);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);box-shadow:0 6px 22px rgba(8,4,24,.25),inset 0 1px 0 rgba(255,255,255,.3)}
 .ib{min-width:40px;height:40px;border-radius:14px;color:#fff;font-size:16px;cursor:pointer;padding:0 12px;text-decoration:none;display:flex;align-items:center;justify-content:center}
@@ -36,8 +31,8 @@ h1{margin:0;display:inline-block;padding:0 .12em;font-family:Cinzel,Georgia,seri
 .sec{display:flex;align-items:center;gap:12px;margin:24px 2px 12px;font:600 12px Cinzel,serif;letter-spacing:.2em;color:var(--gold)}
 .sec::before,.sec::after{content:"";flex:1;height:1px;background:linear-gradient(90deg,transparent,rgba(245,192,74,.6))}.sec::after{transform:scaleX(-1)}
 .nav{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(12px + env(safe-area-inset-bottom,0));z-index:40;display:flex;gap:4px;padding:6px;border-radius:24px;width:min(420px,calc(100% - 24px));background:rgba(26,18,48,.55)}
-.nav a{flex:1;text-align:center;text-decoration:none;color:var(--mut);font-size:11px;padding:8px 2px;border-radius:18px}
-.nav a b{display:block;font-size:20px;margin-bottom:2px;font-weight:400}
+.nav a{flex:1;min-width:0;text-align:center;text-decoration:none;color:var(--mut);font-size:10px;padding:8px 0;border-radius:18px}
+.nav a b{display:block;font-size:19px;margin-bottom:2px;font-weight:400}
 .nav a.on{color:#fff;background:linear-gradient(135deg,rgba(245,192,74,.35),rgba(245,192,74,.1));box-shadow:inset 0 0 0 1px rgba(245,192,74,.5)}
 .row{display:flex;align-items:center;gap:6px}.row .card{flex:1}
 .ctl{display:flex;gap:4px;margin-bottom:12px}.ctl button{width:34px;height:40px;border-radius:10px;border:1px solid var(--line);background:rgba(255,255,255,.1);color:#fff;cursor:pointer}
@@ -114,10 +109,11 @@ select.in option{background:#241a3f;color:#fff}
   <div class="wrap" id="main"></div>
   <nav class="nav g">
     <a href="#/" data-t="home"><b>🏠</b>Beranda</a><a href="#/materi" data-t="materi"><b>📚</b>Materi</a>
-    <a href="#/rekaman" data-t="rekaman"><b>🎬</b>Rekaman</a><a href="#/jadwal" data-t="jadwal"><b>🗓️</b>Jadwal</a>
+    <a href="#/rekaman" data-t="rekaman"><b>🎬</b>Rekaman</a><a href="#/jadwal" data-t="jadwal"><b>🗓️</b>Jadwal</a><a href="#/run" data-t="run"><b>🏃</b>Run</a><a href="#/dokter" data-t="dokter"><b>📞</b>Dokter</a>
   </nav>
 </div>
 
+<script src="run.js"></script>
 <script>
 var $=function(i){return document.getElementById(i)};
 var esc=function(s){return String(s==null?"":s).replace(/[&<>"']/g,function(c){return{"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]})};
@@ -260,8 +256,8 @@ function pHome(){
   return "<div class='hero'><img class='mark' alt='' src='logo.webp'></div><div class='ttl'><h1>ASTERION</h1><div class='yr'>MMXXV</div></div>"+
   "<p class='hint' style='text-align:center;font-size:14px'>Halo, <b>"+esc(S.u)+"</b> 👋<br>Seluruh rekaman, rangkuman, soal, dan materi kuliah ada disini, semangat belajarnya 🤩✨</p>"+
   "<div class='sec'>HARI INI</div><div id='today' class='pn g empty'>Memuat jadwal…</div><div id='next'></div>"+
-  "<div class='sec'>MENU</div>"+cards([["#/materi","📚","Materi & Rangkuman","Per blok, lab, dan Google Drive"],["#/rekaman","🎬","Rekaman Kuliah","Putar langsung per tahun"],["#/jadwal","🗓️","Jadwal Kuliah","Terhubung ke spreadsheet"]])+
-  (S.admin?"<div class='sec'>ADMIN</div><div class='pn g'><b>Reset password mahasiswa</b><div class='hint'>Mengembalikan password ke username (mahasiswa wajib membuat password baru saat login).</div><input id='rU' class='in' placeholder='G0025001'><button class='btn' data-a='reset'>Reset</button></div>":"")}
+  "<div class='sec'>MENU</div>"+cards([["#/materi","📚","Materi & Rangkuman","Per blok, lab, dan Google Drive"],["#/rekaman","🎬","Rekaman Kuliah","Putar langsung per tahun"],["#/jadwal","🗓️","Jadwal Kuliah","Terhubung ke spreadsheet"],["#/run","🏃","ASTERION RUN","Game 3D edukasi · jawab soal sambil berlari"],["#/dokter","📞","Kontak Dokter","Nomor HP dosen & dokter · bisa usul ubah/tambah"]])+
+  (S.admin?"<div class='sec'>ADMIN</div>"+cards([["#/run/admin","🛠️","Kelola ASTERION RUN","Kategori · soal & PDF · leaderboard"],["#/dokter/admin","📋","Pengajuan Dokter","Cek, edit, lalu setujui usulan"]])+"<div class='pn g'><b>Reset password mahasiswa</b><div class='hint'>Mengembalikan password ke username (mahasiswa wajib membuat password baru saat login).</div><input id='rU' class='in' placeholder='G0025001'><button class='btn' data-a='reset'>Reset</button></div>":"")}
 function jkt(){return new Date().toLocaleDateString("en-CA",{timeZone:"Asia/Jakarta"})}
 function pickTab(tabs){return tabs[Math.min(S.def||0,tabs.length-1)]||tabs[0]}
 async function todayFill(){
@@ -333,12 +329,60 @@ function jRefresh(){
 setInterval(jRefresh,20000);window.addEventListener("focus",jRefresh);document.addEventListener("visibilitychange",jRefresh);
 $("main").addEventListener("change",function(e){if(e.target.id!=="tabSel")return;var tabs=S.tabs||S.data.sheet.tabs,t=tabs[+e.target.value];location.hash="#/jadwal/"+e.target.value});
 
+
+/* ---------- kontak dokter ---------- */
+function ph(x){x=String(x||"").replace(/\D/g,"");if(!x)return"";if(x.indexOf("62")===0)x="0"+x.slice(2);else if(x[0]!=="0")x="0"+x;return x}
+function dkItem(d){
+  var p=[d.h1,d.h2].filter(Boolean).map(function(x){x=ph(x);return"<div class='mt'><a class='tag ok' href='tel:"+x+"'>📞 "+x+"</a><a class='tag' target='_blank' rel='noopener noreferrer' href='https://wa.me/62"+x.slice(1)+"'>WhatsApp</a></div>"}).join("");
+  return"<div class='day g dk' data-n=\""+esc(String(d.n).toLowerCase())+"\"><div class='row'><b style='flex:1'>"+esc(d.n)+"</b><button class='ib g' style='height:34px' data-dk='edit' data-id=\""+esc(d.id)+"\" title='Usul ubah'>✎</button></div>"+(p||"<div class='hint'>Belum ada nomor</div>")+"</div>"}
+function pDokter(P){
+  if(P[1]==="admin"&&S.admin){setTimeout(dkAdmin,0);return"<div class='sec'>PENGAJUAN DOKTER</div><div id='dka'><div class='empty'>Memuat…</div></div>"}
+  setTimeout(dkInit,0);
+  return"<input id='dq' class='in' placeholder='🔍 Cari nama dokter…' autocomplete='off' style='margin-bottom:10px'><button class='btn s w' style='margin:0 0 12px' data-dk='new'>＋ Usulkan dokter baru</button><div id='dkf'></div><div id='dkl'><div class='empty'>Memuat daftar dokter…</div></div>"}
+async function dkInit(){
+  try{var r=await api("dokter"),el=$("dkl");if(!el)return;
+    if(!r.ok||!Array.isArray(r.j)){el.innerHTML="<div class='pn g empty'>"+esc((r.j&&r.j.err)||"Daftar dokter belum bisa dimuat.")+(S.admin&&r.j&&r.j.dbg?"<br><small>Info admin: "+esc(r.j.dbg)+"</small>":"")+"</div>";return}
+    S.dk=r.j;el.innerHTML=r.j.length?r.j.map(dkItem).join(""):"<div class='pn g empty'>Belum ada data.</div>";
+    $("dq").oninput=function(){var q=this.value.trim().toLowerCase();[].forEach.call(el.querySelectorAll(".dk"),function(c){c.hidden=q&&c.dataset.n.indexOf(q)<0})}
+  }catch(e){}}
+function dkForm(d){
+  var f=$("dkf");if(!f)return;
+  f.innerHTML="<div class='pn g'><b>"+(d?"Usul ubah data":"Usulkan dokter baru")+"</b><div class='hint'>Usulan dicek admin dulu sebelum tampil di daftar.</div><label>Nama (lengkap dengan gelar)</label><input id='fn' value=\""+esc(d?d.n:"")+"\"><label>Nomor HP 1</label><input id='f1' inputmode='tel' value=\""+esc(d?ph(d.h1):"")+"\"><label>Nomor HP 2 (opsional)</label><input id='f2' inputmode='tel' value=\""+esc(d?ph(d.h2):"")+"\"><label>Catatan untuk admin (opsional)</label><input id='fc'><button class='btn w' data-dk='send'>Kirim</button><button class='btn s w' data-dk='cancel'>Batal</button><div class='err' id='fe'></div></div>";
+  f.dataset.id=d?d.id:"";f.scrollIntoView({behavior:"smooth"})}
+async function dkAdmin(){
+  try{var r=await api("dokter/pengajuan"),el=$("dka");if(!el)return;
+    if(!r.ok||!Array.isArray(r.j)){el.innerHTML="<div class='pn g empty'>Gagal memuat.</div>";return}
+    el.innerHTML=r.j.length?r.j.map(function(x){
+      var old=x.tipe==="edit"&&x.old?"<div class='hint'>Data lama: "+esc(x.old.n)+" · "+esc(ph(x.old.h1))+(x.old.h2?" · "+esc(ph(x.old.h2)):"")+"</div>":"";
+      return"<div class='pn g dka' data-id=\""+esc(x.id)+"\"><span class='badge'>"+(x.tipe==="edit"?"UBAH":"BARU")+"</span><div class='hint'>Dari "+esc(x.oleh)+" · "+esc(x.waktu)+(x.cat?" · “"+esc(x.cat)+"”":"")+"</div>"+old+
+      "<label>Nama</label><input class='an' value=\""+esc(x.n)+"\"><label>Nomor HP 1</label><input class='a1' value=\""+esc(ph(x.h1))+"\"><label>Nomor HP 2</label><input class='a2' value=\""+esc(ph(x.h2))+"\"><div class='row'><button class='btn' style='flex:1' data-dk='acc'>✓ Setujui</button><button class='btn s' style='flex:1' data-dk='no'>✕ Tolak</button></div></div>"}).join(""):"<div class='pn g empty'>Tidak ada pengajuan 🎉</div>"
+  }catch(e){}}
+$("main").addEventListener("click",async function(e){
+  var b=e.target.closest("[data-dk]");if(!b)return;var a=b.dataset.dk;
+  if(a==="new")dkForm(null);
+  else if(a==="edit")dkForm((S.dk||[]).filter(function(x){return x.id===b.dataset.id})[0]);
+  else if(a==="cancel")$("dkf").innerHTML="";
+  else if(a==="send"){
+    var n=$("fn").value.trim(),h1=ph($("f1").value),h2=ph($("f2").value),id=$("dkf").dataset.id;
+    if(!n||!h1){$("fe").textContent="Nama dan Nomor HP 1 wajib diisi.";return}
+    b.disabled=true;
+    var r=await api("dokter/ajukan",{m:"POST",b:{tipe:id?"edit":"baru",id:id,n:n,h1:h1,h2:h2,cat:$("fc").value.trim()}});
+    if(r.ok){$("dkf").innerHTML="<div class='pn g'><b>✅ Terkirim</b><div class='hint'>Usulanmu akan dicek admin. Setelah disetujui, data muncul di daftar.</div></div>";toast("Terkirim, akan dicek admin ✓")}
+    else{b.disabled=false;$("fe").textContent=(r.j&&r.j.err)||"Gagal mengirim."}}
+  else if(a==="acc"||a==="no"){
+    var c=b.closest(".dka"),n2=c.querySelector(".an").value.trim(),p1=ph(c.querySelector(".a1").value);
+    if(a==="acc"&&(!n2||!p1)){toast("Nama dan HP 1 wajib diisi");return}
+    b.disabled=true;
+    var r2=await api("dokter/review",{m:"POST",b:{id:c.dataset.id,aksi:a==="acc"?"acc":"tolak",n:n2,h1:p1,h2:ph(c.querySelector(".a2").value)}});
+    if(r2.ok){c.remove();toast(a==="acc"?"Disetujui & masuk spreadsheet ✓":"Ditolak")}else{b.disabled=false;toast("Gagal memproses")}}
+});
+
 /* ---------- router ---------- */
-var TT={home:"ASTERION",materi:"MATERI & RANGKUMAN",rekaman:"REKAMAN KULIAH",jadwal:"JADWAL KULIAH"};
+var TT={home:"ASTERION",materi:"MATERI & RANGKUMAN",rekaman:"REKAMAN KULIAH",jadwal:"JADWAL KULIAH",run:"ASTERION RUN",dokter:"KONTAK DOKTER"};
 function route(){
   if(!S.data)return;
   var P=location.hash.replace(/^#\/?/,"").split("/").filter(Boolean),tab=P[0]||"home",v;
-  if(tab==="materi")v=pMateri(P);else if(tab==="rekaman")v=pRekaman(P);else if(tab==="jadwal")v=pJadwal(P);else{tab="home";v=pHome()}
+  if(tab==="materi")v=pMateri(P);else if(tab==="rekaman")v=pRekaman(P);else if(tab==="jadwal")v=pJadwal(P);else if(tab==="run"&&window.pRun)v=window.pRun(P);else if(tab==="dokter")v=pDokter(P);else{tab="home";v=pHome()}
   $("main").innerHTML=v;$("ttl").textContent=TT[tab];
   $("back").hidden=P.length<2;$("back").href="#/"+P.slice(0,-1).join("/");
   [].forEach.call(document.querySelectorAll(".nav a"),function(a){a.classList.toggle("on",a.dataset.t===tab)});
