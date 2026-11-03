@@ -12,3 +12,10 @@
     { "binding": "LINKS", "id": "587d322643cd4434a3909abc1f1405c6" }
   ]
 }
+{
+  // ...
+  "vars": {
+    "DOKTER_SECRET": "NO_DOKTER"
+  },
+  // ...
+}
