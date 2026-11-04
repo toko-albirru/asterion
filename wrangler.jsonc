@@ -10,12 +10,12 @@
   },
   "kv_namespaces": [
     { "binding": "LINKS", "id": "587d322643cd4434a3909abc1f1405c6" }
+  ],
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "asterion-run",
+      "database_id": "de8e8827-c5c2-494a-b297-a2d88434b233"
+    }
   ]
-}
-{
-  // ...
-  "vars": {
-    "DOKTER_SECRET": "NO_DOKTER"
-  },
-  // ...
 }
