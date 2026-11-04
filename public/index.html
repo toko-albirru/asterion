@@ -393,7 +393,7 @@ function waLink(d,h){
   "Terima kasih sebelumnya dan mohon maaf menganggu waktunya 🙏🏻";
   return "https://wa.me/62"+h.slice(1)+"?text="+encodeURIComponent(msg)}
 function dkItem(d){
-  var p=[d.h1,d.h2].filter(Boolean).map(function(x){x=ph(x);return"<div class='mt'><a class='tag ok' href='tel:"+x+"'>📞 "+x+"</a><a class='tag' href='https://wa.me/62"+x.slice(1)+"' data-dk='wa' data-id=\""+esc(d.id)+"\" data-h='"+x+"'>WhatsApp</a></div>"}).join("");
+  var p=[d.h1,d.h2].filter(Boolean).map(function(x){x=ph(x);return"<div class='mt'><a class='tag ok' href='tel:"+x+"'>📞 "+x+"</a><a class='tag' href='https://wa.me/62"+x.slice(1)+"' data-dk='wa' data-id=\""+esc(d.id)+"\" data-h='"+x+"'>Konfirmasi Kehadiran (WA)</a></div>"}).join("");
   return"<div class='day g dk' data-n=\""+esc(String(d.n).toLowerCase())+"\"><div class='row'><b style='flex:1'>"+esc(d.n)+"</b><button class='ib g' style='height:34px' data-dk='edit' data-id=\""+esc(d.id)+"\" title='Usul ubah'>✎</button></div>"+(p||"<div class='hint'>Belum ada nomor</div>")+"</div>"}
 function pDokter(P){
   if(P[1]==="admin"&&S.admin){setTimeout(dkAdmin,0);return"<div class='sec'>PENGAJUAN DOKTER</div><div id='dka'><div class='empty'>Memuat…</div></div>"}
