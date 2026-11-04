@@ -235,7 +235,7 @@
     return "<div class='pn g'><b>" + (c ? esc(c.name) : "＋ Kategori baru") + "</b><label>Nama kategori</label><input id='cn" + i + "' value=\"" + esc(c ? c.name : "") + "\" placeholder='mis. UB 3.3 Acromion'><label>Deskripsi</label><textarea id='cd" + i + "' rows='2'>" + esc(c ? c.descr : "") + "</textarea>" +
       "<div class='rn-row'><div><label>Soal per sesi (0 = semua)</label><input id='cp" + i + "' type='number' min='0' max='500' value='" + (c ? c.per_session : 20) + "'></div><div><label>Waktu PER SOAL (detik)</label><input id='ct" + i + "' type='number' min='10' max='600' value='" + (c ? c.q_time : 60) + "'></div></div>" +
       chk("cx" + i, "Tampilkan pembahasan setelah sesi", c ? c.show_explain : 1) + chk("ca" + i, "Kategori aktif (dapat dimainkan mahasiswa)", c ? c.active : 1) +
-      "<div class='rn-row'><button class='btn sm' data-ra='cat-save' data-id='" + i + "'>Simpan</button>" + (c ? "<a class='btn s sm' href='#/run/admin/q/" + c.id + "'>Kelola soal</a><button class='btn d sm' data-ra='cat-del' data-id='" + i + "'>Hapus</button>" : "") + "</div></div>";
+      "<div class='rn-row'><button class='btn sm' data-ra='cat-save' data-id='" + i + "'>Simpan</button>" + (c ? "<button class='btn s sm' data-ra='cat-mv' data-id='" + i + "' data-v2='-1' title='Naikkan'>↑</button><button class='btn s sm' data-ra='cat-mv' data-id='" + i + "' data-v2='1' title='Turunkan'>↓</button><a class='btn s sm' href='#/run/admin/q/" + c.id + "'>Kelola soal</a><button class='btn d sm' data-ra='cat-del' data-id='" + i + "'>Hapus</button>" : "") + "</div></div>";
   }
   async function adminCatsPage(k) {
     var r = await rapi("admin/stats"); if (!alive(k)) return; if (!r.ok) return setRR(errBox(r));
@@ -473,6 +473,7 @@
       else if (a === "cat-save") {
         var body = { id: id || undefined, name: g("cn" + id).value, descr: g("cd" + id).value, per_session: +g("cp" + id).value, q_time: +g("ct" + id).value, show_explain: g("cx" + id).checked, active: g("ca" + id).checked };
         var r = await rapi("admin/cat", { m: "POST", b: body }); if (!r.ok) return toast((r.j && r.j.err) || "Gagal"); toast("Tersimpan ✓"); RS.cats = null; route();
+      } else if (a === "cat-mv") { var rm = await rapi("admin/cat/move", { m: "POST", b: { id: id, dir: +v } }); if (!rm.ok) toast((rm.j && rm.j.err) || "Gagal"); RS.cats = null; route();
       } else if (a === "cat-del") { if (!confirm("Hapus kategori beserta seluruh bank soalnya? Riwayat permainan tetap tersimpan.")) return; var r2 = await rapi("admin/cat/del", { m: "POST", b: { id: id } }); toast(r2.ok ? "Kategori dihapus" : "Gagal"); RS.cats = null; route(); }
       else if (a === "q-find") { RS.qf.s = g("rnQs").value.trim(); RS.qf.act = g("rnQa").value; RS.qf.pg = 0; route(); }
       else if (a === "q-pg") { RS.qf.pg = Math.max(0, RS.qf.pg + +v); route(); }
