@@ -321,7 +321,7 @@ function sched(rows) {
 function uiOk(u) {
   if (u === undefined) return true;
   if (!u || typeof u !== "object" || Array.isArray(u)) return false;
-  return ["nav", "menu", "cm", "cr"].every((g) => u[g] === undefined || (Array.isArray(u[g]) && u[g].length <= 20 && u[g].every((x) => x && typeof x.id === "string" && x.id.length <= 20 && (x.n === undefined || (typeof x.n === "string" && x.n.length <= 60)) && (x.i === undefined || (typeof x.i === "string" && x.i.length <= 16)) && (x.s === undefined || (typeof x.s === "string" && x.s.length <= 200)) && (x.h === undefined || typeof x.h === "boolean"))));
+  return ["nav", "menu", "mp", "cm", "cr"].every((g) => u[g] === undefined || (Array.isArray(u[g]) && u[g].length <= 20 && u[g].every((x) => x && typeof x.id === "string" && x.id.length <= 20 && (x.n === undefined || (typeof x.n === "string" && x.n.length <= 60)) && (x.i === undefined || (typeof x.i === "string" && x.i.length <= 16)) && (x.s === undefined || (typeof x.s === "string" && x.s.length <= 200)) && (x.c === undefined || (typeof x.c === "string" && x.c.length <= 100)) && (x.h === undefined || typeof x.h === "boolean"))));
 }
 
 function valid(d) {
