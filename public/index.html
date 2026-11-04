@@ -89,9 +89,28 @@ h1{margin:0;display:inline-block;padding:0 .12em;font-family:Cinzel,Georgia,seri
 .pv-m .bar{display:flex;align-items:center;gap:8px;padding:10px 12px;background:linear-gradient(180deg,rgba(22,18,34,.9),rgba(22,18,34,.7));border-bottom:1px solid rgba(255,255,255,.1)}
 .pv-m .bar b{flex:1;min-width:0;font:600 13px Inter,sans-serif;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .pv-m .bar a,.pv-m .bar button{flex:none;height:36px;padding:0 12px;border-radius:12px;color:#fff;font:600 13px Inter,sans-serif;text-decoration:none;display:flex;align-items:center;cursor:pointer}
-.pv-m .bd{flex:1;min-height:0;display:flex;align-items:center;justify-content:center;overflow:auto}
-.pv-m iframe{width:100%;height:100%;border:0;background:#fff}
-.pv-m img{max-width:100%;max-height:100%;object-fit:contain}
+.pv-m .bd{flex:1;min-height:0;position:relative;display:flex;flex-direction:column;overflow:hidden}
+.pv-m iframe{width:100%;flex:1;min-height:0;border:0;background:#fff}
+.pv-m .bar .tl{display:flex;gap:6px;align-items:center;flex:none}
+.pv-m .bar .tl span{font:600 12px Inter,sans-serif;color:var(--mut);min-width:62px;text-align:center}
+.pv-m .bar .tl button{min-width:36px;padding:0 8px;font-size:16px}
+.pnote{flex:none;padding:8px 12px;font-size:12px;color:var(--warn);background:rgba(22,18,34,.92);border-bottom:1px solid rgba(255,255,255,.1)}
+.pdfc{position:absolute;inset:0;overflow:auto;padding:10px 8px 60px;-webkit-overflow-scrolling:touch;background:rgba(10,6,22,.45)}
+.pdfc .pg{margin:0 auto 10px;background:#fff;box-shadow:0 6px 22px rgba(0,0,0,.45);position:relative;overflow:hidden}
+.pdfc canvas{display:block;width:100%;height:100%}
+.pst{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;color:var(--mut);font-size:13px;text-align:center;padding:20px}
+.pbar{width:min(260px,70%);height:6px;border-radius:99px;background:rgba(255,255,255,.15);overflow:hidden}
+.pbar i{display:block;height:100%;width:0;background:var(--gold);transition:width .2s}
+.pp{position:absolute;inset:0;display:flex;flex-direction:column}
+.pp .sl2{flex:none;height:42%;background:#000;display:flex}
+.pp .nt{flex:1;min-height:0;display:flex;flex-direction:column;background:rgba(22,18,34,.94)}
+.pp .nh{display:flex;gap:6px;align-items:center;padding:8px 10px;border-bottom:1px solid rgba(255,255,255,.1)}
+.pp .nh button{flex:none;height:36px;min-width:36px;padding:0 8px;border-radius:10px;color:#fff;font:600 14px Inter,sans-serif;cursor:pointer}
+.pp .nh select.in{flex:1;min-width:0;margin:0;padding:8px 34px 8px 10px;font-size:13px}
+.pp .nh2{padding:6px 14px 0;font-size:11px;color:var(--mut)}
+.pp .nb{flex:1;min-height:0;overflow:auto;padding:10px 14px 30px;white-space:pre-wrap;overflow-wrap:anywhere;line-height:1.65;font-size:var(--nf,15px);-webkit-overflow-scrolling:touch}
+.pp .nb.no{color:var(--mut);font-style:italic}
+@media(min-width:900px){.pp{flex-direction:row}.pp .sl2{flex:1;height:auto}.pp .nt{flex:none;width:380px;border-left:1px solid rgba(255,255,255,.1)}}
 .vw img.pi{width:100%;height:100%;object-fit:contain;display:block;background:#000}
 .card[data-pv]{cursor:pointer}
 select.in{appearance:none;-webkit-appearance:none;font-weight:600;padding-right:40px;margin-bottom:14px;border-radius:14px;background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='12' height='8'><path d='M1 1l5 5 5-5' fill='none' stroke='%23f5c04a' stroke-width='2'/></svg>");background-repeat:no-repeat;background-position:right 14px center;cursor:pointer}
@@ -197,6 +216,8 @@ function viewer(x,ex){
   else if(e&&e.img)h+="<div class='vw tall g'><img class='pi' alt='' src=\""+esc(e.s)+"\"></div>";
   else if(e)h+="<div class='vw"+(e.tall?" tall":"")+"'><iframe src=\""+esc(e.s)+"\" allowfullscreen loading='lazy' allow='fullscreen; autoplay; encrypted-media; picture-in-picture'></iframe></div>";
   else h+="<div class='pn g empty'>Tautan ini tidak bisa dibuka langsung di dalam web.</div>";
+  var gi=!x.h&&!x.hid&&!pl&&!fr&&x.u&&(/drive\.google\.com\/file\/d\//.test(x.u)||/docs\.google\.com\/presentation\/d\//.test(x.u))?gid(x.u):"";
+  if(gi)h+="<a class='card g' href='#' data-force='1' data-pv='"+esc(gi)+"' data-pn='"+esc(x.n)+"'"+(/presentation\/d\//.test(x.u)?" data-pk='slides'":"")+"><span class='i'>📖</span><span class='t'>Buka dengan pembaca<small>PDF besar lebih lancar · PPT + catatan pembicara</small></span><span class='a'>›</span></a>";
   if(ou&&!pl)h+="<a class='card g' href=\""+esc(ou)+"\" target='_blank' rel='noopener noreferrer'><span class='i'>↗</span><span class='t'>"+(fr?"Buka di Google Drive":pl?"Buka playlist di YouTube":"Buka di tab baru")+"</span></a>";
   return h}
 async function hFill(id){
@@ -231,7 +252,7 @@ async function fdFill(){
     el.dataset.ok=1;
     el.innerHTML=r.j.v.length?"<div class='hint'>"+r.j.v.length+" item · isi folder selalu mengikuti Google Drive</div>"+r.j.v.map(function(f){
       return f.f?"<a class='card g' href='"+esc(hs+"/"+f.id)+"'><span class='i'>📁</span><span class='t'>"+esc(f.n)+"</span><span class='a'>›</span></a>":
-      "<a class='card g' data-pv='"+esc(f.id)+"' data-pn='"+esc(f.n)+"' href=\""+esc(f.u)+"\" target='_blank' rel='noopener noreferrer'><span class='i'>"+fileIco(f.n)+"</span><span class='t'>"+esc(f.n)+"</span><span class='a'>"+(/^(pdf|png|jpe?g|gif|webp|bmp|svg)$/i.test((f.n.split(".").pop()||""))?"👁":"↗")+"</span></a>"}).join(""):"<div class='pn g empty'>Folder ini kosong.</div>";
+      "<a class='card g'"+pvAttr(f.n,f.u,f.id)+" href=\""+esc(f.u)+"\" target='_blank' rel='noopener noreferrer'><span class='i'>"+fileIco(f.n)+"</span><span class='t'>"+esc(f.n)+"</span><span class='a'>"+(pvKind(f.n,/docs\.google\.com\/presentation\/d\//.test(f.u||"")?"slides":"")?"👁":"↗")+"</span></a>"}).join(""):"<div class='pn g empty'>Folder ini kosong.</div>";
     window.scrollTo(0,y)
   }catch(e){}}
 async function plFill(id,u){
@@ -250,20 +271,126 @@ $("main").addEventListener("click",function(e){
   [].forEach.call(document.querySelectorAll(".vl.on"),function(x){x.classList.remove("on")});b.classList.add("on");
   try{var pl=$("pl");pl.style.scrollBehavior="smooth";pl.scrollTo({left:b.offsetLeft-(pl.clientWidth-b.offsetWidth)/2,behavior:"smooth"})}catch(_){}
   window.scrollTo({top:0,behavior:"smooth"})});
-/* ---------- pratinjau PDF / gambar di dalam web ---------- */
-function pvClose(){var m=$("pvm");if(m)m.remove();document.documentElement.style.overflow=""}
-function pvOpen(id,name,ext){
-  pvClose();var src="https://drive.google.com/file/d/"+encodeURIComponent(id)+"/preview",out="https://drive.google.com/file/d/"+encodeURIComponent(id)+"/view";
+/* ---------- pembaca PDF (pdf.js) & PPT + catatan pembicara ---------- */
+var LIB={},CDN="https://cdnjs.cloudflare.com/ajax/libs/";
+function lib(u){return LIB[u]||(LIB[u]=new Promise(function(ok,no){var t=document.createElement("script");t.src=u;t.onload=ok;t.onerror=function(){delete LIB[u];no(new Error("lib"))};document.head.appendChild(t)}))}
+function fUrl(id,k){return"/api/file?id="+encodeURIComponent(id)+(k?"&k="+k:"")}
+function gid(u){u=String(u||"");var m=u.match(/\/d\/([\w-]{10,80})/)||u.match(/[?&]id=([\w-]{10,80})/);return m?m[1]:""}
+function extOf(n){var m=String(n||"").match(/\.([A-Za-z0-9]{2,5})$/);return m?m[1].toLowerCase():""}
+function pvKind(n,k){if(k==="slides")return"ppt";var e=extOf(n);return e==="pdf"?"pdf":/^(pptx|ppsx|pptm)$/.test(e)?"ppt":/^(ppt|pps)$/.test(e)?"oldppt":/^(png|jpe?g|gif|webp|bmp|svg)$/.test(e)?"img":""}
+function pvAttr(n,u,id){var k=/docs\.google\.com\/presentation\/d\//.test(u||"")?"slides":"",i=id||gid(u);if(!i||!pvKind(n,k))return"";return" data-pv='"+esc(i)+"' data-pn='"+esc(n)+"'"+(k?" data-pk='slides'":"")}
+function pvClose(){var m=$("pvm");if(m){if(m._kd)document.removeEventListener("keydown",m._kd);if(m._rs)window.removeEventListener("resize",m._rs);if(m._pdf){try{m._pdf.destroy()}catch(e){}}m.remove()}document.documentElement.style.overflow=""}
+function pvAlive(m){return $("pvm")===m}
+function pvIframe(m,id,k,note){
+  var src=k==="slides"?"https://docs.google.com/presentation/d/"+encodeURIComponent(id)+"/preview":"https://drive.google.com/file/d/"+encodeURIComponent(id)+"/preview";
+  m.querySelector(".tl").innerHTML="";
+  m.querySelector(".bd").innerHTML=(note?"<div class='pnote'>"+esc(note)+"</div>":"")+"<iframe src='"+src+"' allow='fullscreen' allowfullscreen></iframe>"}
+function pvStatus(m,t){m.querySelector(".bd").innerHTML="<div class='pst'><div class='pt'>"+esc(t)+"</div><div class='pbar'><i></i></div></div>"}
+function pvProg(m,got,tot,lbl){var t=m.querySelector(".pst .pt"),i=m.querySelector(".pst .pbar i");if(!t||!i)return;
+  if(tot){i.style.width=Math.min(100,got/tot*100)+"%";t.textContent=lbl+" "+(got/1048576).toFixed(1)+" / "+(tot/1048576).toFixed(1)+" MB"}else t.textContent=lbl+" "+(got/1048576).toFixed(1)+" MB"}
+
+async function pdfView(m,id){
+  pvStatus(m,"Memuat pembaca PDF…");
+  await lib(CDN+"pdf.js/3.11.174/pdf.min.js");if(!pvAlive(m))return;
+  pdfjsLib.GlobalWorkerOptions.workerSrc=CDN+"pdf.js/3.11.174/pdf.worker.min.js";
+  var task=pdfjsLib.getDocument({url:fUrl(id),httpHeaders:{authorization:"Bearer "+S.t},rangeChunkSize:524288});
+  task.onProgress=function(p){if(pvAlive(m))pvProg(m,p.loaded||0,p.total||0,"Memuat PDF…")};
+  var pdf=await task.promise;if(!pvAlive(m)){pdf.destroy();return}
+  m._pdf=pdf;
+  var N=pdf.numPages,bd=m.querySelector(".bd"),tl=m.querySelector(".tl"),zoom=1;
+  bd.innerHTML="<div class='pdfc'></div>";var c=bd.firstChild;
+  tl.innerHTML="<button class='g' data-z='-1' aria-label='Perkecil'>−</button><span>1 / "+N+"</span><button class='g' data-z='1' aria-label='Perbesar'>＋</button>";
+  var info=tl.querySelector("span"),pgs=[],vis=new Set(),p1=await pdf.getPage(1),v1=p1.getViewport({scale:1});
+  var wd=function(){return Math.max(120,Math.min(c.clientWidth-16,1100))*zoom};
+  for(var i=1;i<=N;i++){var d=document.createElement("div");d.className="pg";d.dataset.i=i;c.appendChild(d);pgs.push(d)}
+  function size(){var W=wd();pgs.forEach(function(d){d.style.width=W+"px";d.style.height=W*(d._r||v1.height/v1.width)+"px"})}
+  async function draw(d){
+    var W=wd();if(d._busy||d._ok===W)return;d._busy=1;
+    try{var pg=await pdf.getPage(+d.dataset.i),b=pg.getViewport({scale:1}),dpr=Math.min(window.devicePixelRatio||1,2),q=W/b.width*dpr,vp=pg.getViewport({scale:q});
+      while(vp.width*vp.height>16e6&&q>.4){q*=.8;vp=pg.getViewport({scale:q})}
+      var cv=document.createElement("canvas");cv.width=Math.floor(vp.width);cv.height=Math.floor(vp.height);
+      d._r=b.height/b.width;d.style.height=W*d._r+"px";
+      d._t=pg.render({canvasContext:cv.getContext("2d",{alpha:false}),viewport:vp});await d._t.promise;
+      if(vis.has(d)){d.innerHTML="";d.appendChild(cv);d._ok=W}
+      pg.cleanup()}catch(e){}
+    d._busy=0;d._t=null;if(vis.has(d)&&d._ok!==wd())draw(d)}
+  function free(d){if(d._t){try{d._t.cancel()}catch(e){}}d.innerHTML="";d._ok=0}
+  var io=new IntersectionObserver(function(es){es.forEach(function(e){if(e.isIntersecting){vis.add(e.target);draw(e.target)}else{vis.delete(e.target);free(e.target)}})},{root:c,rootMargin:"1200px 0px"});
+  size();pgs.forEach(function(d){io.observe(d)});
+  var raf=0;c.addEventListener("scroll",function(){if(raf)return;raf=requestAnimationFrame(function(){raf=0;var y=c.scrollTop+c.clientHeight/3,k=0;for(var j=0;j<pgs.length;j++){if(pgs[j].offsetTop+pgs[j].offsetHeight>y){k=j;break}}info.textContent=(k+1)+" / "+N})});
+  function relayout(){var r=c.scrollHeight?c.scrollTop/c.scrollHeight:0;size();c.scrollTop=r*c.scrollHeight;vis.forEach(draw)}
+  tl.addEventListener("click",function(e){var b=e.target.closest("[data-z]");if(!b)return;zoom=Math.max(.5,Math.min(4,zoom*(+b.dataset.z>0?1.25:.8)));relayout()});
+  var rt;m._rs=function(){clearTimeout(rt);rt=setTimeout(relayout,150)};window.addEventListener("resize",m._rs)}
+
+async function pptView(m,id,k){
+  pvStatus(m,"Memuat presentasi…");
+  await lib(CDN+"jszip/3.10.1/jszip.min.js");if(!pvAlive(m))return;
+  var r=await fetch(fUrl(id,k),{headers:{authorization:"Bearer "+S.t}});if(!r.ok)throw new Error("http "+r.status);
+  var tot=+r.headers.get("content-length")||0,rd=r.body.getReader(),ch=[],got=0;
+  for(;;){var x=await rd.read();if(x.done)break;ch.push(x.value);got+=x.value.length;if(!pvAlive(m)){rd.cancel();return};pvProg(m,got,tot,"Mengunduh…")}
+  var z=await JSZip.loadAsync(await new Blob(ch).arrayBuffer());if(!pvAlive(m))return;
+  var NP="http://schemas.openxmlformats.org/presentationml/2006/main",NA="http://schemas.openxmlformats.org/drawingml/2006/main",NR="http://schemas.openxmlformats.org/officeDocument/2006/relationships",dp=new DOMParser();
+  async function xml(p){var f=z.file(p);return f?dp.parseFromString(await f.async("string"),"application/xml"):null}
+  function rels(d){var o={};if(d)[].forEach.call(d.getElementsByTagName("Relationship"),function(e){o[e.getAttribute("Id")]={t:e.getAttribute("Target")||"",y:e.getAttribute("Type")||""}});return o}
+  function res(base,t){if(t.charAt(0)==="/")return t.slice(1);var a=base.split("/");a.pop();t.split("/").forEach(function(s){if(s==="..")a.pop();else if(s&&s!==".")a.push(s)});return a.join("/")}
+  function relsOf(p){var i=p.lastIndexOf("/");return p.slice(0,i+1)+"_rels/"+p.slice(i+1)+".rels"}
+  function phOf(sp){var h=sp.getElementsByTagNameNS(NP,"ph")[0];return h?(h.getAttribute("type")||"body"):""}
+  function paras(sp){return[].map.call(sp.getElementsByTagNameNS(NA,"p"),function(p){var t="";[].forEach.call(p.getElementsByTagName("*"),function(n){if(n.localName==="t"&&n.namespaceURI===NA)t+=n.textContent;else if(n.localName==="br"&&n.namespaceURI===NA)t+="\n"});return t}).join("\n")}
+  var pres=await xml("ppt/presentation.xml");if(!pres)throw new Error("bukan pptx");
+  var pr=rels(await xml("ppt/_rels/presentation.xml.rels")),sl=[];
+  var ids=[].map.call(pres.getElementsByTagNameNS(NP,"sldId"),function(e){return e.getAttributeNS(NR,"id")});
+  for(var i=0;i<ids.length;i++){
+    var rr=pr[ids[i]];if(!rr)continue;var sp=res("ppt/presentation.xml",rr.t),sd=await xml(sp),title="",note="";
+    if(sd){var sps=[].slice.call(sd.getElementsByTagNameNS(NP,"sp"));
+      var ti=sps.filter(function(q){var t=phOf(q);return t==="title"||t==="ctrTitle"})[0];
+      title=ti?paras(ti).replace(/\s+/g," ").trim():"";
+      if(!title)for(var j=0;j<sps.length&&!title;j++)title=paras(sps[j]).replace(/\s+/g," ").trim().slice(0,60)}
+    var sr=rels(await xml(relsOf(sp))),np="";
+    Object.keys(sr).forEach(function(q){if(/\/notesSlide$/.test(sr[q].y))np=res(sp,sr[q].t)});
+    if(np){var nd=await xml(np);if(nd){var ns=[].slice.call(nd.getElementsByTagNameNS(NP,"sp")),bo=ns.filter(function(q){return phOf(q)==="body"});
+      if(!bo.length)bo=ns.filter(function(q){return!/^(sldNum|sldImg|hdr|ftr|dt)$/.test(phOf(q))});
+      note=bo.map(paras).join("\n").replace(/\n{3,}/g,"\n\n").trim()}}
+    sl.push({t:title,n:note})}
+  if(!sl.length)throw new Error("tanpa slide");
+  var withN=sl.filter(function(q){return q.n}).length,cur=0,fs=15;
+  var src=k==="slides"?"https://docs.google.com/presentation/d/"+encodeURIComponent(id)+"/preview":"https://drive.google.com/file/d/"+encodeURIComponent(id)+"/preview";
+  m.querySelector(".tl").innerHTML="";
+  m.querySelector(".bd").innerHTML="<div class='pp'><div class='sl2'><iframe src='"+src+"' allow='fullscreen' allowfullscreen></iframe></div><div class='nt'><div class='nh'><button class='g' data-n='-1' aria-label='Slide sebelumnya'>‹</button><select class='in' aria-label='Pilih slide'>"+
+    sl.map(function(q,i){return"<option value='"+i+"'>"+(i+1)+". "+esc(q.t||"Slide "+(i+1))+(q.n?" 📝":"")+"</option>"}).join("")+"</select><button class='g' data-n='1' aria-label='Slide berikutnya'>›</button><button class='g' data-f='-1' aria-label='Kecilkan huruf'>A−</button><button class='g' data-f='1' aria-label='Besarkan huruf'>A+</button></div><div class='nh2'>"+sl.length+" slide · "+withN+" punya catatan · pilih nomor slide yang sama dengan yang tampil di atas (tidak otomatis ikut)</div><div class='nb' tabindex='0'></div></div></div>";
+  var pp=m.querySelector(".pp"),sel=pp.querySelector("select"),nb=pp.querySelector(".nb");
+  function go(i){cur=Math.max(0,Math.min(sl.length-1,i));sel.value=cur;var q=sl[cur];
+    if(q.n){nb.className="nb";nb.textContent=q.n}else{nb.className="nb no";nb.textContent=withN?"Slide "+(cur+1)+" tidak punya catatan pembicara.":"Presentasi ini tidak memiliki catatan pembicara."}nb.scrollTop=0}
+  sel.onchange=function(){go(+sel.value)};
+  pp.addEventListener("click",function(e){var b=e.target.closest("[data-n],[data-f]");if(!b)return;
+    if(b.dataset.n)go(cur+(+b.dataset.n));else{fs=Math.max(11,Math.min(30,fs+(+b.dataset.f>0?2:-2)));nb.style.setProperty("--nf",fs+"px")}});
+  m._kd=function(e){if(/^(INPUT|TEXTAREA)$/.test((e.target||{}).tagName||""))return;if(e.key==="ArrowRight")go(cur+1);else if(e.key==="ArrowLeft")go(cur-1)};
+  document.addEventListener("keydown",m._kd);go(0)}
+
+async function pvOpen(id,name,k){
+  pvClose();
+  var out=k==="slides"?"https://docs.google.com/presentation/d/"+encodeURIComponent(id)+"/edit":"https://drive.google.com/file/d/"+encodeURIComponent(id)+"/view";
   var m=document.createElement("div");m.id="pvm";m.className="pv-m";
-  m.innerHTML="<div class='bar'><button class='g' data-pvx>✕ Tutup</button><b>"+esc(name||"")+"</b><a class='g' target='_blank' rel='noopener noreferrer' href='"+out+"'>Buka ↗</a></div><div class='bd'><iframe src='"+src+"' allow='fullscreen' allowfullscreen></iframe></div>";
-  m.addEventListener("click",function(e){if(e.target.closest("[data-pvx]")||e.target.classList.contains("bd"))pvClose()});
-  document.body.appendChild(m);document.documentElement.style.overflow="hidden"}
+  m.innerHTML="<div class='bar'><button class='g' data-pvx>✕</button><b></b><div class='tl'></div><a class='g' target='_blank' rel='noopener noreferrer' href='"+esc(out)+"'>Buka ↗</a></div><div class='bd'></div>";
+  m.querySelector("b").textContent=name||"";
+  m.addEventListener("click",function(e){if(e.target.closest("[data-pvx]"))pvClose()});
+  document.body.appendChild(m);document.documentElement.style.overflow="hidden";
+  var kind=pvKind(name,k);
+  try{
+    if(!kind){pvStatus(m,"Memeriksa file…");var r=await api("file?id="+encodeURIComponent(id)+"&k=probe");
+      if(!pvAlive(m))return;
+      if(r.ok&&r.j){if(r.j.k==="slides"){k="slides";kind="ppt"}else if(r.j.n){name=r.j.n;kind=pvKind(name);if(!/^\s*$/.test(name))m.querySelector("b").textContent=name}}}
+    if(!pvAlive(m))return;
+    if(kind==="pdf")await pdfView(m,id);
+    else if(kind==="ppt")await pptView(m,id,k);
+    else pvIframe(m,id,k,kind==="oldppt"?"Format .ppt lama: catatan pembicara tidak bisa dibaca. Simpan ulang sebagai .pptx agar catatannya tampil.":"")
+  }catch(e){if(pvAlive(m))pvIframe(m,id,k,"Pembaca khusus gagal dimuat (file belum dibagikan publik atau jaringan bermasalah). Memakai pratinjau Google Drive.")}}
 document.addEventListener("keydown",function(e){if(e.key==="Escape")pvClose()});
 window.addEventListener("hashchange",pvClose);
 $("main").addEventListener("click",function(e){
   var a=e.target.closest("[data-pv]");if(!a)return;
-  var n=a.dataset.pn||"",x=(n.split(".").pop()||"").toLowerCase();
-  if(/^(pdf|png|jpe?g|gif|webp|bmp|svg)$/.test(x)){e.preventDefault();pvOpen(a.dataset.pv,n,x)}});
+  var n=a.dataset.pn||"",k=a.dataset.pk||"";
+  if(!(a.dataset.force||pvKind(n,k)))return;
+  e.preventDefault();pvOpen(a.dataset.pv,n,k)});
 
 /* ---------- playlist: geser samping (roda mouse, seret, panah) ---------- */
 function plArrows(){var pl=$("pl");if(!pl)return;var w=pl.parentNode,l=w.querySelector(".pa.l"),r=w.querySelector(".pa.r");if(!l||!r)return;
