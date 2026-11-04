@@ -251,15 +251,16 @@ function cards(items){return items.map(function(c){return "<a class='card g' hre
 var UI_DEF={
   nav:[{id:"home",n:"Beranda",i:"🏠"},{id:"materi",n:"Materi",i:"📚"},{id:"rekaman",n:"Rekaman",i:"🎬"},{id:"jadwal",n:"Jadwal",i:"🗓️"},{id:"run",n:"Run",i:"🏃"},{id:"dokter",n:"Dokter",i:"📞"}],
   menu:[{id:"materi",n:"Materi & Rangkuman",i:"📚",s:"Per blok, lab, dan Google Drive"},{id:"rekaman",n:"Rekaman Kuliah",i:"🎬",s:"Putar langsung per tahun"},{id:"jadwal",n:"Jadwal Kuliah",i:"🗓️",s:"Terhubung ke spreadsheet"},{id:"run",n:"ASTERION RUN",i:"🏃",s:"Game 3D edukasi · jawab soal sambil berlari"},{id:"dokter",n:"Kontak Dokter",i:"📞",s:"Nomor HP dosen & dokter · bisa usul ubah/tambah"}],
+  mp:[{id:"blok",n:"PILIH BLOK",i:"📘"},{id:"drive",n:"DRIVE",i:"🗂️",c:"Google Drive Materi"}],
   cm:[{id:"all",n:"Seluruh Blok",i:"📖"},{id:"lab",n:"Lab",i:"🔬"}],
   cr:[{id:"kl",n:"Kuliah Lain",i:"📝"},{id:"blok",n:"Blok",i:"🧠"},{id:"lab",n:"Lab",i:"🔬"}]
 };
-var UI_LBL={nav:"NAVBAR (menu bawah)",menu:"MENU BERANDA",cm:"KATEGORI DI DALAM BLOK (Materi)",cr:"KATEGORI DI DALAM TAHUN (Rekaman)"};
+var UI_LBL={nav:"NAVBAR (menu bawah)",menu:"MENU BERANDA",mp:"HALAMAN MATERI (urutan bagian: Blok / Drive)",cm:"KATEGORI DI DALAM BLOK (Materi)",cr:"KATEGORI DI DALAM TAHUN (Rekaman)"};
 /* gabungkan pengaturan tersimpan dengan bawaan: urutan & nama dari admin, item baru/hilang tetap aman */
 function uiList(g){
   var def=UI_DEF[g],sv=(S.data&&S.data.ui&&S.data.ui[g])||[],out=[],seen={};
   sv.forEach(function(x){var d=def.filter(function(y){return y.id===x.id})[0];if(!d||seen[x.id])return;seen[x.id]=1;
-    var o={id:d.id,n:(x.n||d.n),i:(x.i||d.i),h:!!x.h};if(d.s!==undefined)o.s=(x.s!==undefined&&x.s!==null?x.s:d.s);out.push(o)});
+    var o={id:d.id,n:(x.n||d.n),i:(x.i||d.i),h:!!x.h};if(d.s!==undefined)o.s=(x.s!==undefined&&x.s!==null?x.s:d.s);if(d.c!==undefined)o.c=(x.c||d.c);out.push(o)});
   def.forEach(function(d){if(!seen[d.id])out.push(JSON.parse(JSON.stringify(d)))});
   return out}
 function uiSet(g,list){S.data.ui=S.data.ui||{};S.data.ui[g]=list}
@@ -270,13 +271,13 @@ function renderNav(){
 function catCards(g,idx,o,suffix){
   return cards(uiList(g).map(function(c){var arr=o[c.id]||[];return["#/"+(g==="cm"?"materi":"rekaman")+"/"+idx+"/"+c.id,c.i,c.n,arr.length+suffix]}))}
 function uiRow(g,x,i,n){
-  return "<div class='row'><div class='card g' style='margin-bottom:0;cursor:default"+(x.h?";opacity:.45":"")+"'><span class='i'>"+esc(x.i)+"</span><span class='t'>"+esc(x.n)+(x.s!==undefined?"<small>"+esc(x.s)+"</small>":"")+"</span></div>"+
+  return "<div class='row'><div class='card g' style='margin-bottom:0;cursor:default"+(x.h?";opacity:.45":"")+"'><span class='i'>"+esc(x.i)+"</span><span class='t'>"+esc(x.n)+(x.s!==undefined?"<small>"+esc(x.s)+"</small>":"")+(x.c!==undefined?"<small>Kartu: "+esc(x.c)+"</small>":"")+"</span></div>"+
   "<div class='ctl'><button data-a='ui-up' data-g='"+g+"' data-i='"+i+"'>↑</button><button data-a='ui-dn' data-g='"+g+"' data-i='"+i+"'>↓</button><button data-a='ui-ren' data-g='"+g+"' data-i='"+i+"'>✎</button>"+
   (g==="nav"||g==="menu"?"<button data-a='ui-hide' data-g='"+g+"' data-i='"+i+"'>"+(x.h?"👁️‍🗨️":"👁")+"</button>":"")+"</div></div>"}
 function pAtur(){
   if(!S.admin)return "<div class='empty'>Khusus admin.</div>";
   var h="<div class='hint'>Atur urutan dengan ↑ ↓, ganti nama/ikon dengan ✎, sembunyikan dengan 👁 (item tersembunyi tampak redup). Perubahan langsung tersimpan.</div>";
-  ["nav","menu","cm","cr"].forEach(function(g){h+="<div class='sec'>"+UI_LBL[g]+"</div>"+uiList(g).map(function(x,i,a){return uiRow(g,x,i,a.length)}).join("")});
+  ["nav","menu","mp","cm","cr"].forEach(function(g){h+="<div class='sec'>"+UI_LBL[g]+"</div>"+uiList(g).map(function(x,i,a){return uiRow(g,x,i,a.length)}).join("")});
   return h+"<div class='pn g'><b>Kembalikan ke bawaan</b><div class='hint'>Mengembalikan semua nama, ikon, dan urutan di halaman ini.</div><button class='btn s' data-a='ui-reset'>Reset</button></div>"}
 function uiAct(b,a){
   if(a==="ui-reset"){if(!confirm("Kembalikan semua pengaturan menu ke bawaan?"))return false;delete S.data.ui;return true}
@@ -287,9 +288,10 @@ function uiAct(b,a){
     if(!l[i].h&&l.filter(function(x){return !x.h}).length<=(g==="nav"?2:1)){toast(g==="nav"?"Minimal 2 item navbar harus tampil":"Minimal 1 menu harus tampil");return false}
     l[i].h=!l[i].h}
   else if(a==="ui-ren"){
-    var nn=prompt("Nama baru:",l[i].n);if(nn===null)return false;nn=nn.trim();if(!nn){toast("Nama tidak boleh kosong");return false}
+    var nn=prompt(g==="mp"?"Judul bagian (teks emas di atas daftar):":"Nama baru:",l[i].n);if(nn===null)return false;nn=nn.trim();if(!nn){toast("Nama tidak boleh kosong");return false}
     l[i].n=nn.slice(0,40);
     var ic=prompt("Ikon (emoji):",l[i].i);if(ic!==null&&ic.trim())l[i].i=ic.trim().slice(0,8);
+    if(l[i].c!==undefined){var cc=prompt("Nama kartu:",l[i].c);if(cc!==null&&cc.trim())l[i].c=cc.trim().slice(0,60)}
     if(l[i].s!==undefined){var ss=prompt("Deskripsi singkat (boleh kosong):",l[i].s);if(ss!==null)l[i].s=ss.trim().slice(0,120)}}
   else return false;
   uiSet(g,l);return true}
@@ -319,7 +321,9 @@ async function todayFill(){
   }catch(e){}}
 function pMateri(P){
   var d=S.data;
-  if(!P[1])return "<div class='sec'>PILIH BLOK</div>"+topList("materi","📘",function(b){return(b.lab.length+b.all.length)+" materi"},"mis. Blok 4.1")+"<div class='sec'>DRIVE</div>"+cards([["#/materi/drive","🗂️","Google Drive Materi",d.drive.length+" folder"]]);
+  if(!P[1])return uiList("mp").map(function(x){
+    if(x.id==="drive")return "<div class='sec'>"+esc(x.n)+"</div>"+cards([["#/materi/drive",x.i,x.c,d.drive.length+" folder"]]);
+    return "<div class='sec'>"+esc(x.n)+"</div>"+topList("materi",x.i,function(b){return(b.lab.length+b.all.length)+" materi"},"mis. Blok 4.1")}).join("");
   if(P[1]==="drive")return P[2]!==undefined?viewer(d.drive[+P[2]]||{n:"?"},P.slice(3)):listPage(P,"🗂️",false);
   var b=d.materi[+P[1]];if(!b)return "<div class='empty'>Tidak ditemukan.</div>";
   if(!P[2])return "<div class='sec'>"+esc(b.n)+"</div>"+catCards("cm",P[1],b," materi");
