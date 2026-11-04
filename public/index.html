@@ -384,32 +384,14 @@ function ph(x){x=String(x||"").replace(/\D/g,"");if(!x)return"";if(x.indexOf("62
 
 /* ---------- chat WA otomatis ke dokter ---------- */
 function waSalam(){var h=+new Intl.DateTimeFormat("en-GB",{hour:"2-digit",hour12:false,timeZone:"Asia/Jakarta"}).format(new Date())%24;return h>=4&&h<11?"pagi":h>=11&&h<15?"siang":h>=15&&h<18?"sore":"malam"}
-function waLoad(){try{return JSON.parse(localStorage.getItem("waf")||"{}")}catch(e){return{}}}
-function waForm(d,h){
-  var f=$("dkf");if(!f)return;var v=waLoad(),nm=(window.MHS||{})[String(S.u).toUpperCase()]||"";
-  var jenis=["Tutor","Skill Lab","Course","Field Lab"];
-  f.innerHTML="<div class='pn g'><b>Konfirmasi kehadiran · "+esc(d.n)+"</b><div class='hint'>Isi dulu, lalu WhatsApp terbuka dengan pesan yang sudah jadi.</div>"+
-  (nm?"<div class='hint'>Pengirim: <b>"+esc(nm)+"</b> ("+esc(S.u)+")</div>":"<label>Nama kamu</label><input id='wn' value=\""+esc(v.nama||"")+"\">")+
-  "<label>Perwakilan dari Tutor (mis. 3A)</label><input id='wt' value=\""+esc(v.tutor||"")+"\">"+
-  "<label>Jenis kegiatan</label><select id='wj' class='in' style='margin-bottom:0'>"+jenis.map(function(j){return"<option"+(v.jenis===j?" selected":"")+">"+j+"</option>"}).join("")+"</select>"+
-  "<label>Hari / tanggal</label><input id='wh' placeholder='Senin, 10 November 2026' value=\""+esc(v.hari||"")+"\">"+
-  "<label>Jam</label><input id='wm' placeholder='08.00 - 10.00 WIB' value=\""+esc(v.jam||"")+"\">"+
-  "<label>Tempat</label><input id='wp' value=\""+esc(v.tempat||"")+"\">"+
-  "<button class='btn w' data-dk='wasend'>Buka WhatsApp</button><button class='btn s w' data-dk='cancel'>Batal</button><div class='err' id='fe'></div></div>";
-  f.dataset.wa=d.id;f.dataset.h=h;f.scrollIntoView({behavior:"smooth"})}
-function waSend(){
-  var f=$("dkf"),d=(S.dk||[]).filter(function(x){return x.id===f.dataset.wa})[0];if(!d)return;
-  var nm=(window.MHS||{})[String(S.u).toUpperCase()]||($("wn")?$("wn").value.trim():""),
-  g=function(i){return $(i).value.trim()},t=g("wt"),j=$("wj").value,hr=g("wh"),jm=g("wm"),tp=g("wp");
-  if(!nm||!t||!hr||!jm||!tp){$("fe").textContent="Semua kolom wajib diisi.";return}
-  try{localStorage.setItem("waf",JSON.stringify({nama:$("wn")?nm:"",tutor:t,jenis:j,hari:hr,jam:jm,tempat:tp}))}catch(e){}
-  var msg="Selamat "+waSalam()+", "+d.n+". Mohon maaf mengganggu waktunya 🙏🏻\n\n"+
-  "Saya "+nm+" dengan NIM "+String(S.u).toUpperCase()+" dari Prodi Pendidikan Dokter, Fakultas Kedokteran UNS angkatan 2025.\n\n"+
-  "Saya sebagai perwakilan dari Tutor "+t+" hendak mengonfirmasi kehadiran dokter pada "+j+" yang akan dibimbing oleh "+d.n+" pada\n\n"+
-  "Hari : "+hr+"\nJam : "+jm+"\nTempat : "+tp+"\n\n"+
+function waLink(d,h){
+  var u=String(S.u).toUpperCase(),nm=(window.MHS||{})[u]||"[Nama]",
+  msg="Selamat "+waSalam()+", "+d.n+". Mohon maaf mengganggu waktunya 🙏🏻\n\n"+
+  "Saya "+nm+" dengan NIM "+u+" dari Prodi Pendidikan Dokter, Fakultas Kedokteran UNS angkatan 2025.\n\n"+
+  "Saya sebagai perwakilan dari Tutor [isi] hendak mengonfirmasi kehadiran dokter pada [Tutor/Skill Lab/Course/Field Lab] yang akan dibimbing oleh "+d.n+" pada\n\n"+
+  "Hari : \nJam : \nTempat : \n\n"+
   "Terima kasih sebelumnya dan mohon maaf menganggu waktunya 🙏🏻";
-  window.open("https://wa.me/62"+f.dataset.h.slice(1)+"?text="+encodeURIComponent(msg),"_blank","noopener");
-  f.innerHTML=""}
+  return "https://wa.me/62"+h.slice(1)+"?text="+encodeURIComponent(msg)}
 function dkItem(d){
   var p=[d.h1,d.h2].filter(Boolean).map(function(x){x=ph(x);return"<div class='mt'><a class='tag ok' href='tel:"+x+"'>📞 "+x+"</a><a class='tag' href='https://wa.me/62"+x.slice(1)+"' data-dk='wa' data-id=\""+esc(d.id)+"\" data-h='"+x+"'>WhatsApp</a></div>"}).join("");
   return"<div class='day g dk' data-n=\""+esc(String(d.n).toLowerCase())+"\"><div class='row'><b style='flex:1'>"+esc(d.n)+"</b><button class='ib g' style='height:34px' data-dk='edit' data-id=\""+esc(d.id)+"\" title='Usul ubah'>✎</button></div>"+(p||"<div class='hint'>Belum ada nomor</div>")+"</div>"}
@@ -437,8 +419,7 @@ async function dkAdmin(){
   }catch(e){}}
 $("main").addEventListener("click",async function(e){
   var b=e.target.closest("[data-dk]");if(!b)return;var a=b.dataset.dk;
-  if(a==="wa"){e.preventDefault();waForm((S.dk||[]).filter(function(x){return x.id===b.dataset.id})[0]||{n:"",id:b.dataset.id},b.dataset.h)}
-  else if(a==="wasend")waSend();
+  if(a==="wa"){var dd=(S.dk||[]).filter(function(x){return x.id===b.dataset.id})[0]||{n:""};b.href=waLink(dd,b.dataset.h)}
   else if(a==="new")dkForm(null);
   else if(a==="edit")dkForm((S.dk||[]).filter(function(x){return x.id===b.dataset.id})[0]);
   else if(a==="cancel")$("dkf").innerHTML="";
