@@ -318,9 +318,15 @@ function sched(rows) {
   return days.map((d, i) => [d, i]).sort((a, b) => (a[0].iso < b[0].iso ? 1 : a[0].iso > b[0].iso ? -1 : a[1] - b[1])).map((x) => x[0]);
 }
 
+function uiOk(u) {
+  if (u === undefined) return true;
+  if (!u || typeof u !== "object" || Array.isArray(u)) return false;
+  return ["nav", "menu", "cm", "cr"].every((g) => u[g] === undefined || (Array.isArray(u[g]) && u[g].length <= 20 && u[g].every((x) => x && typeof x.id === "string" && x.id.length <= 20 && (x.n === undefined || (typeof x.n === "string" && x.n.length <= 60)) && (x.i === undefined || (typeof x.i === "string" && x.i.length <= 16)) && (x.s === undefined || (typeof x.s === "string" && x.s.length <= 200)) && (x.h === undefined || typeof x.h === "boolean"))));
+}
+
 function valid(d) {
   const L = (a) => Array.isArray(a) && a.length <= 500 && a.every((x) => x && typeof x.n === "string" && x.n.length <= 200 && (x.u === undefined || (typeof x.u === "string" && x.u.length <= 2000)) && (x.h === undefined || (typeof x.h === "string" && x.h.length <= 100000)) && (x.hid === undefined || (typeof x.hid === "string" && /^[\w-]{6,40}$/.test(x.hid))));
-  return d && L(d.drive) && Array.isArray(d.materi) && d.materi.length <= 60 && d.materi.every((b) => typeof b.n === "string" && L(b.lab) && L(b.all)) &&
+  return d && uiOk(d.ui) && L(d.drive) && Array.isArray(d.materi) && d.materi.length <= 60 && d.materi.every((b) => typeof b.n === "string" && L(b.lab) && L(b.all)) &&
     Array.isArray(d.rekaman) && d.rekaman.length <= 20 && d.rekaman.every((t) => typeof t.n === "string" && L(t.kl) && L(t.blok) && L(t.lab)) &&
     d.sheet && /^[\w-]{20,80}$/.test(d.sheet.id) && Array.isArray(d.sheet.tabs) && d.sheet.tabs.length <= 30 && d.sheet.tabs.every((t) => typeof t.n === "string" && /^\d{1,12}$/.test(t.g));
 }
@@ -586,6 +592,17 @@ async function runApi(request, env, a, path, url, body, M) {
       const r = await db.prepare("INSERT INTO run_cats (name, descr, active, per_session, q_time, show_explain, created) VALUES (?, ?, ?, ?, ?, ?, ?)").bind(...f, t).run();
       await runAudit(db, a.u, "kategori.buat", name);
       return J({ id: r.meta.last_row_id });
+    }
+    if (ap === "cat/move" && M === "POST") {
+      const rows = (await db.prepare("SELECT id FROM run_cats ORDER BY sort, id").all()).results;
+      const i = rows.findIndex((r) => r.id === +body.id), j = i + (+body.dir < 0 ? -1 : 1);
+      if (i < 0) return runErr("Kategori tidak ditemukan.", 404);
+      if (j >= 0 && j < rows.length) {
+        [rows[i], rows[j]] = [rows[j], rows[i]];
+        await db.batch(rows.map((r, n) => db.prepare("UPDATE run_cats SET sort = ? WHERE id = ?").bind(n, r.id)));
+        await runAudit(db, a.u, "kategori.urut", "#" + body.id);
+      }
+      return J({ ok: 1 });
     }
     if (ap === "cat/del" && M === "POST") {
       const c = await db.prepare("SELECT name FROM run_cats WHERE id = ?").bind(+body.id || 0).first();
