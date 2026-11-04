@@ -818,6 +818,34 @@ export default {
       const r = await cached("fd/" + id, 20, () => driveList(id, env, dbg));
       return r ? J(r) : J({ err: "Isi folder tidak bisa dimuat.", dbg: a.admin ? dbg.join("; ") : undefined }, 502);
     }
+    if (path === "file" && M === "GET") { // unduh file Drive (PDF/PPT) lewat server: mendukung file besar + Range untuk pdf.js
+      const id = url.searchParams.get("id") || "", k = url.searchParams.get("k") || "";
+      if (!/^[\w-]{10,80}$/.test(id)) return J({ err: 1 }, 400);
+      const uc = `https://drive.usercontent.google.com/download?id=${id}&export=download&confirm=t`;
+      const fname = (cd) => { const m = cd.match(/filename\*=UTF-8''([^;]+)/i) || cd.match(/filename="?([^";]+)/i); try { return m ? decodeURIComponent(m[1]) : ""; } catch { return m ? m[1] : ""; } };
+      if (k === "probe") { // cuma cari nama/jenis file
+        let n = "";
+        try {
+          if (env.DRIVE_API_KEY) {
+            const m = await fetch(`https://www.googleapis.com/drive/v3/files/${id}?fields=name,mimeType&supportsAllDrives=true&key=${env.DRIVE_API_KEY}`);
+            if (m.ok) { const j = await m.json(); if (j.mimeType === "application/vnd.google-apps.presentation") return J({ n: j.name || "", k: "slides" }); n = j.name || ""; }
+          }
+          if (!n) { const r = await fetch(uc, { headers: { ...UA, range: "bytes=0-0" } }); n = fname(r.headers.get("content-disposition") || ""); try { await r.body?.cancel(); } catch {} }
+        } catch {}
+        return J({ n });
+      }
+      const src = k === "slides" ? `https://docs.google.com/presentation/d/${id}/export/pptx`
+        : env.DRIVE_API_KEY ? `https://www.googleapis.com/drive/v3/files/${id}?alt=media&supportsAllDrives=true&key=${env.DRIVE_API_KEY}` : uc;
+      const h = { ...UA }, rg = request.headers.get("range");
+      if (rg && /^bytes=\d*-\d*$/.test(rg)) h.range = rg;
+      let r = await fetch(src, { headers: h });
+      if (!r.ok && r.status !== 206 && env.DRIVE_API_KEY && k !== "slides") r = await fetch(uc, { headers: h });
+      if (r.status !== 200 && r.status !== 206) return J({ err: "File tidak bisa diambil dari Drive. Pastikan dibagikan 'siapa saja yang memiliki link'." }, 502);
+      if (/text\/html/i.test(r.headers.get("content-type") || "")) return J({ err: "Drive tidak memberi file (mungkin belum dibagikan publik)." }, 403);
+      const o = new Headers({ "content-type": "application/octet-stream", "cache-control": "private, max-age=300", "x-content-type-options": "nosniff" });
+      for (const n of ["content-length", "content-range", "accept-ranges", "content-disposition"]) { const v = r.headers.get(n); if (v) o.set(n, v); }
+      return new Response(r.body, { status: r.status, headers: o });
+    }
     if (path === "schedule" && M === "GET") {
       const g = url.searchParams.get("g") || "0";
       if (!/^\d{1,12}$/.test(g)) return J({ err: 1 }, 400);
