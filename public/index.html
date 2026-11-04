@@ -107,10 +107,7 @@ select.in option{background:#241a3f;color:#fff}
 <div id="shell" hidden>
   <div class="top"><a class="ib g" id="back" href="#/" hidden>‹</a><h2 id="ttl"></h2><button class="ib g" id="out" title="Keluar">⎋</button></div>
   <div class="wrap" id="main"></div>
-  <nav class="nav g">
-    <a href="#/" data-t="home"><b>🏠</b>Beranda</a><a href="#/materi" data-t="materi"><b>📚</b>Materi</a>
-    <a href="#/rekaman" data-t="rekaman"><b>🎬</b>Rekaman</a><a href="#/jadwal" data-t="jadwal"><b>🗓️</b>Jadwal</a><a href="#/run" data-t="run"><b>🏃</b>Run</a><a href="#/dokter" data-t="dokter"><b>📞</b>Dokter</a>
-  </nav>
+  <nav class="nav g" id="nav"></nav>
 </div>
 
 <script src="run.js"></script>
@@ -250,14 +247,61 @@ function topList(k,ico,sub,ph){
   return h}
 function cards(items){return items.map(function(c){return "<a class='card g' href='"+c[0]+"'><span class='i'>"+c[1]+"</span><span class='t'>"+esc(c[2])+(c[3]?"<small>"+esc(c[3])+"</small>":"")+"</span><span class='a'>›</span></a>"}).join("")}
 
+/* ---------- pengaturan menu / navbar / kategori (admin) ---------- */
+var UI_DEF={
+  nav:[{id:"home",n:"Beranda",i:"🏠"},{id:"materi",n:"Materi",i:"📚"},{id:"rekaman",n:"Rekaman",i:"🎬"},{id:"jadwal",n:"Jadwal",i:"🗓️"},{id:"run",n:"Run",i:"🏃"},{id:"dokter",n:"Dokter",i:"📞"}],
+  menu:[{id:"materi",n:"Materi & Rangkuman",i:"📚",s:"Per blok, lab, dan Google Drive"},{id:"rekaman",n:"Rekaman Kuliah",i:"🎬",s:"Putar langsung per tahun"},{id:"jadwal",n:"Jadwal Kuliah",i:"🗓️",s:"Terhubung ke spreadsheet"},{id:"run",n:"ASTERION RUN",i:"🏃",s:"Game 3D edukasi · jawab soal sambil berlari"},{id:"dokter",n:"Kontak Dokter",i:"📞",s:"Nomor HP dosen & dokter · bisa usul ubah/tambah"}],
+  cm:[{id:"all",n:"Seluruh Blok",i:"📖"},{id:"lab",n:"Lab",i:"🔬"}],
+  cr:[{id:"kl",n:"Kuliah Lain",i:"📝"},{id:"blok",n:"Blok",i:"🧠"},{id:"lab",n:"Lab",i:"🔬"}]
+};
+var UI_LBL={nav:"NAVBAR (menu bawah)",menu:"MENU BERANDA",cm:"KATEGORI DI DALAM BLOK (Materi)",cr:"KATEGORI DI DALAM TAHUN (Rekaman)"};
+/* gabungkan pengaturan tersimpan dengan bawaan: urutan & nama dari admin, item baru/hilang tetap aman */
+function uiList(g){
+  var def=UI_DEF[g],sv=(S.data&&S.data.ui&&S.data.ui[g])||[],out=[],seen={};
+  sv.forEach(function(x){var d=def.filter(function(y){return y.id===x.id})[0];if(!d||seen[x.id])return;seen[x.id]=1;
+    var o={id:d.id,n:(x.n||d.n),i:(x.i||d.i),h:!!x.h};if(d.s!==undefined)o.s=(x.s!==undefined&&x.s!==null?x.s:d.s);out.push(o)});
+  def.forEach(function(d){if(!seen[d.id])out.push(JSON.parse(JSON.stringify(d)))});
+  return out}
+function uiSet(g,list){S.data.ui=S.data.ui||{};S.data.ui[g]=list}
+function uiName(id){var m=uiList("menu").filter(function(x){return x.id===id})[0];return m?m.n:null}
+function renderNav(){
+  var l=uiList("nav").filter(function(x){return !x.h});if(l.length<2)l=UI_DEF.nav;
+  $("nav").innerHTML=l.map(function(x){return "<a href='"+(x.id==="home"?"#/":"#/"+x.id)+"' data-t='"+x.id+"'><b>"+esc(x.i)+"</b>"+esc(x.n)+"</a>"}).join("")}
+function catCards(g,idx,o,suffix){
+  return cards(uiList(g).map(function(c){var arr=o[c.id]||[];return["#/"+(g==="cm"?"materi":"rekaman")+"/"+idx+"/"+c.id,c.i,c.n,arr.length+suffix]}))}
+function uiRow(g,x,i,n){
+  return "<div class='row'><div class='card g' style='margin-bottom:0;cursor:default"+(x.h?";opacity:.45":"")+"'><span class='i'>"+esc(x.i)+"</span><span class='t'>"+esc(x.n)+(x.s!==undefined?"<small>"+esc(x.s)+"</small>":"")+"</span></div>"+
+  "<div class='ctl'><button data-a='ui-up' data-g='"+g+"' data-i='"+i+"'>↑</button><button data-a='ui-dn' data-g='"+g+"' data-i='"+i+"'>↓</button><button data-a='ui-ren' data-g='"+g+"' data-i='"+i+"'>✎</button>"+
+  (g==="nav"||g==="menu"?"<button data-a='ui-hide' data-g='"+g+"' data-i='"+i+"'>"+(x.h?"👁️‍🗨️":"👁")+"</button>":"")+"</div></div>"}
+function pAtur(){
+  if(!S.admin)return "<div class='empty'>Khusus admin.</div>";
+  var h="<div class='hint'>Atur urutan dengan ↑ ↓, ganti nama/ikon dengan ✎, sembunyikan dengan 👁 (item tersembunyi tampak redup). Perubahan langsung tersimpan.</div>";
+  ["nav","menu","cm","cr"].forEach(function(g){h+="<div class='sec'>"+UI_LBL[g]+"</div>"+uiList(g).map(function(x,i,a){return uiRow(g,x,i,a.length)}).join("")});
+  return h+"<div class='pn g'><b>Kembalikan ke bawaan</b><div class='hint'>Mengembalikan semua nama, ikon, dan urutan di halaman ini.</div><button class='btn s' data-a='ui-reset'>Reset</button></div>"}
+function uiAct(b,a){
+  if(a==="ui-reset"){if(!confirm("Kembalikan semua pengaturan menu ke bawaan?"))return false;delete S.data.ui;return true}
+  var g=b.dataset.g,i=+b.dataset.i,l=uiList(g);if(!l[i])return false;
+  if(a==="ui-up"){if(i<1)return false;l.splice(i-1,0,l.splice(i,1)[0])}
+  else if(a==="ui-dn"){if(i>l.length-2)return false;l.splice(i+1,0,l.splice(i,1)[0])}
+  else if(a==="ui-hide"){
+    if(!l[i].h&&l.filter(function(x){return !x.h}).length<=(g==="nav"?2:1)){toast(g==="nav"?"Minimal 2 item navbar harus tampil":"Minimal 1 menu harus tampil");return false}
+    l[i].h=!l[i].h}
+  else if(a==="ui-ren"){
+    var nn=prompt("Nama baru:",l[i].n);if(nn===null)return false;nn=nn.trim();if(!nn){toast("Nama tidak boleh kosong");return false}
+    l[i].n=nn.slice(0,40);
+    var ic=prompt("Ikon (emoji):",l[i].i);if(ic!==null&&ic.trim())l[i].i=ic.trim().slice(0,8);
+    if(l[i].s!==undefined){var ss=prompt("Deskripsi singkat (boleh kosong):",l[i].s);if(ss!==null)l[i].s=ss.trim().slice(0,120)}}
+  else return false;
+  uiSet(g,l);return true}
+
 /* ---------- pages ---------- */
 function pHome(){
   setTimeout(todayFill,0);
   return "<div class='hero'><img class='mark' alt='' src='logo.webp'></div><div class='ttl'><h1>ASTERION</h1><div class='yr'>MMXXV</div></div>"+
   "<p class='hint' style='text-align:center;font-size:14px'>Halo, <b>"+esc(S.u)+"</b> 👋<br>Seluruh rekaman, rangkuman, soal, dan materi kuliah ada disini, semangat belajarnya 🤩✨</p>"+
   "<div class='sec'>HARI INI</div><div id='today' class='pn g empty'>Memuat jadwal…</div><div id='next'></div>"+
-  "<div class='sec'>MENU</div>"+cards([["#/materi","📚","Materi & Rangkuman","Per blok, lab, dan Google Drive"],["#/rekaman","🎬","Rekaman Kuliah","Putar langsung per tahun"],["#/jadwal","🗓️","Jadwal Kuliah","Terhubung ke spreadsheet"],["#/run","🏃","ASTERION RUN","Game 3D edukasi · jawab soal sambil berlari"],["#/dokter","📞","Kontak Dokter","Nomor HP dosen & dokter · bisa usul ubah/tambah"]])+
-  (S.admin?"<div class='sec'>ADMIN</div>"+cards([["#/run/admin","🛠️","Kelola ASTERION RUN","Kategori · soal & PDF · leaderboard"],["#/dokter/admin","📋","Pengajuan Dokter","Cek, edit, lalu setujui usulan"]])+"<div class='pn g'><b>Reset password mahasiswa</b><div class='hint'>Mengembalikan password ke username (mahasiswa wajib membuat password baru saat login).</div><input id='rU' class='in' placeholder='G0025001'><button class='btn' data-a='reset'>Reset</button></div>":"")}
+  "<div class='sec'>MENU</div>"+cards(uiList("menu").filter(function(x){return !x.h}).map(function(x){return["#/"+x.id,x.i,x.n,x.s]}))+
+  (S.admin?"<div class='sec'>ADMIN</div>"+cards([["#/atur","🧭","Atur Menu, Navbar & Kategori","Ubah urutan, nama, dan ikon"],["#/run/admin","🛠️","Kelola ASTERION RUN","Kategori · soal & PDF · leaderboard"],["#/dokter/admin","📋","Pengajuan Dokter","Cek, edit, lalu setujui usulan"]])+"<div class='pn g'><b>Reset password mahasiswa</b><div class='hint'>Mengembalikan password ke username (mahasiswa wajib membuat password baru saat login).</div><input id='rU' class='in' placeholder='G0025001'><button class='btn' data-a='reset'>Reset</button></div>":"")}
 function jkt(){return new Date().toLocaleDateString("en-CA",{timeZone:"Asia/Jakarta"})}
 function pickTab(tabs){return tabs[Math.min(S.def||0,tabs.length-1)]||tabs[0]}
 async function todayFill(){
@@ -278,13 +322,13 @@ function pMateri(P){
   if(!P[1])return "<div class='sec'>PILIH BLOK</div>"+topList("materi","📘",function(b){return(b.lab.length+b.all.length)+" materi"},"mis. Blok 4.1")+"<div class='sec'>DRIVE</div>"+cards([["#/materi/drive","🗂️","Google Drive Materi",d.drive.length+" folder"]]);
   if(P[1]==="drive")return P[2]!==undefined?viewer(d.drive[+P[2]]||{n:"?"},P.slice(3)):listPage(P,"🗂️",false);
   var b=d.materi[+P[1]];if(!b)return "<div class='empty'>Tidak ditemukan.</div>";
-  if(!P[2])return "<div class='sec'>"+esc(b.n)+"</div>"+cards([["#/materi/"+P[1]+"/all","📖","Seluruh Blok",b.all.length+" materi"],["#/materi/"+P[1]+"/lab","🔬","Lab",b.lab.length+" materi"]]);
+  if(!P[2])return "<div class='sec'>"+esc(b.n)+"</div>"+catCards("cm",P[1],b," materi");
   return P[3]!==undefined?viewer((arrAt(P)||[])[+P[3]]||{n:"?"},P.slice(4)):listPage(P.slice(0,3),"📄",true)}
 function pRekaman(P){
   var d=S.data;
   if(!P[1])return "<div class='sec'>PILIH TAHUN</div>"+topList("rekaman","🎓",function(t){return(t.kl.length+t.blok.length+t.lab.length)+" playlist"},"mis. Tahun 4");
   var t=d.rekaman[+P[1]];if(!t)return "<div class='empty'>Tidak ditemukan.</div>";
-  if(!P[2])return "<div class='sec'>"+esc(t.n)+"</div>"+cards([["#/rekaman/"+P[1]+"/kl","📝","Kuliah Lain",t.kl.length+" playlist"],["#/rekaman/"+P[1]+"/blok","🧠","Blok",t.blok.length+" playlist"],["#/rekaman/"+P[1]+"/lab","🔬","Lab",t.lab.length+" playlist"]]);
+  if(!P[2])return "<div class='sec'>"+esc(t.n)+"</div>"+catCards("cr",P[1],t," playlist");
   return P[3]!==undefined?viewer((arrAt(P)||[])[+P[3]]||{n:"?"},P.slice(4)):listPage(P.slice(0,3),"▶️",false)}
 function slot(x){
   var h="<div class='sl'><div class='tm'>"+esc(x.j)+"</div><div class='bd'><b>"+esc(x.k||"—")+"</b><div class='mt'>";
@@ -378,12 +422,12 @@ $("main").addEventListener("click",async function(e){
 });
 
 /* ---------- router ---------- */
-var TT={home:"ASTERION",materi:"MATERI & RANGKUMAN",rekaman:"REKAMAN KULIAH",jadwal:"JADWAL KULIAH",run:"ASTERION RUN",dokter:"KONTAK DOKTER"};
+var TT={atur:"ATUR MENU",home:"ASTERION",materi:"MATERI & RANGKUMAN",rekaman:"REKAMAN KULIAH",jadwal:"JADWAL KULIAH",run:"ASTERION RUN",dokter:"KONTAK DOKTER"};
 function route(){
   if(!S.data)return;
   var P=location.hash.replace(/^#\/?/,"").split("/").filter(Boolean),tab=P[0]||"home",v;
-  if(tab==="materi")v=pMateri(P);else if(tab==="rekaman")v=pRekaman(P);else if(tab==="jadwal")v=pJadwal(P);else if(tab==="run"&&window.pRun)v=window.pRun(P);else if(tab==="dokter")v=pDokter(P);else{tab="home";v=pHome()}
-  $("main").innerHTML=v;$("ttl").textContent=TT[tab];
+  if(tab==="materi")v=pMateri(P);else if(tab==="rekaman")v=pRekaman(P);else if(tab==="jadwal")v=pJadwal(P);else if(tab==="run"&&window.pRun)v=window.pRun(P);else if(tab==="dokter")v=pDokter(P);else if(tab==="atur")v=pAtur();else{tab="home";v=pHome()}
+  renderNav();$("main").innerHTML=v;$("ttl").textContent=(tab!=="home"&&tab!=="atur"&&uiName(tab)?uiName(tab).toUpperCase():TT[tab]);
   $("back").hidden=P.length<2;$("back").href="#/"+P.slice(0,-1).join("/");
   [].forEach.call(document.querySelectorAll(".nav a"),function(a){a.classList.toggle("on",a.dataset.t===tab)});
   if(tab!=="jadwal")window.scrollTo(0,0)}
@@ -399,6 +443,7 @@ $("main").addEventListener("click",async function(e){
     var o={n:n};if(u){o.u=/^https?:\/\//i.test(u)?u:"https://"+u}else if(hh.length>6e4){var rr=await api("html",{m:"POST",b:{h:hh}});if(!rr.ok){toast("Gagal menyimpan HTML");return}o.hid=rr.j.id}else o.h=hh;arr.unshift(o)}
   else if(a==="ren"){var nn=prompt("Nama baru:",arr[i].n);if(!nn||!nn.trim())return;arr[i].n=nn.trim().slice(0,200)}
   else if(a==="addtop"){var nm=$("tN").value.trim();if(!nm){toast("Isi nama dulu");return}arr.unshift(b.dataset.k==="materi"?{n:nm,lab:[],all:[]}:{n:nm,kl:[],blok:[],lab:[]})}
+  else if(a.indexOf("ui-")===0){if(!uiAct(b,a))return}
   else if(a==="reset"){var r=await api("reset",{m:"POST",b:{u:$("rU").value}});toast(r.ok?"Password direset ✓":"Username tidak valid");return}
   else if(a==="sheet"){var sid=$("sId").value.trim();if(!sid){toast("Isi ID spreadsheet");return}var tl=$("sTabs").value.split("\n").map(function(l){var p=l.split("|");return{n:(p[0]||"").trim(),g:(p[1]||"").trim()}}).filter(function(t){return t.n&&/^\d+$/.test(t.g)});
     S.data.sheet={id:sid,tabs:tl.length?tl:S.data.sheet.tabs};S.tabs=null}
