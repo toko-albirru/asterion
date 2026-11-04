@@ -3,19 +3,32 @@
   "main": "src/worker.js",
   "compatibility_date": "2026-10-01",
   "keep_vars": true,
+
+  // File statis (index.html, run.js, dll). Hanya /api/* yang lewat worker.
   "assets": {
     "directory": "./public",
     "binding": "ASSETS",
     "run_worker_first": ["/api/*"]
   },
+
+  // KV: data link, akun, jadwal (sudah ada)
   "kv_namespaces": [
     { "binding": "LINKS", "id": "587d322643cd4434a3909abc1f1405c6" }
+  ],
+
+  // D1: dipakai ASTERION RUN (bank soal, sesi, skor).
+  // GANTI database_id dengan ID database D1 milikmu (lihat README langkah B).
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "asterion-run",
+      "database_id": "de8e8827-c5c2-494a-b297-a2d88434b233"
+    }
   ]
-}
-{
-  // ...
-  "vars": {
-    "DOKTER_SECRET": "NO_DOKTER"
-  },
-  // ...
+
+  // OPSIONAL - arsip PDF asli (butuh R2). Hapus tanda // di bawah kalau sudah membuat bucket:
+  // ,"r2_buckets": [{ "binding": "RUN_FILES", "bucket_name": "asterion-run-files" }]
+
+  // JANGAN taruh ADMIN_PASSWORD, DOKTER_SECRET, YT_API_KEY, GOOGLE_API_KEY, DRIVE_API_KEY di sini.
+  // Isi lewat dashboard: Settings -> Variables and Secrets -> tipe Secret.
 }
