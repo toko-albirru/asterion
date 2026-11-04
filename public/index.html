@@ -95,8 +95,8 @@ h1{margin:0;display:inline-block;padding:0 .12em;font-family:Cinzel,Georgia,seri
 .pv-m .bar .tl span{font:600 12px Inter,sans-serif;color:var(--mut);min-width:62px;text-align:center}
 .pv-m .bar .tl button{min-width:36px;padding:0 8px;font-size:16px}
 .pnote{flex:none;padding:8px 12px;font-size:12px;color:var(--warn);background:rgba(22,18,34,.92);border-bottom:1px solid rgba(255,255,255,.1)}
-.pdfc{position:absolute;inset:0;overflow:auto;padding:10px 8px 60px;-webkit-overflow-scrolling:touch;background:rgba(10,6,22,.45)}
-.pdfc .pg{margin:0 auto 10px;background:#fff;box-shadow:0 6px 22px rgba(0,0,0,.45);position:relative;overflow:hidden}
+.pdfc{position:absolute;inset:0;overflow:auto;scroll-snap-type:y proximity;padding:10px 8px 10px;-webkit-overflow-scrolling:touch;background:rgba(10,6,22,.45)}
+.pdfc .pg{scroll-snap-align:center;margin:0 auto 14px;background:#fff;box-shadow:0 6px 22px rgba(0,0,0,.45);position:relative;overflow:hidden}
 .pdfc canvas{display:block;width:100%;height:100%}
 .pst{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;color:var(--mut);font-size:13px;text-align:center;padding:20px}
 .pbar{width:min(260px,70%);height:6px;border-radius:99px;background:rgba(255,255,255,.15);overflow:hidden}
@@ -104,8 +104,14 @@ h1{margin:0;display:inline-block;padding:0 .12em;font-family:Cinzel,Georgia,seri
 .pp{position:absolute;inset:0;display:flex;flex-direction:column}
 .pp .sg{flex:1;min-height:120px;position:relative;background:#0b0816;overflow:hidden;display:block}
 .pp .sg>iframe{position:absolute;inset:0;width:100%;height:100%}
-.pp .sg>div:not(.pst){box-shadow:0 8px 30px rgba(0,0,0,.5)}
-.pp .nt{flex:none;height:36%;min-height:150px;max-height:48%;display:flex;flex-direction:column;background:rgba(22,18,34,.96);border-top:1px solid rgba(255,255,255,.12)}
+.pp .sc{position:absolute;inset:0;overflow:auto;scroll-snap-type:y proximity;padding:10px 8px;-webkit-overflow-scrolling:touch}
+.pp .sw{position:relative;margin:0 auto 14px;background:#161226;box-shadow:0 8px 30px rgba(0,0,0,.5);scroll-snap-align:center;overflow:hidden}
+.pp .sw>div{position:absolute}
+.pp.own [data-n]{display:none}
+.pp .spl{flex:none;height:16px;cursor:row-resize;touch-action:none;display:flex;align-items:center;justify-content:center;background:rgba(22,18,34,.96);border-top:1px solid rgba(255,255,255,.12);user-select:none}
+.pp .spl i{width:48px;height:4px;border-radius:4px;background:rgba(255,255,255,.35)}
+.pp .spl:hover i,.pp .spl.dr i{background:var(--gold)}
+.pp .nt{flex:none;height:36%;min-height:90px;display:flex;flex-direction:column;background:rgba(22,18,34,.96)}
 .pp .nh{display:flex;gap:6px;align-items:center;padding:8px 10px;border-bottom:1px solid rgba(255,255,255,.1)}
 .pp .nh button{flex:none;height:36px;min-width:36px;padding:0 8px;border-radius:10px;color:#fff;font:600 13px Inter,sans-serif;cursor:pointer}
 .pp .nh select.in{flex:1;min-width:0;margin:0;padding:8px 34px 8px 10px;font-size:13px}
@@ -578,7 +584,7 @@ async function pdfView(m,id){
   bd.innerHTML="<div class='pdfc'></div>";var c=bd.firstChild;
   tl.innerHTML="<button class='g' data-z='-1' aria-label='Perkecil'>−</button><span>1 / "+N+"</span><button class='g' data-z='1' aria-label='Perbesar'>＋</button>";
   var info=tl.querySelector("span"),pgs=[],vis=new Set(),p1=await pdf.getPage(1),v1=p1.getViewport({scale:1});
-  var wd=function(){return Math.max(120,Math.min(c.clientWidth-16,1100))*zoom};
+  var wd=function(){var ar=v1.width/v1.height;return Math.max(120,Math.min(c.clientWidth-16,(c.clientHeight-24)*ar,1600))*zoom};
   for(var i=1;i<=N;i++){var d=document.createElement("div");d.className="pg";d.dataset.i=i;c.appendChild(d);pgs.push(d)}
   function size(){var W=wd();pgs.forEach(function(d){d.style.width=W+"px";d.style.height=W*(d._r||v1.height/v1.width)+"px"})}
   async function draw(d){
@@ -614,30 +620,47 @@ async function pptView(m,id,k){
   var withN=sl.filter(function(q){return q.n}).length,cur=0,fs=15,mode=deck?"own":"drive",tok=0,
     src=k==="slides"?"https://docs.google.com/presentation/d/"+encodeURIComponent(id)+"/preview":"https://drive.google.com/file/d/"+encodeURIComponent(id)+"/preview";
   m.querySelector(".tl").innerHTML="";
-  m.querySelector(".bd").innerHTML="<div class='pp'><div class='sg'></div><div class='nt'><div class='nh'><button class='g' data-n='-1' aria-label='Slide sebelumnya'>‹</button><select class='in' aria-label='Pilih slide'>"+
+  m.querySelector(".bd").innerHTML="<div class='pp'><div class='sg'></div><div class='spl' role='separator' aria-label='Geser untuk mengubah ukuran slide dan catatan' title='Geser untuk ubah ukuran (klik 2x untuk reset)'><i></i></div><div class='nt'><div class='nh'><button class='g' data-n='-1' aria-label='Slide sebelumnya'>‹</button><select class='in' aria-label='Pilih slide'>"+
     sl.map(function(q,i){return"<option value='"+i+"'>"+(i+1)+". "+esc(q.t||"Slide "+(i+1))+(q.n?" 📝":"")+"</option>"}).join("")+"</select><button class='g' data-n='1' aria-label='Slide berikutnya'>›</button><span class='ct'></span>"+
     (deck?"<button class='g' data-v='1' title='Ganti tampilan slide'>Drive</button>":"")+"<button class='g' data-f='-1' aria-label='Kecilkan huruf'>A−</button><button class='g' data-f='1' aria-label='Besarkan huruf'>A+</button></div><div class='nh2'></div><div class='nb' tabindex='0'></div></div></div>";
   var pp=m.querySelector(".pp"),sg=pp.querySelector(".sg"),sel=pp.querySelector("select"),nb=pp.querySelector(".nb"),ct=pp.querySelector(".ct"),hint=pp.querySelector(".nh2"),vb=pp.querySelector("[data-v]");
-  function hn(){hint.textContent=mode==="own"?sl.length+" slide · "+withN+" punya catatan · geser/← → untuk ganti slide, catatan ikut berganti":(deck?"Tampilan Drive: slide & catatan tidak otomatis sinkron, pilih nomor slide yang sama. ":"Format .ppt: slide tampil dari Google Drive (tidak otomatis sinkron), pilih nomor slide yang sama. ")+sl.length+" slide · "+withN+" punya catatan"}
-  function fit(){var st=sg.firstElementChild;if(mode!=="own"||!deck||!st||!st.style||st.tagName==="DIV"&&st.classList.contains("pst"))return;var s=Math.min(sg.clientWidth/deck.W,sg.clientHeight/deck.H);st.style.transform="translate(-50%,-50%) scale("+s+")"}
-  function showDrive(){sg.innerHTML="<iframe src='"+src+"' allow='fullscreen' allowfullscreen></iframe>"}
-  function show(){
-    if(mode==="drive"){if(!sg.querySelector("iframe"))showDrive();return}
-    var my=++tok;if(!sg.firstElementChild)sg.innerHTML="<div class='pst'><div class='pt'>Menggambar slide…</div></div>";
-    deck.draw(cur).then(function(st){if(my!==tok||!pvAlive(m))return;if(sg.firstElementChild!==st){sg.innerHTML="";sg.appendChild(st)}fit()}).catch(function(){if(my!==tok||!pvAlive(m))return;mode="drive";if(vb)vb.textContent="Cepat";hn();showDrive()})}
-  function go(i){cur=Math.max(0,Math.min(sl.length-1,i));sel.value=cur;ct.textContent=(cur+1)+" / "+sl.length;var q=sl[cur];
-    if(q.n){nb.className="nb";nb.textContent=q.n}else{nb.className="nb no";nb.textContent=withN?"Slide "+(cur+1)+" tidak punya catatan pembicara.":"Presentasi ini tidak memiliki catatan pembicara."}nb.scrollTop=0;show()}
+  function hn(){hint.textContent=mode==="own"?sl.length+" slide · "+withN+" punya catatan · gulir untuk pindah slide, catatan ikut berganti":(deck?"Tampilan Drive: slide & catatan tidak otomatis sinkron, pilih nomor slide yang sama. ":"Format .ppt: slide tampil dari Google Drive (tidak otomatis sinkron), pilih nomor slide yang sama. ")+sl.length+" slide · "+withN+" punya catatan"}
+  var sc=null,sws=[],io=null,raf=0;
+  function dims(){var W=deck.W,H=deck.H,w=Math.max(120,Math.min(sg.clientWidth-16,(sg.clientHeight-24)*W/H,1600));return{w:w,h:w*H/W,k:w/W}}
+  function fit(){if(!sc||!deck)return;var d=dims();sws.forEach(function(w){w.style.width=d.w+"px";w.style.height=d.h+"px";var st=w.firstElementChild;if(st)st.style.transform="scale("+d.k+")"})}
+  function put(i){var w=sws[i];if(!w||w.firstElementChild)return;
+    deck.draw(i).then(function(st){if(!pvAlive(m)||!sc||w.firstElementChild||!w._vis)return;st.style.left="0";st.style.top="0";st.style.transformOrigin="0 0";w.appendChild(st);fit()}).catch(function(){w.textContent="Slide tidak bisa digambar"})}
+  function onScr(){if(raf)return;raf=requestAnimationFrame(function(){raf=0;if(!sc)return;var y=sc.scrollTop+sc.clientHeight/3,k=0;for(var j=0;j<sws.length;j++){if(sws[j].offsetTop+sws[j].offsetHeight>y){k=j;break}}if(k!==cur)setCur(k)})}
+  function buildOwn(){
+    sg.innerHTML="";sc=document.createElement("div");sc.className="sc";sg.appendChild(sc);
+    sws=sl.map(function(q,i){var w=document.createElement("div");w.className="sw";w.dataset.i=i;sc.appendChild(w);return w});
+    io=new IntersectionObserver(function(es){es.forEach(function(e){var w=e.target;w._vis=e.isIntersecting;if(e.isIntersecting)put(+w.dataset.i);else w.innerHTML=""})},{root:sc,rootMargin:"1200px 0px"});
+    fit();sws.forEach(function(w){io.observe(w)});sc.addEventListener("scroll",onScr);
+    sc.scrollTop=sws[cur].offsetTop-(sc.clientHeight-sws[cur].offsetHeight)/2}
+  function leaveOwn(){if(io)io.disconnect();io=null;sc=null;sws=[]}
+  function showDrive(){leaveOwn();sg.innerHTML="<iframe src='"+src+"' allow='fullscreen' allowfullscreen></iframe>"}
+  function setCur(i){cur=Math.max(0,Math.min(sl.length-1,i));sel.value=cur;ct.textContent=(cur+1)+" / "+sl.length;var q=sl[cur];
+    if(q.n){nb.className="nb";nb.textContent=q.n}else{nb.className="nb no";nb.textContent=withN?"Slide "+(cur+1)+" tidak punya catatan pembicara.":"Presentasi ini tidak memiliki catatan pembicara."}nb.scrollTop=0}
+  function go(i){setCur(i);if(mode==="own"&&sc){var w=sws[cur];sc.scrollTo({top:w.offsetTop-(sc.clientHeight-w.offsetHeight)/2,behavior:"smooth"})}}
   sel.onchange=function(){go(+sel.value)};
   pp.addEventListener("click",function(e){var b=e.target.closest("[data-n],[data-f],[data-v]");if(!b)return;
     if(b.dataset.n)go(cur+(+b.dataset.n));
-    else if(b.dataset.v){mode=mode==="own"?"drive":"own";b.textContent=mode==="own"?"Drive":"Cepat";hn();sg.innerHTML="";show()}
+    else if(b.dataset.v){mode=mode==="own"?"drive":"own";b.textContent=mode==="own"?"Drive":"Cepat";pp.classList.toggle("own",mode==="own");hn();if(mode==="own")buildOwn();else showDrive()}
     else{fs=Math.max(11,Math.min(30,fs+(+b.dataset.f>0?2:-2)));nb.style.setProperty("--nf",fs+"px")}});
-  var tx=null;sg.addEventListener("touchstart",function(e){tx=mode==="own"&&e.touches.length===1?e.touches[0].clientX:null},{passive:true});
-  sg.addEventListener("touchend",function(e){if(tx==null)return;var dx=e.changedTouches[0].clientX-tx;tx=null;if(Math.abs(dx)>50)go(cur+(dx<0?1:-1))});
   m._kd=function(e){if(/^(INPUT|TEXTAREA)$/.test((e.target||{}).tagName||""))return;var k2=e.key;if(k2==="ArrowRight"||k2==="PageDown")go(cur+1);else if(k2==="ArrowLeft"||k2==="PageUp")go(cur-1)};
   document.addEventListener("keydown",m._kd);
   if(window.ResizeObserver){m._ro=new ResizeObserver(fit);m._ro.observe(sg)}
-  hn();go(0)}
+  var spl=pp.querySelector(".spl"),nt=pp.querySelector(".nt");
+  function setNt(h){var mx=pp.clientHeight-spl.offsetHeight-120;h=Math.max(90,Math.min(mx,h));nt.style.height=h+"px";return h}
+  try{var sv=+localStorage.getItem("ast.ntf");if(sv>0&&sv<1)setNt(pp.clientHeight*sv)}catch(e){}
+  var dg=false;
+  spl.addEventListener("pointerdown",function(e){dg=true;spl.classList.add("dr");try{spl.setPointerCapture(e.pointerId)}catch(_){}e.preventDefault()});
+  spl.addEventListener("pointermove",function(e){if(!dg)return;var r=pp.getBoundingClientRect();setNt(r.bottom-e.clientY-spl.offsetHeight/2)});
+  function dEnd(){if(!dg)return;dg=false;spl.classList.remove("dr");try{localStorage.setItem("ast.ntf",String(nt.offsetHeight/pp.clientHeight))}catch(e){}}
+  spl.addEventListener("pointerup",dEnd);spl.addEventListener("pointercancel",dEnd);
+  spl.addEventListener("dblclick",function(){nt.style.height="";try{localStorage.removeItem("ast.ntf")}catch(e){}});
+  if(deck){pp.classList.add("own");buildOwn()}else showDrive();
+  hn();setCur(0)}
 
 async function pvOpen(id,name,k){
   pvClose();
