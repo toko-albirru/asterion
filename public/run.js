@@ -38,7 +38,7 @@
     ".rn-tg{display:flex;align-items:center;gap:8px;margin:8px 0;font-size:13px}.rn-tg input{width:auto}" +
     ".rn-nk{padding:12px 14px;margin:0 0 12px}.rn-nk.ask{border:1px solid rgba(245,192,74,.6);background:linear-gradient(135deg,rgba(245,192,74,.16),rgba(177,140,255,.14))}.rn-nk input.in{margin:8px 0 4px}" +
     ".rn-qo{width:100%;text-align:left;color:#fff;cursor:pointer;font-family:inherit;margin-bottom:8px;padding:12px}.rn-qo:hover:not(:disabled){border-color:var(--gold)}.rn-qo:disabled{cursor:default;color:#fff;opacity:1}.rn-qo.ok{border-color:var(--ok);background:rgba(74,222,128,.22)}.rn-qo.no{border-color:var(--bad);background:rgba(248,113,113,.22)}.rn-qo.sel{border-color:var(--gold);background:rgba(245,192,74,.16)}" +
-    ".rn-qz .q{white-space:pre-line;line-height:1.55;font-size:15px;margin:10px 0 14px;overflow-wrap:anywhere}.rn-qz img{max-width:100%;border-radius:10px;background:#fff;margin-bottom:10px}.rn-qt{font:700 18px Inter,sans-serif;font-variant-numeric:tabular-nums}.rn-qt.low{color:var(--bad)}.rn-qf{text-align:center;font-weight:700;margin:6px 0;min-height:22px}";
+    ".rn-qz .q{white-space:pre-line;line-height:1.55;font-size:15px;margin:10px 0 14px;overflow-wrap:anywhere}.rn-qz img{max-width:100%;border-radius:10px;background:#fff;margin-bottom:10px}.rn-qt{font:700 18px Inter,sans-serif;font-variant-numeric:tabular-nums}.rn-qt.low{color:var(--bad)}.rn-qo.key{border-color:var(--ok);background:rgba(74,222,128,.14)}.rn-qf{text-align:center;font-weight:700;margin:6px 0;min-height:22px}";
   (function () { var s = document.createElement("style"); s.textContent = CSS; document.head.appendChild(s); })();
 
   function errBox(r) {
@@ -163,7 +163,7 @@
 
   /* ======================= MODE SOAL (tanpa game) =======================
      Memakai sesi, timer per soal, dan penilaian yang sama persis dengan game (server yang menilai), hanya tampilannya berupa halaman soal biasa.
-     Skor ikut leaderboard. Pembahasan tetap dibuka setelah semua soal selesai. */
+     Skor ikut leaderboard. Setelah tiap soal dijawab, kunci & pembahasan langsung tampil; timer soal berikutnya mulai saat pemain menekan Lanjut. */
   function quizStop() { var Q = RS.quiz; if (!Q) return; clearInterval(Q.tm); clearTimeout(Q.fb); document.removeEventListener("keydown", Q.kd); RS.quiz = null; }
   async function quizFlow(cid, k) {
     quizStop(); destroyGame(); setRR("<div class='empty'>Menyiapkan soal…</div>");
@@ -174,11 +174,11 @@
       var p = r.j;
       if (p.adjusted) toast("Soal aktif hanya " + p.total + " (target " + p.requested + "): sesi disesuaikan.");
       var Q = RS.quiz = { k: k, sid: p.sid, name: "", qs: p.qs, total: p.total, qTime: p.q_time * 1000, cur: p.cur, score: p.score, dl: 0, busy: false, paused: false, tm: 0, fb: 0, kd: null };
-      Q.kd = function (e) { if (!RS.quiz || RS.quiz !== Q || e.ctrlKey || e.metaKey || e.altKey) return; var t = e.target && e.target.tagName; if (t === "INPUT" || t === "TEXTAREA" || t === "SELECT") return; var L = String(e.key || "").toUpperCase(); if (LET.indexOf(L) >= 0) quizAnswer(L); };
+      Q.kd = function (e) { if (!RS.quiz || RS.quiz !== Q || e.ctrlKey || e.metaKey || e.altKey) return; var t = e.target && e.target.tagName; if (t === "INPUT" || t === "TEXTAREA" || t === "SELECT") return; if (Q.review && (e.key === "Enter" || e.key === " ")) { e.preventDefault(); quizNext(); return; } var L = String(e.key || "").toUpperCase(); if (LET.indexOf(L) >= 0 && !Q.review) quizAnswer(L); };
       document.addEventListener("keydown", Q.kd);
       var c = (RS.cats || []).filter(function (x) { return x.id === cid; })[0]; Q.name = c ? c.name : "";
       if (p.status === "ready") {
-        setRR("<div class='rn-hero g'><h1 style='font-size:clamp(22px,6vw,30px)'>📝 Mode Soal</h1><p>" + (Q.name ? "<b>" + esc(Q.name) + "</b><br>" : "") + p.total + " soal · <b>" + p.q_time + " detik</b> per soal · tanpa game.<br>Jawab dengan menekan pilihan A–E (di komputer bisa pakai tombol keyboard A–E). Timer soal berikutnya langsung berjalan setelah kamu menjawab.</p><div class='rn-row'><button class='btn' data-ra='qz-begin'>▶ Mulai</button><a class='btn s' href='#/run'>Kembali</a></div></div>");
+        setRR("<div class='rn-hero g'><h1 style='font-size:clamp(22px,6vw,30px)'>📝 Mode Soal</h1><p>" + (Q.name ? "<b>" + esc(Q.name) + "</b><br>" : "") + p.total + " soal · <b>" + p.q_time + " detik</b> per soal · tanpa game.<br>Jawab dengan menekan pilihan A–E (di komputer bisa pakai tombol keyboard A–E). Setelah menjawab, kunci dan pembahasan langsung muncul; timer soal berikutnya mulai saat kamu menekan Lanjut.</p><div class='rn-row'><button class='btn' data-ra='qz-begin'>▶ Mulai</button><a class='btn s' href='#/run'>Kembali</a></div></div>");
         return;
       }
       var rem = p.remaining;
@@ -197,8 +197,8 @@
     Q.tm = setInterval(function () {
       if (RS.quiz !== Q || RS.route !== Q.k || !g("rr")) return quizStop();
       var rem = Q.dl - performance.now(), el = g("qzT"), bar = g("qzBar");
-      if (el && !Q.paused) { el.textContent = "⏱ " + fdur(Math.max(0, rem)); el.className = "rn-qt" + (rem < 10000 ? " low" : ""); }
-      if (bar) bar.style.width = Math.max(0, Math.min(100, rem / Q.qTime * 100)) + "%";
+      if (el && !Q.paused && !Q.review) { el.textContent = "⏱ " + fdur(Math.max(0, rem)); el.className = "rn-qt" + (rem < 10000 ? " low" : ""); }
+      if (bar && !Q.review) bar.style.width = Math.max(0, Math.min(100, rem / Q.qTime * 100)) + "%";
       if (rem <= 0 && !Q.busy && !Q.paused) quizAnswer(null);
     }, 150);
   }
@@ -224,13 +224,23 @@
     var j = r.j, t0 = performance.now(); Q.score = j.score;
     var hit = btns.filter(function (x) { return x.dataset.v2 === ans; })[0]; btns.forEach(function (x) { x.classList.remove("sel"); });
     if (hit) hit.classList.add(j.correct ? "ok" : "no");
-    var f = g("qzF"); if (f) { f.innerHTML = j.correct ? "<span class='rn-s-ok'>✔ Benar</span>" : j.blank ? "<span class='rn-s-warn'>⏰ Waktu habis — tidak dijawab</span>" : "<span class='rn-s-bad'>✘ Salah</span>"; }
-    if (!j.done) Q.dl = t0 + Q.qTime; // timer soal berikutnya sudah berjalan di server sejak jawaban diterima
-    Q.fb = setTimeout(function () {
-      if (RS.quiz !== Q) return;
-      if (j.done) { quizStop(); location.replace("#/run/result/" + Q.sid); return; }
-      Q.cur = j.cur; Q.busy = false; quizDraw();
-    }, 850);
+    var f = g("qzF"), key = j.ans || "";
+    btns.forEach(function (x) { if (key && x.dataset.v2 === key) x.classList.add("key"); });
+    var verdict = j.correct ? "<span class='rn-s-ok'>✔ Benar</span>" : j.blank ? "<span class='rn-s-warn'>⏰ Waktu habis — tidak dijawab</span>" : "<span class='rn-s-bad'>✘ Salah</span>";
+    var exH = j.explain ? (j.expl ? "<div class='rn-ex' style='text-align:left'><b>Pembahasan</b><br>" + esc(j.expl) + "</div>" : "<div class='rn-ex no' style='text-align:left'>Pembahasan belum tersedia untuk soal ini.</div>") : "";
+    if (f) { f.style.textAlign = "center"; f.innerHTML = verdict + (key ? "<div style='margin-top:4px'>Kunci jawaban: <b class='rn-s-ok' style='font-size:18px'>" + esc(key) + "</b></div>" : "") + exH + "<div style='margin-top:12px'><button class='btn' data-ra='qz-next'>" + (j.done ? "Lihat hasil ▶" : "Lanjut ▶") + "</button></div>"; try { f.scrollIntoView({ block: "nearest", behavior: "smooth" }); } catch (e) {} }
+    var tm = g("qzT"); if (tm) { tm.textContent = ""; tm.className = "rn-qt"; }
+    Q.review = j; // timer soal berikutnya baru berjalan setelah "Lanjut" ditekan (server menahan sesi sampai resume)
+  }
+  async function quizNext() {
+    var Q = RS.quiz; if (!Q || !Q.review || Q.nexting) return; var j = Q.review;
+    if (j.done) { quizStop(); location.replace("#/run/result/" + Q.sid); return; }
+    Q.nexting = true;
+    var r; try { r = await rapi("resume", { m: "POST", b: { sid: Q.sid } }); } catch (e) { Q.nexting = false; if (e === 0) return; toast("Koneksi terputus. Coba lagi."); return; }
+    if (!RS.quiz || RS.quiz !== Q) return; Q.nexting = false;
+    if (!r.ok) { toast((r.j && r.j.err) || "Gagal melanjutkan"); return; }
+    if (r.j.status === "done") { quizStop(); location.replace("#/run/result/" + Q.sid); return; }
+    Q.review = null; Q.cur = r.j.cur; Q.score = r.j.score; Q.dl = performance.now() + (r.j.remaining == null ? Q.qTime : r.j.remaining); Q.busy = false; quizDraw();
   }
   async function quizResync(Q, r) { // jawaban ditolak: samakan dengan keadaan di server
     var msg = r.j && r.j.err;
@@ -612,6 +622,7 @@
       else if (a === "nick-reset") { if (!confirm("Hapus nama samaran " + nmOf(b.dataset.u) + "?")) return; var rz = await rapi("admin/nick", { m: "POST", b: { u: b.dataset.u, nick: "" } }); toast(rz.ok ? "Nama dihapus" : "Gagal"); route(); }
       else if (a === "qz-begin") quizBegin();
       else if (a === "qz-ans") quizAnswer(b.dataset.v2);
+      else if (a === "qz-next") quizNext();
       else if (a === "qz-pause") quizPause();
       else if (a === "qz-resume") quizResume();
       else if (a === "qz-exit") quizExit();
