@@ -757,11 +757,12 @@ function zipPack(j,url,hd){
 /* tampilan asli: slide dari PDF hasil konversi Google (butuh GOOGLE_SA_JSON di server); catatan tetap dari PPTX. null bila tidak tersedia → pakai penggambar bawaan */
 async function pdfDeckTry(m,id,k,deck){
   var r=await fetch(fUrl(id,"pdfslides")+(k==="slides"?"&n=1":""),{headers:{authorization:"Bearer "+S.t}});
-  if(!r.ok||!pvAlive(m))return null;
+  if(!pvAlive(m))return null;
+  if(!r.ok){var ej=null;try{ej=await r.json()}catch(e){}m._pe=r.status===501?"gagal, secret GOOGLE_SA_JSON belum terbaca server (cek nama secret & deploy ulang)":r.status===404?"gagal, server belum memakai worker.js baru (belum ter-deploy)":"gagal ("+r.status+") "+((ej&&ej.err)||"");return null}
   var buf=await r.arrayBuffer();if(!pvAlive(m))return null;
   await lib(CDN+"pdf.js/3.11.174/pdf.min.js");pdfjsLib.GlobalWorkerOptions.workerSrc=CDN+"pdf.js/3.11.174/pdf.worker.min.js";
   var pdf=await pdfjsLib.getDocument({data:new Uint8Array(buf)}).promise;
-  if(pdf.numPages!==deck.sl.length){try{pdf.destroy()}catch(e){}return null}
+  if(pdf.numPages!==deck.sl.length){m._pe="gagal, jumlah halaman PDF ("+pdf.numPages+") beda dengan jumlah slide ("+deck.sl.length+")";try{pdf.destroy()}catch(e){}return null}
   var urls={};
   return{W:deck.W,H:deck.H,sl:deck.sl,
     free:function(){Object.keys(urls).forEach(function(i){urls[i].then(function(u){URL.revokeObjectURL(u)})});try{pdf.destroy()}catch(e){}deck.free()},
@@ -814,7 +815,7 @@ async function pptView(m,id,k){
     sl.map(function(q,i){return"<option value='"+i+"'>"+(i+1)+". "+esc(q.t||"Slide "+(i+1))+(q.n?" 📝":"")+"</option>"}).join("")+"</select><button class='g' data-n='1' aria-label='Slide berikutnya'>›</button><span class='ct'></span>"+
     (deck?"<button class='g' data-v='1' title='Ganti tampilan slide'>"+(old?"Sinkron":"Drive")+"</button>":"")+"<button class='g' data-f='-1' aria-label='Kecilkan huruf'>A−</button><button class='g' data-f='1' aria-label='Besarkan huruf'>A+</button></div><div class='nh2'></div><div class='nb' tabindex='0'></div></div></div>";
   var pp=m.querySelector(".pp"),sg=pp.querySelector(".sg"),sel=pp.querySelector("select"),nb=pp.querySelector(".nb"),ct=pp.querySelector(".ct"),hint=pp.querySelector(".nh2"),vb=pp.querySelector("[data-v]");
-  function hn(){hint.textContent=mode==="own"?sl.length+" slide · "+withN+" punya catatan · gulir untuk pindah slide, catatan ikut berganti · "+via+" "+((performance.now()-t0)/1000).toFixed(1)+"s"+(old?" · .ppt lama: tampil teks judul & isi saja, tekan Drive untuk tampilan asli":""):(deck?"Tampilan Drive (asli): slide & catatan tidak otomatis sinkron, pilih nomor slide yang sama."+(old?" Tekan Sinkron untuk geser slide + catatan otomatis (hanya teks). ":" "):"Format .ppt: slide tampil dari Google Drive (tidak otomatis sinkron), pilih nomor slide yang sama. ")+sl.length+" slide · "+withN+" punya catatan"}
+  function hn(){hint.textContent=mode==="own"?sl.length+" slide · "+withN+" punya catatan · gulir untuk pindah slide, catatan ikut berganti · "+via+" "+((performance.now()-t0)/1000).toFixed(1)+"s"+(old?" · .ppt lama: tampil teks judul & isi saja, tekan Drive untuk tampilan asli":"")+(m._pe?" · tampilan asli: "+m._pe:""):(deck?"Tampilan Drive (asli): slide & catatan tidak otomatis sinkron, pilih nomor slide yang sama."+(old?" Tekan Sinkron untuk geser slide + catatan otomatis (hanya teks). ":" "):"Format .ppt: slide tampil dari Google Drive (tidak otomatis sinkron), pilih nomor slide yang sama. ")+sl.length+" slide · "+withN+" punya catatan"}
   var sc=null,sws=[],io=null,raf=0;
   function dims(){var W=deck.W,H=deck.H,w=Math.max(120,Math.min(sg.clientWidth-16,(sg.clientHeight-24)*W/H,1600))*zoom;return{w:w,h:w*H/W,k:w/W}}
   var zl=tl.querySelector("span");
@@ -857,8 +858,9 @@ async function pptView(m,id,k){
   if(deck&&mode==="own"){pp.classList.add("own");buildOwn()}else{if(deck)tl.style.display="none";showDrive()}
   hn();setCur(0);
   /* tampilan asli menyusul di latar belakang: slide sudah bisa dipakai, lalu otomatis diganti begitu PDF Google siap */
-  if(deck&&!old){pdfDeckTry(m,id,k,deck).then(function(pd){if(!pd)return;if(!pvAlive(m)){pd.free();return}
-    deck=pd;m._deck=pd;via+=" + PDF Google";if(mode==="own"){buildOwn()}hn()}).catch(function(){})}}
+  if(deck&&!old){m._pe="sedang disiapkan (10–40 detik pertama kali)…";hn();
+    pdfDeckTry(m,id,k,deck).then(function(pd){if(!pvAlive(m)){if(pd)pd.free();return}if(!pd){hn();return}
+      deck=pd;m._deck=pd;m._pe="";via+=" + PDF Google";if(mode==="own"){buildOwn()}hn()}).catch(function(e){m._pe="error: "+String(e&&e.message||e).slice(0,120);if(pvAlive(m))hn()})}}
 
 async function pvOpen(id,name,k){
   pvClose();
