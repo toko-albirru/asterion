@@ -56,6 +56,7 @@ h1{margin:0;display:inline-block;padding:0 .12em;font-family:Cinzel,Georgia,seri
 .ak{display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:14px;margin:6px 0}
 .ak .n{flex:1;min-width:0}.ak .n b{display:block;font-size:14px;line-height:1.3}.ak .n small{display:block;color:var(--mut);font-size:11px;margin-top:2px}
 .stt{flex:none;font-size:11px;font-weight:600;padding:5px 10px;border-radius:999px;white-space:nowrap}
+.ak .dot{display:inline-block;width:9px;height:9px;border-radius:50%;background:#3ddc84;box-shadow:0 0 0 3px rgba(61,220,132,.25);margin-right:7px;vertical-align:middle;animation:onl 1.6s ease-in-out infinite}@keyframes onl{50%{box-shadow:0 0 0 6px rgba(61,220,132,0)}}.stt.on{background:rgba(61,220,132,.25);color:#3ddc84}
 .stt.ok{background:rgba(80,200,120,.18);color:#7fe3a1}.stt.bk{background:rgba(245,192,74,.18);color:var(--gold)}.stt.bl{background:rgba(255,255,255,.08);color:var(--mut)}
 .day{border-radius:22px;padding:14px 14px 4px;margin-bottom:14px}
 .day.today{box-shadow:0 0 0 2px rgba(245,192,74,.7),0 10px 30px rgba(8,4,24,.4)}
@@ -171,11 +172,17 @@ select.in option{background:#241a3f;color:#fff}
 var $=function(i){return document.getElementById(i)};
 var esc=function(s){return String(s==null?"":s).replace(/[&<>"']/g,function(c){return{"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]})};
 var S={t:localStorage.getItem("tk")||"",data:null,u:"",admin:false};
+/* detak "sedang online": dikirim tiap 90 dtk selama tab terlihat (admin tidak dihitung) */
+var BT=0;
+function beat(){if(!S.t||S.admin||document.hidden)return;api("ping",{m:"POST"}).catch(function(){})}
+function beatStart(){if(BT||S.admin||!S.t)return;beat();BT=setInterval(beat,9e4)}
+document.addEventListener("visibilitychange",function(){if(!document.hidden)beat()});
+function myName(){var u=String(S.u||"").toUpperCase();return S.admin?"Admin":((window.MHS||{})[u]||S.u)}
 function toast(m){var t=$("toast");t.textContent=m;t.classList.add("on");clearTimeout(toast.h);toast.h=setTimeout(function(){t.classList.remove("on")},2200)}
 async function api(p,o){o=o||{};var r=await fetch("/api/"+p,{method:o.m||"GET",headers:{"content-type":"application/json",authorization:"Bearer "+S.t},body:o.b?JSON.stringify(o.b):undefined});
   if(r.status===401&&p!=="login"){logout();throw 0}var j=null;try{j=await r.json()}catch(e){}return{ok:r.ok,s:r.status,j:j}}
 function setUser(){var u=S.t.split(".")[0]||"";S.u=u;S.admin=u==="admin"}
-function logout(){localStorage.removeItem("tk");S.t="";S.data=null;location.hash="#/";show("gate");$("lp").value=""}
+function logout(){clearInterval(BT);BT=0;localStorage.removeItem("tk");S.t="";S.data=null;location.hash="#/";show("gate");$("lp").value=""}
 function show(w){["gate","shell"].forEach(function(i){$(i).hidden=i!==w});if(w==="gate"){$("fLogin").hidden=false;$("fPw").hidden=true}}
 $("out").onclick=logout;
 
@@ -204,7 +211,7 @@ async function boot(){
   try{var r=await api("data");
     if(r.s===403){show("gate");$("fLogin").hidden=true;$("fPw").hidden=false;return}
     if(!r.ok){show("gate");return}
-    S.data=r.j;show("shell");route()
+    S.data=r.j;show("shell");route();beatStart()
   }catch(e){}
 }
 
@@ -316,7 +323,7 @@ function xA(el,n,d){var v=el?el.getAttribute(n):null;return v==null?d:v}
 function xHsl(r,g,b){r/=255;g/=255;b/=255;var mx=Math.max(r,g,b),mn=Math.min(r,g,b),h=0,s=0,l=(mx+mn)/2;if(mx!==mn){var d=mx-mn;s=l>.5?d/(2-mx-mn):d/(mx+mn);h=mx===r?(g-b)/d+(g<b?6:0):mx===g?(b-r)/d+2:(r-g)/d+4;h/=6}return[h,s,l]}
 function xRgb(h,s,l){function f(p,q,t){if(t<0)t+=1;if(t>1)t-=1;return t<1/6?p+(q-p)*6*t:t<1/2?q:t<2/3?p+(q-p)*(2/3-t)*6:p}if(!s)return[l*255,l*255,l*255];var q=l<.5?l*(1+s):l+s-l*s,p=2*l-q;return[f(p,q,h+1/3)*255,f(p,q,h)*255,f(p,q,h-1/3)*255]}
 var X_NUM={arabicPeriod:1,arabicParenR:1,arabicPlain:1,alphaLcPeriod:2,alphaLcParenR:2,alphaUcPeriod:3,alphaUcParenR:3,romanLcPeriod:4,romanUcPeriod:5};
-var X_WING={"§":"▪","Ø":"➢","ü":"✓","v":"❖","l":"●","n":"■","q":"❑","þ":"☑","¨":"□","w":"◆","u":"◆","o":"□","p":"▪","�":"•"};
+var X_WING={"§":"▪","Ø":"➢","ü":"✓","v":"❖","l":"●","n":"■","q":"❑","þ":"☑","¨":"□","w":"◆","u":"◆","o":"□","p":"▪"," ":"•"};
 function xAlpha(n,u){var s="";n++;while(n>0){var r=(n-1)%26;s=String.fromCharCode(97+r)+s;n=Math.floor((n-1)/26)}return u?s.toUpperCase():s}
 function xRoman(n,u){var m=[[1000,"m"],[900,"cm"],[500,"d"],[400,"cd"],[100,"c"],[90,"xc"],[50,"l"],[40,"xl"],[10,"x"],[9,"ix"],[5,"v"],[4,"iv"],[1,"i"]],s="";m.forEach(function(p){while(n>=p[0]){s+=p[1];n-=p[0]}});return u?s.toUpperCase():s}
 
@@ -865,10 +872,10 @@ function uiAct(b,a){
 function pHome(){
   setTimeout(todayFill,0);
   return "<div class='hero'><img class='mark' alt='' src='logo.webp'></div><div class='ttl'><h1>ASTERION</h1><div class='yr'>MMXXV</div></div>"+
-  "<p class='hint' style='text-align:center;font-size:14px'>Halo, <b>"+esc(S.u)+"</b> 👋<br>Seluruh rekaman, rangkuman, soal, dan materi kuliah ada disini, semangat belajarnya 🤩✨</p>"+
+  "<p class='hint' style='text-align:center;font-size:14px'>Halo, <b>"+esc(myName())+"</b> 👋<br>Seluruh rekaman, rangkuman, soal, dan materi kuliah ada disini, semangat belajarnya 🤩✨</p>"+
   "<div class='sec'>HARI INI</div><div id='today' class='pn g empty'>Memuat jadwal…</div><div id='next'></div>"+
   "<div class='sec'>MENU</div>"+cards(uiList("menu").filter(function(x){return !x.h}).map(function(x){return["#/"+x.id,x.i,x.n,x.s]}))+
-  (S.admin?"<div class='sec'>ADMIN</div>"+cards([["#/atur","🧭","Atur Menu, Navbar & Kategori","Ubah urutan, nama, dan ikon"],["#/run/admin","🛠️","Kelola ASTERION RUN","Kategori · soal & PDF · leaderboard"],["#/dokter/admin","📋","Pengajuan Dokter","Cek, edit, lalu setujui usulan"],["#/akun","👥","Status Akun Mahasiswa","Siapa yang sudah buka web & ganti password"]])+"<div class='pn g'><b>Reset password mahasiswa</b><div class='hint'>Mengembalikan password ke username (mahasiswa wajib membuat password baru saat login).</div><input id='rU' class='in' placeholder='G0025001'><button class='btn' data-a='reset'>Reset</button></div>":"")}
+  (S.admin?"<div class='sec'>ADMIN</div>"+cards([["#/atur","🧭","Atur Menu, Navbar & Kategori","Ubah urutan, nama, dan ikon"],["#/run/admin","🛠️","Kelola ASTERION RUN","Kategori · soal & PDF · leaderboard"],["#/dokter/admin","📋","Pengajuan Dokter","Cek, edit, lalu setujui usulan"],["#/akun","👥","Status Akun Mahasiswa","Siapa yang online, sudah buka web & ganti password"]])+"<div class='pn g'><b>Reset password mahasiswa</b><div class='hint'>Mengembalikan password ke username (mahasiswa wajib membuat password baru saat login).</div><input id='rU' class='in' placeholder='G0025001'><button class='btn' data-a='reset'>Reset</button></div>":"")}
 function jkt(){return new Date().toLocaleDateString("en-CA",{timeZone:"Asia/Jakarta"})}
 function pickTab(tabs){return tabs[Math.min(S.def||0,tabs.length-1)]||tabs[0]}
 async function todayFill(){
@@ -1064,36 +1071,38 @@ $("main").addEventListener("click",function(e){
 /* ---------- status akun mahasiswa (admin) ---------- */
 function akAgo(t){var m=Math.floor((Date.now()-t)/6e4);if(m<1)return"baru saja";if(m<60)return m+" mnt lalu";var h=Math.floor(m/60);if(h<24)return h+" jam lalu";var d=Math.floor(h/24);return d<30?d+" hari lalu":new Date(t).toLocaleDateString("id-ID",{timeZone:"Asia/Jakarta",day:"numeric",month:"short",year:"numeric"})}
 function akFull(t){return new Date(t).toLocaleString("id-ID",{timeZone:"Asia/Jakarta",day:"numeric",month:"short",year:"numeric",hour:"2-digit",minute:"2-digit"})+" WIB"}
+function akOn(n){var A=S.ak||{},t=(A.pt||{})[n];return !!(t&&(A.now||Date.now())-t<2e5)}
 function akSt(r){return r&&r.p?"ok":(r&&(r.f||r.l)?"bk":"bl")}  /* ok = sudah ganti password, bk = sudah buka tapi password masih NIM, bl = belum pernah buka */
-function akCount(){var U=(S.ak&&S.ak.users)||{},c={all:0,open:0,pw:0,nopw:0,none:0};Object.keys(window.MHS||{}).forEach(function(n){var st=akSt(U[n]);c.all++;if(st!=="bl")c.open++;if(st==="ok")c.pw++;else c.nopw++;if(st==="bl")c.none++});return c}
+function akCount(){var U=(S.ak&&S.ak.users)||{},c={all:0,on:0,open:0,pw:0,nopw:0,none:0};Object.keys(window.MHS||{}).forEach(function(n){var st=akSt(U[n]);c.all++;if(akOn(n))c.on++;if(st!=="bl")c.open++;if(st==="ok")c.pw++;else c.nopw++;if(st==="bl")c.none++});return c}
 function akRows(){
   var U=(S.ak&&S.ak.users)||{},M=window.MHS||{},f=S.akf||"all",q=(S.akq||"").toLowerCase().trim(),out=[];
   Object.keys(M).forEach(function(n){var r=U[n]||{f:0,l:0,p:0},st=akSt(r);
-    if(f==="open"&&st==="bl")return;if(f==="pw"&&st!=="ok")return;if(f==="nopw"&&st==="ok")return;if(f==="none"&&st!=="bl")return;
+    if(f==="on"&&!akOn(n))return;if(f==="open"&&st==="bl")return;if(f==="pw"&&st!=="ok")return;if(f==="nopw"&&st==="ok")return;if(f==="none"&&st!=="bl")return;
     if(q&&n.toLowerCase().indexOf(q)<0&&M[n].toLowerCase().indexOf(q)<0)return;
-    out.push({n:n,nm:M[n],r:r,st:st,t:Math.max(r.l||0,r.p>1?r.p:0)})});
-  out.sort(function(a,b){return b.t-a.t||a.n.localeCompare(b.n)});return out}
+    out.push({n:n,nm:M[n],r:r,st:st,on:akOn(n),t:Math.max(r.l||0,r.p>1?r.p:0)})});
+  out.sort(function(a,b){return (b.on-a.on)||b.t-a.t||a.n.localeCompare(b.n)});return out}
 function akDraw(){
   var el=$("akL");if(!el)return;var c=akCount(),f=S.akf||"all",rows=akRows(),
-  lab={all:"Semua",open:"Sudah buka web",pw:"Sudah ganti password",nopw:"Belum ganti password",none:"Belum pernah buka"};
-  $("akC").innerHTML=["all","open","pw","nopw","none"].map(function(k){return"<a href='javascript:void 0' class='chip g"+(f===k?" on":"")+"' data-ak='"+k+"'>"+lab[k]+" ("+c[k]+")</a>"}).join("");
+  lab={all:"Semua",on:"🟢 Sedang online",open:"Sudah buka web",pw:"Sudah ganti password",nopw:"Belum ganti password",none:"Belum pernah buka"};
+  $("akC").innerHTML=["all","on","open","pw","nopw","none"].map(function(k){return"<a href='javascript:void 0' class='chip g"+(f===k?" on":"")+"' data-ak='"+k+"'>"+lab[k]+" ("+c[k]+")</a>"}).join("");
   var tag={ok:"✅ Sudah ganti pw",bk:"👀 Pw masih NIM",bl:"Belum buka"};
   el.innerHTML=rows.length?rows.map(function(x){
     var i=[];
-    if(x.r.l)i.push("<span title='"+akFull(x.r.l)+"'>Terakhir buka "+akAgo(x.r.l)+"</span>");else if(x.st==="ok")i.push("Waktu buka belum tercatat");
+    if(x.on)i.push("<span style='color:#3ddc84'>Sedang online</span>");else if(x.r.l)i.push("<span title='"+akFull(x.r.l)+"'>Terakhir aktif "+akAgo(x.r.l)+"</span>");else if(x.st==="ok")i.push("Waktu buka belum tercatat");
     if(x.r.p>1)i.push("<span title='"+akFull(x.r.p)+"'>Ganti pw "+akAgo(x.r.p)+"</span>");
-    return"<div class='ak g'><div class='n'><b>"+esc(x.nm)+"</b><small>"+x.n+(i.length?" · "+i.join(" · "):"")+"</small></div><span class='stt "+x.st+"'>"+tag[x.st]+"</span></div>"}).join(""):"<div class='pn g empty'>Tidak ada yang cocok.</div>"}
+    return"<div class='ak g'><div class='n'><b>"+(x.on?"<span class='dot'></span>":"")+esc(x.nm)+"</b><small>"+x.n+(i.length?" · "+i.join(" · "):"")+"</small></div><span class='stt "+(x.on?"on":x.st)+"'>"+(x.on?"🟢 Online":tag[x.st])+"</span></div>"}).join(""):"<div class='pn g empty'>Tidak ada yang cocok.</div>"}
 async function akLoad(force){
   var el=$("akL");if(!el)return;
   if(!S.ak||force){
     if(!S.ak)el.innerHTML="<div class='pn g empty'>Memuat…</div>";
-    try{var r=await api("users");if(!r.ok||!r.j||!r.j.users){el.innerHTML="<div class='pn g empty'>Gagal memuat data akun"+(r.s?" ("+r.s+")":"")+".</div>";return}S.ak=r.j}catch(e){return}}
+    try{var r=await api("users");if(!r.ok||!r.j||!r.j.users){el.innerHTML="<div class='pn g empty'>Gagal memuat data akun"+(r.s?" ("+r.s+")":"")+".</div>";return}var J2=r.j,P2=J2.pt||{};Object.keys(P2).forEach(function(n){var o=J2.users[n]||(J2.users[n]={f:0,l:0,p:0});o.l=Math.max(o.l||0,P2[n]);o.f=o.f||P2[n]});S.ak=J2}catch(e){return}}
   akDraw()}
 function pAkun(){
   if(!S.admin)return"<div class='empty'>Khusus admin.</div>";
   setTimeout(function(){akLoad(true)},0);
+  clearInterval(S.akT);S.akT=setInterval(function(){if(!$("akL")){clearInterval(S.akT);return}if(!document.hidden)akLoad(true)},3e4);
   return"<div class='sec'>STATUS AKUN MAHASISWA</div><div class='chips' id='akC'></div><input id='akQ' class='in' placeholder='Cari nama atau NIM…' value=\""+esc(S.akq||"")+"\" style='margin-bottom:6px'>"+
-  "<div class='hint'>“Sudah buka web” = pernah login. “Sudah ganti pw” = password sudah bukan NIM lagi. Urut dari aktivitas terbaru. Pencatatan buka web dimulai sejak fitur ini dipasang; akun yang sudah ganti password otomatis dianggap sudah buka.</div>"+
+  "<div class='hint'>“Sedang online” = membuka web dalam ±3 menit terakhir (daftar diperbarui otomatis tiap 30 detik). “Sudah buka web” = pernah login. “Sudah ganti pw” = password sudah bukan NIM lagi. Urut dari aktivitas terbaru. Pencatatan buka web dimulai sejak fitur ini dipasang; akun yang sudah ganti password otomatis dianggap sudah buka.</div>"+
   "<div id='akL'></div><a href='javascript:void 0' class='btn s w' data-ak='reload' style='display:block;text-align:center;text-decoration:none;margin-top:10px'>↻ Muat ulang</a>"}
 $("main").addEventListener("click",function(e){var b=e.target.closest("[data-ak]");if(!b)return;if(b.dataset.ak==="reload"){akLoad(true);return}S.akf=b.dataset.ak;akDraw()});
 $("main").addEventListener("input",function(e){if(e.target.id!=="akQ")return;S.akq=e.target.value;akDraw()});
