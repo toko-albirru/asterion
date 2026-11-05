@@ -62,6 +62,7 @@
     ".rg-opts li{display:flex;gap:6px;align-items:flex-start;padding:2px 6px;border-radius:10px;background:rgba(255,255,255,.06);font-size:var(--fo,13px);line-height:1.25;border:1px solid transparent;overflow-wrap:anywhere;min-width:0}" +
     ".rg-opts li b{flex:none;width:1.7em;height:1.7em;border-radius:50%;display:grid;place-items:center;color:#120c24;font-size:.9em}" +
     ".rg-opts li.on{border-color:#fff;background:rgba(255,255,255,.2)}" +
+    ".rg-opts li.ok{border-color:#4ade80;background:rgba(74,222,128,.32);box-shadow:0 0 0 1px #4ade80 inset}.rg-opts li.no{border-color:#f87171;background:rgba(248,113,113,.34);box-shadow:0 0 0 1px #f87171 inset}" +
     ".rg-tg{flex:none;align-self:flex-end;font-size:11px;color:#d9cdf5;background:none;border:0;cursor:pointer;padding:0 6px}" +
     ".rg.min .rg-opts{display:none}@media (min-width:640px){.rg-opts{grid-template-columns:1fr 1fr}}.rg.two .rg-opts{grid-template-columns:1fr 1fr}" +
     ".rg-foot{position:relative;flex:none;padding:6px 10px calc(8px + env(safe-area-inset-bottom,0px));display:flex;justify-content:center;align-items:center;gap:10px;min-height:54px;background:linear-gradient(#150e2c,#0f0a1f);border-top:1px solid rgba(245,192,74,.2);z-index:2}" +
@@ -370,7 +371,10 @@
     }
     function feedback(r, letter) {
       var lane = letter ? LET.indexOf(letter) : st.lane, x = laneX(lane);
-      var kn = r.ans ? "<small class='rg-key'>Kunci jawaban: <b>" + r.ans + "</b></small>" : "";
+      var kn = ""; // kunci tidak ditulis; cukup pilihan soal diwarnai: benar = hijau, jawaban salah = merah
+      [].forEach.call(root.querySelectorAll("#rgO li"), function (li) { li.classList.remove("on", "ok", "no"); if (r.ans && li.dataset.l === r.ans) li.classList.add("ok"); else if (letter && li.dataset.l === letter && !r.correct) li.classList.add("no"); });
+      if (r.correct && letter) { var cl = root.querySelector("#rgO li[data-l='" + letter + "']"); if (cl) cl.classList.add("ok"); }
+      if (root.classList.contains("min")) { root.classList.remove("min"); $("rgTg").textContent = "Sembunyikan pilihan ▲"; fitHud(); }
       if (r.blank) { msg("WAKTU HABIS<small>Tidak dijawab · 0 poin</small>" + kn, "blank long"); sfx.blank(); flash("bad"); }
       else if (r.correct) { msg("BENAR! +1" + kn, "ok long"); sfx.ok(); flash("ok"); burst(x, 1.4, 0, 0x4ade80, 26); burst(x, 1.4, 0, 0xf5c04a, 18); st.score = r.score != null ? r.score : st.score + 1; }
       else { msg("SALAH<small>0 poin · lanjut ke soal berikutnya</small>" + kn, "bad long"); sfx.bad(); flash("bad"); shake(); burst(x, 1.4, 0, 0xf87171, 22); if (r.score != null) st.score = r.score; }
