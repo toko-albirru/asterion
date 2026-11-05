@@ -97,7 +97,8 @@
     var rs = c.resume, rm = rs ? rs.mode || "game" : "", prog = rs ? " (" + rs.cur + "/" + rs.total + ")" : "";
     var warn = function (m) { return rs && rm !== m ? " data-warn='Ada sesi " + (rm === "quiz" ? "Mode Soal" : "game") + " yang belum selesai " + prog.trim() + " di kategori ini. Mulai sesi baru dengan mode lain? Sesi lama akan dibatalkan.'" : ""; };
     return "<button class='btn' data-ra='go-mode' data-href='#/run/play/" + c.id + "'" + warn("game") + ">" + (rm === "game" ? "▶ Lanjutkan game" + prog : "🎮 Main game") + "</button>" +
-      "<button class='btn s' data-ra='go-mode' data-href='#/run/quiz/" + c.id + "'" + warn("quiz") + ">" + (rm === "quiz" ? "▶ Lanjutkan soal" + prog : "📝 Mode Soal") + "</button>";
+      "<button class='btn s' data-ra='go-mode' data-href='#/run/quiz/" + c.id + "'" + warn("quiz") + ">" + (rm === "quiz" ? "▶ Lanjutkan soal" + prog : "📝 Mode Soal") + "</button>" +
+      (rs ? "<button class='btn s' data-ra='cat-reset' data-cid='" + c.id + "' data-mode='" + rm + "' title='Ulang dari soal 1'>🔄 Reset" + prog + "</button>" : "");
   }
 
   /* ======================= NAMA SAMARAN LEADERBOARD ======================= */
@@ -633,6 +634,12 @@
     var b = e.target.closest && e.target.closest("[data-ra]"); if (!b || !b.closest("#rr")) return;
     var a = b.dataset.ra, id = +b.dataset.id, i = +b.dataset.i, v = b.dataset.v2, rv = RS.rv, im = RS.imp;
     try {
+      if (a === "cat-reset") { // ulang dari awal: batalkan sesi yang sedang berjalan di kategori ini (mode game maupun mode soal)
+        if (b.disabled) return; if (!confirm("Reset ujian di kategori ini? Progres sesi yang sedang berjalan dihapus dan kamu bisa mulai lagi dari soal 1 (skor sesi itu tidak dihitung).")) return;
+        b.disabled = true; var rs0 = await rapi("start", { m: "POST", b: { cat: +b.dataset.cid, mode: b.dataset.mode } });
+        var ok0 = rs0.ok && rs0.j && rs0.j.sid && rs0.j.status !== "done"; if (ok0) { var ra0 = await rapi("abandon", { m: "POST", b: { sid: rs0.j.sid } }); ok0 = ra0.ok; }
+        toast(ok0 ? "Sesi direset ✓ — mulai lagi dari soal 1" : ((rs0.j && rs0.j.err) || "Gagal mereset. Coba lagi.")); RS.cats = null; route(); return;
+      }
       if (a === "go-mode") { if (b.dataset.warn && !confirm(b.dataset.warn)) return; location.hash = b.dataset.href; }
       else if (a === "nick-edit") { g("rnNk").className = "pn g rn-nk"; g("rnNk").innerHTML = nickInner(true); var ni = g("rnNkI"); if (ni) { ni.focus(); ni.select(); } }
       else if (a === "nick-cancel") g("rnNk").innerHTML = nickInner(false);
