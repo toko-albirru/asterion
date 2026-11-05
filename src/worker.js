@@ -295,7 +295,21 @@ function csv(t) {
   return R;
 }
 const MON = { januari: 1, februari: 2, maret: 3, april: 4, mei: 5, juni: 6, juli: 7, agustus: 8, september: 9, oktober: 10, november: 11, desember: 12 };
-const DAY = /^(senin|selasa|rabu|kamis|jum'?at|sabtu|minggu)\s*,/i;
+const MON3 = { jan: 1, feb: 2, mar: 3, apr: 4, mei: 5, jun: 6, jul: 7, agu: 8, ags: 8, sep: 9, okt: 10, nov: 11, des: 12 };
+// "Selasa, 10 November 2026" | "Selasa 10, November 2026" | "Kamis. 12 November 2026" | "Jum'at,13 Nov 2026"
+function parseTgl(t) {
+  t = String(t || "").trim();
+  const m = t.match(/^(senin|selasa|rabu|kamis|jum['’`]?at|sabtu|minggu|ahad)\b[\s,.:;\-–]*(\d{1,2})[\s,.\-/]*([a-z]+)\.?[\s,.\-/]*(\d{4})/i);
+  if (m) { const k = m[3].toLowerCase(), mo = MON[k] || MON3[k.slice(0, 3)]; return { iso: mo ? `${m[4]}-${String(mo).padStart(2, "0")}-${m[2].padStart(2, "0")}` : "" }; }
+  return /^(senin|selasa|rabu|kamis|jum['’`]?at|sabtu|minggu|ahad)\b[\s,.:;\-–]*\d/i.test(t) ? { iso: "" } : null;
+}
+// perbaikan gelar (hanya yang terverifikasi sumber resmi/publikasi terbaru)
+function fixName(s) {
+  if (!s) return s;
+  s = s.replace(/\bDr\s+(?=[A-Z])/g, "Dr. ");
+  s = s.replace(/(^|[\n;/]\s*)(?:Dr\.?\s+)?(?:dr\.\s+)?Budiyanti Wiboworini,?\s*(?:dr\.?,?\s*)?M\.?\s?Kes\.?,?\s*Sp\.?\s?GK\.?/gi, "$1Dr. Budiyanti Wiboworini, dr., M.Kes., Sp.GK");
+  return s;
+}
 function sched(rows) {
   const h = rows.findIndex((r) => r.some((c) => c.trim().toUpperCase() === "TANGGAL"));
   if (h < 0) return [];
@@ -305,17 +319,29 @@ function sched(rows) {
   const days = []; let cur = null;
   for (const r of rows.slice(h + 1)) {
     const t = g(r, C.t);
-    if (DAY.test(t)) {
-      const m = t.match(/(\d+)\s+(\w+)\s+(\d{4})/), mo = m && MON[m[2].toLowerCase()];
-      cur = { d: t, iso: m && mo ? `${m[3]}-${String(mo).padStart(2, "0")}-${m[1].padStart(2, "0")}` : "", items: [], notes: [] };
+    const pd = parseTgl(t);
+    if (pd) {
+      cur = { d: t.replace(/\s+/g, " "), iso: pd.iso, items: [], notes: [] };
       days.push(cur);
     } else if (t && cur) cur.notes.push(t);
     if (!cur) continue;
-    const it = { j: g(r, C.j), k: g(r, C.k), r: g(r, C.r), s: g(r, C.s), rs: g(r, C.rs), d: g(r, C.d), st: g(r, C.st), rk: g(r, C.rk), ke: g(r, C.ke) };
+    const it = { j: g(r, C.j), k: g(r, C.k), r: g(r, C.r), s: g(r, C.s), rs: g(r, C.rs), d: fixName(g(r, C.d)), st: fixName(g(r, C.st)), rk: g(r, C.rk), ke: g(r, C.ke) };
     if (it.k || it.s || it.rs || it.d || it.st || it.rk || it.ke) cur.items.push(it);
   }
   // tanggal terbaru di paling atas (yang tanpa tanggal valid di paling bawah)
   return days.map((d, i) => [d, i]).sort((a, b) => (a[0].iso < b[0].iso ? 1 : a[0].iso > b[0].iso ? -1 : a[1] - b[1])).map((x) => x[0]);
+}
+
+async function getSched(id, g) {
+  return cached(`sched/${id}/${g}`, 15, async () => {
+    const r = await fetch(`https://docs.google.com/spreadsheets/d/${id}/export?format=csv&gid=${g}`, { headers: { "cache-control": "no-cache" } });
+    return r.ok ? sched(csv(await r.text())) : null;
+  });
+}
+const jktToday = () => new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Jakarta" });
+// tanggal terakhir yang punya kegiatan di sebuah tab (akhir blok, mis. Ujian Blok)
+async function blockEnd(id, g) {
+  try { const d = await getSched(id, g); return d ? d.filter((x) => x.iso && x.items.length).reduce((m, x) => (x.iso > m ? x.iso : m), "") : ""; } catch { return ""; }
 }
 
 function uiOk(u) {
@@ -796,8 +822,13 @@ export default {
       const tabs = t || site.sheet.tabs, g = grp(a.u);
       let def = 0;
       if (g) { // tab terbaru (paling kiri) yang namanya diawali "A." / "B."
-        const re = new RegExp("^\\s*" + g + "\\s*\\.", "i"), i = tabs.findIndex((x) => re.test(x.n));
-        if (i >= 0) def = i;
+        const re = new RegExp("^\\s*" + g + "\\s*\\.", "i"), idx = tabs.map((x, i) => (re.test(x.n) ? i : -1)).filter((i) => i >= 0);
+        if (idx.length) {
+          def = idx[0];
+          // blok yang belum selesai didahulukan walaupun jadwal blok berikutnya sudah dibuat
+          const cand = idx.slice(0, 4), today = jktToday(), ends = await Promise.all(cand.map((i) => blockEnd(site.sheet.id, tabs[i].g)));
+          for (let k = cand.length - 1; k >= 0; k--) if (ends[k] && ends[k] >= today) { def = cand[k]; break; }
+        }
       }
       return J({ tabs, auto: !!t, def, grp: g });
     }
@@ -847,14 +878,15 @@ export default {
       for (const n of ["content-length", "content-range", "accept-ranges", "content-disposition"]) { const v = r.headers.get(n); if (v) o.set(n, v); }
       return new Response(r.body, { status: r.status, headers: o });
     }
+    if (path === "tutor" && M === "GET") {
+      const b = await cached("tutor/v1", 60, () => tutorBook(env));
+      return b ? J(b) : J({ err: "Spreadsheet tutorial tidak bisa dibaca. Pastikan dibagikan 'siapa saja yang memiliki link'." }, 502);
+    }
     if (path === "schedule" && M === "GET") {
       const g = url.searchParams.get("g") || "0";
       if (!/^\d{1,12}$/.test(g)) return J({ err: 1 }, 400);
       const id = (await getSite(env)).sheet.id;
-      const days = await cached(`sched/${id}/${g}`, 15, async () => {
-        const r = await fetch(`https://docs.google.com/spreadsheets/d/${id}/export?format=csv&gid=${g}`, { headers: { "cache-control": "no-cache" } });
-        return r.ok ? sched(csv(await r.text())) : null;
-      });
+      const days = await getSched(id, g);
       if (!days) return J({ err: "Spreadsheet tidak bisa dibaca. Pastikan dibagikan 'siapa saja yang memiliki link'." }, 502);
       return J(days);
     }
@@ -923,6 +955,83 @@ async function pptxPack(id, env, uc) {
   const e2 = {};
   for (const x of Object.keys(ent)) if (!(x in parts) && x.startsWith("ppt/") && ent[x].cs) e2[x] = [ent[x].o, ent[x].cs, ent[x].nl, ent[x].mt];
   return new Response(JSON.stringify({ p: parts, e: e2, nr }), { headers: { "content-type": "application/json", "cache-control": "private, max-age=600" } });
+}
+
+
+// ===== JADWAL TUTORIAL (spreadsheet .xlsx di Drive) ================================
+const TUTOR_ID = "1wGtzCT4qpjMb1I0RyhDhp-Wuy7CoOe59";
+const DAYN = ["Minggu", "Senin", "Selasa", "Rabu", "Kamis", "Jumat", "Sabtu"], MONN = ["Januari", "Februari", "Maret", "April", "Mei", "Juni", "Juli", "Agustus", "September", "Oktober", "November", "Desember"];
+const xmlDec = (s) => s.replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&quot;/g, '"').replace(/&apos;/g, "'").replace(/&#(\d+);/g, (_, n) => String.fromCodePoint(+n)).replace(/&#x([0-9a-f]+);/gi, (_, n) => String.fromCodePoint(parseInt(n, 16))).replace(/&amp;/g, "&");
+async function unzipBuf(buf) {
+  const u = new Uint8Array(buf), dv = new DataView(buf), td = new TextDecoder();
+  let e = u.length - 22; while (e >= 0 && dv.getUint32(e, true) !== 0x06054b50) e--;
+  if (e < 0) throw new Error("zip");
+  const cnt = dv.getUint16(e + 10, true); let q = dv.getUint32(e + 16, true); const ent = {};
+  for (let n = 0; n < cnt; n++) {
+    if (dv.getUint32(q, true) !== 0x02014b50) break;
+    const nl = dv.getUint16(q + 28, true), el = dv.getUint16(q + 30, true), cl = dv.getUint16(q + 32, true);
+    ent[td.decode(u.subarray(q + 46, q + 46 + nl))] = { mt: dv.getUint16(q + 10, true), cs: dv.getUint32(q + 20, true), o: dv.getUint32(q + 42, true) };
+    q += 46 + nl + el + cl;
+  }
+  return async (name) => {
+    const en = ent[name]; if (!en) return null;
+    const ds = en.o + 30 + dv.getUint16(en.o + 26, true) + dv.getUint16(en.o + 28, true), raw = u.subarray(ds, ds + en.cs);
+    return en.mt === 0 ? td.decode(raw) : new Response(new Blob([raw]).stream().pipeThrough(new DecompressionStream("deflate-raw"))).text();
+  };
+}
+const colIdx = (ref) => { let n = 0; for (const ch of ref.replace(/\d+/g, "")) n = n * 26 + ch.charCodeAt(0) - 64; return n - 1; };
+const attr = (s, k) => { const m = s.match(new RegExp("(?:^|\\s)" + k + '="([^"]*)"')); return m ? xmlDec(m[1]) : ""; };
+async function xlsxSheets(buf) {
+  const get = await unzipBuf(buf);
+  const wb = await get("xl/workbook.xml"), rels = (await get("xl/_rels/workbook.xml.rels")) || "", ss = (await get("xl/sharedStrings.xml")) || "";
+  if (!wb) throw new Error("xlsx");
+  const rt = {}; for (const m of rels.matchAll(/<Relationship\b[^>]*>/g)) { const t = attr(m[0], "Target"); rt[attr(m[0], "Id")] = t.startsWith("/") ? t.slice(1) : "xl/" + t.replace(/^\.\//, ""); }
+  const sst = []; for (const m of ss.matchAll(/<si\b[^>]*>([\s\S]*?)<\/si>/g)) sst.push(xmlDec([...m[1].replace(/<rPh\b[\s\S]*?<\/rPh>/g, "").matchAll(/<t\b[^>]*>([\s\S]*?)<\/t>/g)].map((x) => x[1]).join("")));
+  const out = [];
+  for (const m of wb.matchAll(/<sheet\b[^>]*>/g)) {
+    if (/state="(hidden|veryHidden)"/.test(m[0])) continue;
+    const path = rt[attr(m[0], "r:id")], x = path && (await get(path)); if (!x) continue;
+    const rows = [];
+    for (const rm of x.matchAll(/<row\b[^>]*?(?:\/>|>([\s\S]*?)<\/row>)/g)) {
+      const row = []; if (rm[1]) for (const cm of rm[1].matchAll(/<c\b([^>]*?)(?:\/>|>([\s\S]*?)<\/c>)/g)) {
+        const at = cm[1], body = cm[2] || "", t = attr(at, "t"), v = (body.match(/<v>([\s\S]*?)<\/v>/) || [])[1];
+        let val = "";
+        if (t === "s") val = sst[+v] || ""; else if (t === "inlineStr") val = xmlDec([...body.matchAll(/<t\b[^>]*>([\s\S]*?)<\/t>/g)].map((x2) => x2[1]).join("")); else if (v !== undefined) val = xmlDec(v);
+        row[colIdx(attr(at, "r") || "A1")] = val;
+      }
+      const r1 = +attr(rm[0].slice(0, 80), "r") || rows.length + 1; while (rows.length < r1 - 1) rows.push([]); rows.push(row);
+    }
+    out.push({ n: attr(m[0], "name"), rows });
+  }
+  return out;
+}
+function tutorItems(rows) {
+  const h = rows.findIndex((r) => r.some((c) => /^skenario$/i.test((c || "").trim())) && r.some((c) => /^tutor$/i.test((c || "").trim())));
+  if (h < 0) return [];
+  const H = rows[h].map((c) => (c || "").trim().toLowerCase()), f = (re, d) => { const i = H.findIndex((c) => re.test(c)); return i >= 0 ? i : d; };
+  const C = { sk: f(/^skenario/, 0), pt: f(/^pertemuan/, 1), tg: f(/^tanggal/, 2), jm: f(/^jam/, 3), kl: f(/kelompok/, 4), tu: f(/^tutor/, 5), rg: f(/^ruang/, 6) };
+  const g = (r, i) => (r[i] || "").replace(/\u200b/g, "").replace(/\s+/g, " ").trim(), cur = { sk: "", pt: "", tg: "", jm: "" }, items = [];
+  for (const r of rows.slice(h + 1)) {
+    let tg = g(r, C.tg); if (/^\d{5}(\.\d+)?$/.test(tg)) { const d = new Date(Date.UTC(1899, 11, 30) + Math.floor(+tg) * 864e5); tg = `${DAYN[d.getUTCDay()]}, ${d.getUTCDate()} ${MONN[d.getUTCMonth()]} ${d.getUTCFullYear()}`; }
+    if (tg) { cur.tg = tg; cur.jm = ""; }
+    for (const k of ["sk", "pt", "jm"]) { const v = g(r, C[k]); if (v) cur[k] = v; }
+    const kel = g(r, C.kl), tutor = fixName(g(r, C.tu));
+    if (!kel && !tutor) continue;
+    items.push({ sk: cur.sk, pt: cur.pt, tgl: cur.tg, iso: (parseTgl(cur.tg) || {}).iso || "", jam: cur.jm, kel: /^\d+$/.test(kel) ? +kel : kel, tutor, ruang: g(r, C.rg) });
+  }
+  return items;
+}
+async function tutorBook(env) {
+  const id = env.TUTOR_SHEET_ID || TUTOR_ID;
+  const urls = [`https://docs.google.com/spreadsheets/d/${id}/export?format=xlsx`, env.DRIVE_API_KEY && `https://www.googleapis.com/drive/v3/files/${id}?alt=media&supportsAllDrives=true&key=${env.DRIVE_API_KEY}`, `https://drive.usercontent.google.com/download?id=${id}&export=download&confirm=t`].filter(Boolean);
+  for (const u of urls) {
+    try {
+      const r = await fetch(u, { headers: UA, redirect: "follow" }); if (!r.ok) continue;
+      const b = await r.arrayBuffer(), h = new Uint8Array(b, 0, 2);
+      if (h[0] === 0x50 && h[1] === 0x4b) { const sh = await xlsxSheets(b), tabs = sh.map((s) => ({ n: s.n, items: tutorItems(s.rows) })).filter((t) => t.items.length); if (tabs.length) return { tabs }; }
+    } catch {}
+  }
+  return null;
 }
 
 // ===== KONTAK DOKTER (terhubung ke Google Sheets via Apps Script) ================
