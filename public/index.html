@@ -327,6 +327,71 @@ var X_WING={"§":"▪","Ø":"➢","ü":"✓","v":"❖","l":"●","n":"■","q":"
 function xAlpha(n,u){var s="";n++;while(n>0){var r=(n-1)%26;s=String.fromCharCode(97+r)+s;n=Math.floor((n-1)/26)}return u?s.toUpperCase():s}
 function xRoman(n,u){var m=[[1000,"m"],[900,"cm"],[500,"d"],[400,"cd"],[100,"c"],[90,"xc"],[50,"l"],[40,"xl"],[10,"x"],[9,"ix"],[5,"v"],[4,"iv"],[1,"i"]],s="";m.forEach(function(p){while(n>=p[0]){s+=p[1];n-=p[0]}});return u?s.toUpperCase():s}
 
+/* ---------- font pengganti seukuran font Office (Calibri→Carlito, Georgia→Gelasio, dst.) supaya tata letak slide sama dengan aslinya ---------- */
+var FMAP={"calibri":"Carlito","calibri light":"Carlito","cambria":"Caladea","georgia":"Gelasio","arial":"Arimo","arial narrow":"Arimo","arial black":"Arimo","helvetica":"Arimo","helvetica neue":"Arimo","times new roman":"Tinos","times":"Tinos","courier new":"Cousine","courier":"Cousine","lucida console":"Cousine","consolas":"Inconsolata","segoe ui":"Open Sans","segoe ui light":"Open Sans","segoe ui semibold":"Open Sans","tahoma":"Noto Sans","verdana":"Noto Sans","trebuchet ms":"Fira Sans","century gothic":"Poppins","aptos":"Inter","aptos display":"Inter","aptos narrow":"Inter","corbel":"Open Sans","candara":"Open Sans","franklin gothic book":"Libre Franklin","franklin gothic medium":"Libre Franklin","gill sans mt":"Lato","garamond":"EB Garamond","palatino linotype":"Tinos","book antiqua":"Tinos","constantia":"Gelasio","impact":"Anton","comic sans ms":"Comic Neue","rockwell":"Roboto Slab","calisto mt":"Gelasio"};
+var FSER=/^(cambria|georgia|times|times new roman|garamond|palatino linotype|book antiqua|constantia|calisto mt|rockwell|century schoolbook|bookman old style|tinos|gelasio|caladea|eb garamond|lora|merriweather|playfair display|cormorant|libre baskerville|pt serif|noto serif|roboto slab)$/i,FMONO=/^(courier new|courier|consolas|lucida console|monaco|menlo|cousine|inconsolata|fira code|roboto mono)$/i,FSKIP=/^(\+|symbol|wingdings|webdings|cambria math|segoe ui emoji|segoe ui symbol|segoe mdl2)/i;
+function ffam(fn){fn=String(fn||"").replace(/['"]/g,"").trim();if(!fn||fn.charAt(0)==="+")return"";var k=fn.toLowerCase(),sub=FMAP[k],g=FSER.test(k)?"serif":FMONO.test(k)?"monospace":"sans-serif";
+  return"'"+fn+"'"+(sub?",'"+sub+"'":"")+(g==="sans-serif"?",'Carlito','Calibri'":"")+","+g}
+var FLOAD={};
+function fontLoad(name){if(FLOAD[name])return FLOAD[name];
+  return FLOAD[name]=new Promise(function(ok){var urls=["family="+encodeURIComponent(name).replace(/%20/g,"+")+":ital,wght@0,400;0,700;1,400;1,700","family="+encodeURIComponent(name).replace(/%20/g,"+")+":wght@400;700","family="+encodeURIComponent(name).replace(/%20/g,"+")],i=0,done=false,tm=setTimeout(fin,5000);
+    function fin(){if(done)return;done=true;clearTimeout(tm);ok()}
+    function nx(){if(i>=urls.length)return fin();var l=document.createElement("link");l.rel="stylesheet";l.href="https://fonts.googleapis.com/css2?"+urls[i++]+"&display=swap";
+      l.onload=function(){Promise.all(["400","700","italic 400"].map(function(w){return document.fonts.load(w+" 16px '"+name+"'")})).then(fin,fin)};
+      l.onerror=function(){try{l.remove()}catch(e){}nx()};document.head.appendChild(l)}
+    try{nx()}catch(e){fin()}})}
+function fontsFor(docs,th){var set={Carlito:1};
+  docs.forEach(function(d){if(!d)return;[].forEach.call(d.getElementsByTagNameNS(NSA,"latin"),function(n){var t=(n.getAttribute("typeface")||"").trim();if(t&&!FSKIP.test(t)){set[FMAP[t.toLowerCase()]||t]=1}})});
+  if(th)[th.mj,th.mn].forEach(function(t){t=String(t||"").trim();if(t&&!FSKIP.test(t))set[FMAP[t.toLowerCase()]||t]=1});
+  return Promise.all(Object.keys(set).map(fontLoad))}
+var MKN=0;
+function svgArrow(sv,en,col,lw){var ty=en?en.getAttribute("type")||"none":"none";if(ty==="none")return null;
+  var SZ={sm:2,med:3,lg:5},wv=SZ[en.getAttribute("w")||"med"]||3,lv=SZ[en.getAttribute("len")||"med"]||3,u=Math.max(lw||1,1.6),W=wv*u,L=lv*u,id="mk"+(++MKN),NS="http://www.w3.org/2000/svg",
+    df=sv.querySelector("defs")||sv.insertBefore(document.createElementNS(NS,"defs"),sv.firstChild),mk=document.createElementNS(NS,"marker"),pa=document.createElementNS(NS,ty==="oval"?"ellipse":"path"),rx=L*.8;
+  mk.setAttribute("id",id);mk.setAttribute("markerUnits","userSpaceOnUse");mk.setAttribute("markerWidth",L);mk.setAttribute("markerHeight",W);mk.setAttribute("viewBox","0 0 "+L+" "+W);mk.setAttribute("orient","auto-start-reverse");mk.style.overflow="visible";
+  if(ty==="oval"){pa.setAttribute("cx",L/2);pa.setAttribute("cy",W/2);pa.setAttribute("rx",L/2);pa.setAttribute("ry",W/2);rx=L/2}
+  else if(ty==="diamond"){pa.setAttribute("d","M0 "+W/2+"L"+L/2+" 0L"+L+" "+W/2+"L"+L/2+" "+W+"Z");rx=L/2}
+  else if(ty==="stealth")pa.setAttribute("d","M0 0L"+L+" "+W/2+"L0 "+W+"L"+L*.3+" "+W/2+"Z");
+  else if(ty==="arrow"){pa.setAttribute("d","M0 0L"+L+" "+W/2+"L0 "+W);pa.setAttribute("fill","none");pa.setAttribute("stroke",col);pa.setAttribute("stroke-width",u);rx=L}
+  else pa.setAttribute("d","M0 0L"+L+" "+W/2+"L0 "+W+"Z");
+  if(ty!=="arrow")pa.setAttribute("fill",col);
+  mk.setAttribute("refX",rx);mk.setAttribute("refY",W/2);mk.appendChild(pa);df.appendChild(mk);return"url(#"+id+")"}
+/* bentuk preset → clip-path / radius (pendekatan bentuk bawaan PowerPoint) */
+function presetCss(prst,geom,PW,PH){
+  var ss=Math.min(PW,PH)||1;
+  function adj(n,d){var r=d;xKids(xK1(geom,"avLst"),"gd").forEach(function(g){if(xA(g,"name","")===n){var v=(xA(g,"fmla","")).split(" ")[1];if(v!=null&&!isNaN(+v))r=+v}});return r}
+  function pc(a,b){return(a/PW*100).toFixed(2)+"% "+(b/PH*100).toFixed(2)+"%"}
+  function poly(a){return"clip-path:polygon("+a.join(",")+");"}
+  var a1,a2,d,h,w=PW,H=PH;
+  switch(prst){
+    case"rightArrow":a1=adj("adj1",50000)/1e5;a2=adj("adj2",50000)/1e5;d=Math.min(ss*a2,w);h=H*a1/2;return poly([pc(0,H/2-h),pc(w-d,H/2-h),pc(w-d,0),pc(w,H/2),pc(w-d,H),pc(w-d,H/2+h),pc(0,H/2+h)]);
+    case"leftArrow":a1=adj("adj1",50000)/1e5;a2=adj("adj2",50000)/1e5;d=Math.min(ss*a2,w);h=H*a1/2;return poly([pc(w,H/2-h),pc(d,H/2-h),pc(d,0),pc(0,H/2),pc(d,H),pc(d,H/2+h),pc(w,H/2+h)]);
+    case"upArrow":a1=adj("adj1",50000)/1e5;a2=adj("adj2",50000)/1e5;d=Math.min(ss*a2,H);h=w*a1/2;return poly([pc(w/2-h,H),pc(w/2-h,d),pc(0,d),pc(w/2,0),pc(w,d),pc(w/2+h,d),pc(w/2+h,H)]);
+    case"downArrow":a1=adj("adj1",50000)/1e5;a2=adj("adj2",50000)/1e5;d=Math.min(ss*a2,H);h=w*a1/2;return poly([pc(w/2-h,0),pc(w/2-h,H-d),pc(0,H-d),pc(w/2,H),pc(w,H-d),pc(w/2+h,H-d),pc(w/2+h,0)]);
+    case"chevron":d=Math.min(ss*adj("adj",50000)/1e5,w);return poly([pc(0,0),pc(w-d,0),pc(w,H/2),pc(w-d,H),pc(0,H),pc(d,H/2)]);
+    case"homePlate":d=Math.min(ss*adj("adj",50000)/1e5,w);return poly([pc(0,0),pc(w-d,0),pc(w,H/2),pc(w-d,H),pc(0,H)]);
+    case"pentagon":return poly(["50% 0","100% 38%","82% 100%","18% 100%","0 38%"]);
+    case"hexagon":d=Math.min(ss*adj("adj",25000)/1e5,w/2);return poly([pc(d,0),pc(w-d,0),pc(w,H/2),pc(w-d,H),pc(d,H),pc(0,H/2)]);
+    case"octagon":d=Math.min(ss*adj("adj",29289)/1e5,ss/2);return poly([pc(d,0),pc(w-d,0),pc(w,d),pc(w,H-d),pc(w-d,H),pc(d,H),pc(0,H-d),pc(0,d)]);
+    case"parallelogram":d=Math.min(ss*adj("adj",25000)/1e5,w);return poly([pc(d,0),pc(w,0),pc(w-d,H),pc(0,H)]);
+    case"trapezoid":d=Math.min(ss*adj("adj",25000)/1e5,w/2);return poly([pc(d,0),pc(w-d,0),pc(w,H),pc(0,H)]);
+    case"rtTriangle":return poly(["0 0","100% 100%","0 100%"]);
+    case"plus":d=Math.min(ss*adj("adj",25000)/1e5,ss/2);return poly([pc(d,0),pc(w-d,0),pc(w-d,d),pc(w,d),pc(w,H-d),pc(w-d,H-d),pc(w-d,H),pc(d,H),pc(d,H-d),pc(0,H-d),pc(0,d),pc(d,d)]);
+    case"star5":return poly(["50% 0","61% 35%","98% 35%","68% 57%","79% 91%","50% 70%","21% 91%","32% 57%","2% 35%","39% 35%"]);
+    case"flowChartDecision":return poly(["50% 0","100% 50%","50% 100%","0 50%"]);
+    case"flowChartTerminator":return"border-radius:"+ss/2+"px;";
+    case"flowChartAlternateProcess":case"wedgeRoundRectCallout":d=ss*.1667;return"border-radius:"+d+"px;";
+    case"flowChartConnector":return"border-radius:50%;";
+    case"round2SameRect":d=ss*adj("adj1",16667)/1e5;return"border-radius:"+d+"px "+d+"px 0 0;";
+    case"round1Rect":d=ss*adj("adj",16667)/1e5;return"border-radius:0 "+d+"px 0 0;";
+    case"snip1Rect":d=ss*adj("adj",16667)/1e5;return poly([pc(0,0),pc(w-d,0),pc(w,d),pc(w,H),pc(0,H)]);
+    case"snip2SameRect":d=ss*adj("adj1",16667)/1e5;return poly([pc(d,0),pc(w-d,0),pc(w,d),pc(w,H),pc(0,H),pc(0,d)]);
+  }
+  return""}
+function shdwCss(spPr,X,colorOf){var ef=xK1(spPr,"effectLst"),sh=ef?xK1(ef,"outerShdw"):null;if(!sh)return"";
+  var c=colorOf(sh,X)||"rgba(0,0,0,.4)",dist=+xA(sh,"dist",0)/9525,dir=+xA(sh,"dir",0)/60000*Math.PI/180,bl=+xA(sh,"blurRad",0)/9525;
+  return"box-shadow:"+(dist*Math.cos(dir)).toFixed(1)+"px "+(dist*Math.sin(dir)).toFixed(1)+"px "+bl.toFixed(1)+"px "+c+";"}
+
 async function pptxOpen(z){
   var E=9525,dp=new DOMParser(),xc={},pc={},bu={},dcache={};
   async function xml(p){if(xc[p]!==undefined)return xc[p];var f=z.file(p);return xc[p]=f?dp.parseFromString(await f.async("string"),"application/xml"):null}
@@ -394,7 +459,7 @@ async function pptxOpen(z){
   function findPh(tree,ph,byIdx){if(!tree||!ph)return null;var ty=phT(ph),ix=xA(ph,"idx",null),sps=xKids(tree,"sp").concat(xKids(tree,"pic")),r=null;
     if(byIdx&&ix!=null)r=sps.filter(function(s){var h=phEl(s);return h&&xA(h,"idx",null)===ix})[0];
     if(!r)r=sps.filter(function(s){var h=phEl(s);return h&&phT(h)===ty})[0];return r||null}
-  var X_CI=99;function addR(r,n){["sz","b","i","u","strike","baseline"].forEach(function(a){if(n.hasAttribute(a))r[a]=n.getAttribute(a)});var sf=xK1(n,"solidFill");if(sf){r.sf=sf;r.sfi=X_CI}var la=xK1(n,"latin");if(la)r.lat=xA(la,"typeface","")}
+  var X_CI=99;function addR(r,n){["sz","b","i","u","strike","baseline","spc"].forEach(function(a){if(n.hasAttribute(a))r[a]=n.getAttribute(a)});var sf=xK1(n,"solidFill");if(sf){r.sf=sf;r.sfi=X_CI}var la=xK1(n,"latin");if(la)r.lat=xA(la,"typeface","")}
   function addP(o,n){["algn","marL","indent"].forEach(function(a){if(n.hasAttribute(a))o.a[a]=n.getAttribute(a)});
     xKids(n).forEach(function(c){var l=c.localName;if(l==="defRPr")addR(o.r,c);else if(/^(lnSpc|spcBef|spcAft|buClr|buSzPct|buFont)$/.test(l))o[l]=c;else if(/^bu(Char|AutoNum|None|Blip)$/.test(l))o.bu=c})}
   function lvl(chain,n){var o={a:{},r:{}};chain.forEach(function(ls,ix){X_CI=ix;var p=ls?xK1(ls,"lvl"+(n+1)+"pPr"):null;if(p)addP(o,p)});X_CI=99;return o}
@@ -406,6 +471,7 @@ async function pptxOpen(z){
   async function draw(i){
     if(dcache[i])return dcache[i];
     var s=sl[i],tc=await themeCtx(s.p),X={th:tc.th,cm:tc.cm},st=document.createElement("div");
+    try{await fontsFor([tc.spt.doc,tc.lp.doc,tc.mp.doc],tc.th)}catch(e){}
     if(z.prefetch){var pf=[];[tc.spt,tc.lp,tc.mp].forEach(function(P){Object.keys(P.rl).forEach(function(q){if(/\/image$/.test(P.rl[q].y))pf.push(res(P.path,P.rl[q].t))})});z.prefetch(pf)}
     st.style.cssText="position:absolute;left:50%;top:50%;width:"+SW/E+"px;height:"+SH/E+"px;background:#fff;overflow:hidden;transform-origin:center center;font-family:Calibri,Carlito,Arial,sans-serif;color:#000;line-height:1.2";
     var mas={tree:xPath(tc.mp.doc.documentElement,"cSld/spTree"),doc:tc.mp.doc},lay={tree:xPath(tc.lp.doc.documentElement,"cSld/spTree"),doc:tc.lp.doc};
@@ -464,12 +530,14 @@ async function pptxOpen(z){
     var isSvg=lineLike||cust;
     if(isSvg){
       var NS="http://www.w3.org/2000/svg",sv=document.createElementNS(NS,"svg"),vw=PW||1,vh=PH||1,pw=0,ph2=0,pd2="";
-      sv.setAttribute("width",PW);sv.setAttribute("height",PH);sv.style.cssText="position:absolute;left:0;top:0;overflow:visible";
+      sv.setAttribute("width",Math.max(PW,1));sv.setAttribute("height",Math.max(PH,1));sv.style.cssText="position:absolute;left:0;top:0;overflow:visible";
       if(cust){var pl=xK1(xK1(cust,"pathLst"),"path");pw=+xA(pl,"w",0)||PW*E;ph2=+xA(pl,"h",0)||PH*E;sv.setAttribute("viewBox","0 0 "+pw+" "+ph2);sv.setAttribute("preserveAspectRatio","none");
         xKids(pl).forEach(function(c){var pts=xKids(c,"pt").map(function(p){return xA(p,"x",0)+" "+xA(p,"y",0)}),k=c.localName;
           if(k==="moveTo")pd2+="M"+pts[0];else if(k==="lnTo")pd2+="L"+pts[0];else if(k==="cubicBezTo")pd2+="C"+pts.join(" ");else if(k==="quadBezTo")pd2+="Q"+pts.join(" ");else if(k==="close")pd2+="Z"});
-        var pa=document.createElementNS(NS,"path");pa.setAttribute("d",pd2);pa.setAttribute("fill",fillCol||"none");pa.setAttribute("vector-effect","non-scaling-stroke");if(lc){pa.setAttribute("stroke",lc);pa.setAttribute("stroke-width",lw||1);if(dashS)pa.setAttribute("stroke-dasharray",dashS)}sv.appendChild(pa)}
-      else{var li=document.createElementNS(NS,"line");li.setAttribute("x1",fh?PW:0);li.setAttribute("y1",fv?PH:0);li.setAttribute("x2",fh?0:PW);li.setAttribute("y2",fv?0:PH);li.setAttribute("stroke",lc||"#000");li.setAttribute("stroke-width",lw||1);if(dashS)li.setAttribute("stroke-dasharray",dashS);sv.appendChild(li)}
+        var pa=document.createElementNS(NS,"path");pa.setAttribute("d",pd2);pa.setAttribute("fill",fillCol||"none");pa.setAttribute("vector-effect","non-scaling-stroke");if(lc){pa.setAttribute("stroke",lc);pa.setAttribute("stroke-width",lw||1);if(dashS)pa.setAttribute("stroke-dasharray",dashS);
+          var hE2=svgArrow(sv,xK1(lnEl,"headEnd"),lc,lw||1),tE2=svgArrow(sv,xK1(lnEl,"tailEnd"),lc,lw||1);if(hE2)pa.setAttribute("marker-start",hE2);if(tE2)pa.setAttribute("marker-end",tE2)}sv.appendChild(pa)}
+      else{var li=document.createElementNS(NS,"line");li.setAttribute("x1",fh?PW:0);li.setAttribute("y1",fv?PH:0);li.setAttribute("x2",fh?0:PW);li.setAttribute("y2",fv?0:PH);li.setAttribute("stroke",lc||"#000");li.setAttribute("stroke-width",lw||1);if(dashS)li.setAttribute("stroke-dasharray",dashS);
+        var hE=svgArrow(sv,xK1(lnEl,"headEnd"),lc||"#000",lw||1),tE=svgArrow(sv,xK1(lnEl,"tailEnd"),lc||"#000",lw||1);if(hE)li.setAttribute("marker-start",hE);if(tE)li.setAttribute("marker-end",tE);sv.appendChild(li)}
       if(cust&&(fh||fv))sv.style.transform="scale("+(fh?-1:1)+","+(fv?-1:1)+")";
       d.appendChild(sv)}
     else{
@@ -478,6 +546,8 @@ async function pptxOpen(z){
       else if(prst==="ellipse")css+="border-radius:50%;";
       else if(prst==="triangle")css+="clip-path:polygon(50% 0,100% 100%,0 100%);";
       else if(prst==="diamond")css+="clip-path:polygon(50% 0,100% 50%,50% 100%,0 50%);";
+      else css+=presetCss(prst,geom,PW,PH);
+      if(fl&&fl!=="background:none;")css+=shdwCss(spPr,ctx.X,colorOf);
       d.style.cssText+=css}
     var tb=xK1(el,"txBody");
     if(tb&&paras2(tb)){await fillText(tb,el,ctx,lph,mph,d,st,PW)}
@@ -523,7 +593,8 @@ async function pptxOpen(z){
         if(r.b==="1")s2+="font-weight:700;";if(r.i==="1")s2+="font-style:italic;";
         if(r.u&&r.u!=="none")s2+="text-decoration:underline;";if(r.strike&&r.strike!=="noStrike")s2+="text-decoration:line-through;";
         if(r.baseline&&+r.baseline>0)s2+="vertical-align:super;font-size:"+KV(sz*.7)+";";else if(r.baseline&&+r.baseline<0)s2+="vertical-align:sub;font-size:"+KV(sz*.7)+";";
-        var fn=r.lat||"";fn=fn==="+mj-lt"?th.mj:fn==="+mn-lt"?th.mn:fn;if(fn&&fn.charAt(0)!=="+")s2+="font-family:'"+fn.replace(/'/g,"")+"',Calibri,Carlito,Arial,sans-serif;";
+        var fn=r.lat||"";fn=fn==="+mj-lt"?th.mj:fn==="+mn-lt"?th.mn:fn;if(fn&&fn.charAt(0)!=="+")s2+="font-family:"+ffam(fn)+";";
+        if(r.spc&&+r.spc)s2+="letter-spacing:calc("+((+r.spc)/100*96/72*fs).toFixed(3)+"px * var(--k,1));";
         sp2.style.cssText=s2;sp2.textContent=t;div.appendChild(sp2);first=false});
       /* bullet */
       var bu=o.bu,bt="";
@@ -683,6 +754,24 @@ function zipPack(j,url,hd){
   z.file=function(x){if(P[x]!==undefined)return{async:function(t){return Promise.resolve(t==="string"?P[x]:new TextEncoder().encode(P[x]).buffer)}};return f0(x)};
   z.core=function(){return[]};return z}
 
+/* tampilan asli: slide dari PDF hasil konversi Google (butuh GOOGLE_SA_JSON di server); catatan tetap dari PPTX. null bila tidak tersedia → pakai penggambar bawaan */
+async function pdfDeckTry(m,id,k,deck){
+  var r=await fetch(fUrl(id,"pdfslides")+(k==="slides"?"&n=1":""),{headers:{authorization:"Bearer "+S.t}});
+  if(!r.ok||!pvAlive(m))return null;
+  var buf=await r.arrayBuffer();if(!pvAlive(m))return null;
+  await lib(CDN+"pdf.js/3.11.174/pdf.min.js");pdfjsLib.GlobalWorkerOptions.workerSrc=CDN+"pdf.js/3.11.174/pdf.worker.min.js";
+  var pdf=await pdfjsLib.getDocument({data:new Uint8Array(buf)}).promise;
+  if(pdf.numPages!==deck.sl.length){try{pdf.destroy()}catch(e){}return null}
+  var urls={};
+  return{W:deck.W,H:deck.H,sl:deck.sl,
+    free:function(){Object.keys(urls).forEach(function(i){urls[i].then(function(u){URL.revokeObjectURL(u)})});try{pdf.destroy()}catch(e){}deck.free()},
+    draw:async function(i){
+      if(!urls[i])urls[i]=(async function(){var pg=await pdf.getPage(i+1),b=pg.getViewport({scale:1}),q=Math.min(3,Math.max(1,Math.min(2560,deck.W*2*(window.devicePixelRatio>1.5?1.3:1))/b.width)),vp=pg.getViewport({scale:q}),cv=document.createElement("canvas");
+        cv.width=Math.floor(vp.width);cv.height=Math.floor(vp.height);await pg.render({canvasContext:cv.getContext("2d",{alpha:false}),viewport:vp}).promise;pg.cleanup();
+        return await new Promise(function(ok,no){cv.toBlob(function(bl){bl?ok(URL.createObjectURL(bl)):no(new Error("blob"))},"image/jpeg",.92)})})();
+      var u=await urls[i],st=document.createElement("div");st.style.cssText="position:absolute;left:50%;top:50%;width:"+deck.W+"px;height:"+deck.H+"px;background:#fff;overflow:hidden;transform-origin:center center";
+      var im=document.createElement("img");im.src=u;im.alt="";im.draggable=false;im.style.cssText="width:100%;height:100%;display:block";st.appendChild(im);return st}}}
+
 async function pptView(m,id,k){
   pvStatus(m,"Membuka presentasi…");
   var t0=performance.now(),via="",url=fUrl(id,k),hd={authorization:"Bearer "+S.t},deck=null,sl=null,old=false;
@@ -766,7 +855,10 @@ async function pptView(m,id,k){
   spl.addEventListener("pointerup",dEnd);spl.addEventListener("pointercancel",dEnd);
   spl.addEventListener("dblclick",function(){nt.style.height="";try{localStorage.removeItem("ast.ntf")}catch(e){}});
   if(deck&&mode==="own"){pp.classList.add("own");buildOwn()}else{if(deck)tl.style.display="none";showDrive()}
-  hn();setCur(0)}
+  hn();setCur(0);
+  /* tampilan asli menyusul di latar belakang: slide sudah bisa dipakai, lalu otomatis diganti begitu PDF Google siap */
+  if(deck&&!old){pdfDeckTry(m,id,k,deck).then(function(pd){if(!pd)return;if(!pvAlive(m)){pd.free();return}
+    deck=pd;m._deck=pd;via+=" + PDF Google";if(mode==="own"){buildOwn()}hn()}).catch(function(){})}}
 
 async function pvOpen(id,name,k){
   pvClose();
