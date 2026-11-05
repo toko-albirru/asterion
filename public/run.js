@@ -106,8 +106,8 @@
     return "<div class='pn g rn-nk" + (ask && !RS.nick ? " ask" : "") + "' id='rnNk'>" + nickInner(!RS.nick, ask) + "</div>";
   }
   function nickInner(edit, ask) {
-    if (!edit) return "<div class='rn-hd'><span>Nama di leaderboard: <b>" + esc(RS.nick) + "</b></span><span class='sp'></span><button class='btn s sm' data-ra='nick-edit'>✏️ Ubah</button></div><div class='hint' style='margin:4px 0 0'>Boleh nama samaran bebas. Kalau diganti, nama di semua leaderboard (termasuk yang lama) ikut berubah. Admin tetap bisa melihat akun aslimu.</div>";
-    return "<b>" + (RS.nick ? "Ubah nama leaderboard" : ask ? "🎉 Satu langkah lagi — beri nama untuk leaderboard" : "Pilih nama untuk leaderboard") + "</b><div class='hint' style='margin:4px 0 0'>2–20 karakter, boleh nama samaran. Nama ini yang dilihat teman-temanmu; admin tetap melihat akun aslimu.</div>" +
+    if (!edit) return "<div class='rn-hd'><span>Nama di leaderboard: <b>" + esc(RS.nick) + "</b></span><span class='sp'></span><button class='btn s sm' data-ra='nick-edit'>✏️ Ubah</button></div><div class='hint' style='margin:4px 0 0'>Boleh nama samaran bebas. Kalau diganti, nama di semua leaderboard (termasuk yang lama) ikut berubah.</div>";
+    return "<b>" + (RS.nick ? "Ubah nama leaderboard" : ask ? "🎉 Satu langkah lagi — beri nama untuk leaderboard" : "Pilih nama untuk leaderboard") + "</b><div class='hint' style='margin:4px 0 0'>2–20 karakter, boleh nama samaran. Nama ini yang dilihat teman-temanmu.</div>" +
       "<input id='rnNkI' class='in' maxlength='20' autocomplete='off' placeholder='mis. Dokter Bintang' value=\"" + esc(RS.nick || "") + "\"><div class='rn-row'><button class='btn sm' data-ra='nick-save'>Simpan</button>" + (RS.nick ? "<button class='btn s sm' data-ra='nick-cancel'>Batal</button>" : "") + "</div>";
   }
 
