@@ -380,12 +380,21 @@ const RUN_DDL = [
   "CREATE TABLE IF NOT EXISTS run_answers ( sid TEXT NOT NULL, idx INTEGER NOT NULL, qid INTEGER, snap TEXT NOT NULL, chosen TEXT, correct INTEGER NOT NULL DEFAULT 0, ms INTEGER, answered INTEGER NOT NULL DEFAULT 0, PRIMARY KEY (sid, idx) )",
   "CREATE TABLE IF NOT EXISTS run_images ( id TEXT PRIMARY KEY, mime TEXT NOT NULL, data TEXT NOT NULL, created INTEGER NOT NULL )",
   "CREATE TABLE IF NOT EXISTS run_settings ( k TEXT PRIMARY KEY, v TEXT NOT NULL )",
-  "CREATE TABLE IF NOT EXISTS run_audit ( id INTEGER PRIMARY KEY AUTOINCREMENT, t INTEGER NOT NULL, u TEXT NOT NULL, act TEXT NOT NULL, detail TEXT NOT NULL DEFAULT '' )"
+  "CREATE TABLE IF NOT EXISTS run_audit ( id INTEGER PRIMARY KEY AUTOINCREMENT, t INTEGER NOT NULL, u TEXT NOT NULL, act TEXT NOT NULL, detail TEXT NOT NULL DEFAULT '' )",
+  // nama samaran leaderboard (satu per akun; nick_key = bentuk huruf kecil tanpa spasi untuk cek kembar)
+  "CREATE TABLE IF NOT EXISTS run_players ( u TEXT PRIMARY KEY, nick TEXT NOT NULL, nick_key TEXT NOT NULL UNIQUE, updated INTEGER NOT NULL )",
+  // status online: waktu ping terakhir tiap mahasiswa (ditulis klien tiap ±90 detik saat tab terlihat)
+  "CREATE TABLE IF NOT EXISTS run_presence ( u TEXT PRIMARY KEY, t INTEGER NOT NULL )"
 ];
 let runReady = false;
 async function runDb(env) {
   if (!env.DB) return null;
-  if (!runReady) { await env.DB.batch(RUN_DDL.map((s) => env.DB.prepare(s))); runReady = true; }
+  if (!runReady) {
+    await env.DB.batch(RUN_DDL.map((s) => env.DB.prepare(s)));
+    const cols = (await env.DB.prepare("PRAGMA table_info(run_sessions)").all()).results || [];
+    if (!cols.some((c) => c.name === "mode")) await env.DB.prepare("ALTER TABLE run_sessions ADD COLUMN mode TEXT NOT NULL DEFAULT 'game'").run(); // game | quiz
+    runReady = true;
+  }
   return env.DB;
 }
 const RUN_L = ["A", "B", "C", "D", "E"];
@@ -424,13 +433,35 @@ async function runGlobal(db, since) { // rata-rata akurasi terbaik per kategori 
   return [...by.values()].map((o) => ({ u: o.u, acc: o.sum / o.cats, cats: o.cats, games: gm.get(o.u) || 0, dur: o.dur }))
     .sort((a, b) => b.acc - a.acc || a.dur - b.dur || (a.u < b.u ? -1 : 1)).map((x, i) => ({ ...x, rank: i + 1 }));
 }
+// ---- nama samaran ----
+const RUN_NICK_BAN = ["admin", "administrator", "asterion", "moderator", "panitia"];
+function runNickCheck(v) {
+  const nick = String(v == null ? "" : v).normalize("NFKC").replace(/[\u0000-\u001f\u007f-\u009f\u200b-\u200f\u202a-\u202e\u2066-\u2069\ufeff<>]/g, "").replace(/\s+/g, " ").trim();
+  const n = [...nick].length;
+  if (n < 2 || n > 20) return { err: "Nama harus 2–20 karakter." };
+  const key = nick.toLowerCase().replace(/[\s._-]+/g, "");
+  if (!key || RUN_NICK_BAN.includes(key) || /^g0025\d{3}$/.test(key)) return { err: "Nama ini tidak dapat dipakai. Pilih nama lain." };
+  return { nick, key };
+}
+async function runNicks(db) { const m = new Map(); for (const r of (await db.prepare("SELECT u, nick FROM run_players").all()).results) m.set(r.u, r.nick); return m; }
+// pemain yang belum punya nama samaran tampil sebagai Anonim-XXXX (stabil, tidak bisa ditelusuri ke NIM)
+const runAnon = async (env, u) => "Anonim-" + (await hmac(K(env), "anon|" + u)).replace(/[^A-Za-z0-9]/g, "").slice(0, 4).toUpperCase();
+async function runSetNick(db, u, v, t) { // → { nick } | { err, s }
+  const c = runNickCheck(v);
+  if (c.err) return { err: c.err, s: 400 };
+  const dup = await db.prepare("SELECT u FROM run_players WHERE nick_key = ? AND u <> ?").bind(c.key, u).first();
+  if (dup) return { err: "Nama “" + c.nick + "” sudah dipakai pemain lain. Coba nama lain.", s: 409 };
+  try { await db.prepare("INSERT INTO run_players (u, nick, nick_key, updated) VALUES (?, ?, ?, ?) ON CONFLICT(u) DO UPDATE SET nick = excluded.nick, nick_key = excluded.nick_key, updated = excluded.updated").bind(u, c.nick, c.key, t).run(); }
+  catch { return { err: "Nama “" + c.nick + "” sudah dipakai pemain lain. Coba nama lain.", s: 409 }; }
+  return { nick: c.nick };
+}
 const runGet = (db, sid) => db.prepare("SELECT * FROM run_sessions WHERE id = ?").bind(String(sid || "")).first();
 
 async function runView(db, s, extra) { // keadaan sesi untuk klien — TANPA kunci & pembahasan
   const rows = (await db.prepare("SELECT idx, snap FROM run_answers WHERE sid = ? ORDER BY idx").bind(s.id).all()).results;
   const qs = rows.map((r) => { const q = JSON.parse(r.snap); return { idx: r.idx, q: q.q, o: { A: q.a, B: q.b, C: q.c, D: q.d, E: q.e }, img: q.img || "" }; });
   const t = Date.now();
-  return { sid: s.id, status: s.status, total: s.total, requested: s.requested, adjusted: s.requested > 0 && s.total < s.requested, q_time: s.q_time, cur: s.cur, score: s.score,
+  return { sid: s.id, status: s.status, mode: s.mode || "game", total: s.total, requested: s.requested, adjusted: s.requested > 0 && s.total < s.requested, q_time: s.q_time, cur: s.cur, score: s.score,
     remaining: s.status === "active" ? Math.max(0, s.q_time * 1000 - ((s.paused_at || t) - s.qstart)) : null, paused: !!s.paused_at, qs, ...extra };
 }
 async function runFinish(db, s, t) {
@@ -508,16 +539,17 @@ async function runApi(request, env, a, path, url, body, M) {
   if (path === "cats" && M === "GET") {
     const set = await runSettings(db);
     const cats = (await db.prepare("SELECT c.*, (SELECT COUNT(*) FROM run_questions q WHERE q.cat_id = c.id AND q.active = 1 AND q.verified = 1) AS aq, (SELECT COUNT(DISTINCT u) FROM run_sessions s WHERE s.cat_id = c.id AND s.status = 'done' AND s.u <> 'admin') AS players FROM run_cats c " + (a.admin ? "" : "WHERE c.active = 1 ") + "ORDER BY c.sort, c.id").all()).results;
-    const mine = (await db.prepare("SELECT cat_id, cur, total FROM run_sessions WHERE u = ? AND status IN ('ready', 'active')").bind(a.u).all()).results;
+    const mine = (await db.prepare("SELECT cat_id, cur, total, mode FROM run_sessions WHERE u = ? AND status IN ('ready', 'active')").bind(a.u).all()).results;
     const best = (await db.prepare("SELECT cat_id, score, total, acc, dur FROM (SELECT cat_id, score, total, acc, dur, ROW_NUMBER() OVER (PARTITION BY cat_id ORDER BY score DESC, acc DESC, dur ASC) rn FROM run_sessions WHERE u = ? AND status = 'done') WHERE rn = 1").bind(a.u).all()).results;
     const out = [];
     for (const c of cats) {
       const b = best.find((x) => x.cat_id === c.id), rs = mine.find((x) => x.cat_id === c.id);
       let me = null;
       if (b) { const i = a.admin ? -1 : (await runBoard(db, c.id, 0)).findIndex((x) => x.u === a.u); me = { score: b.score, total: b.total, acc: b.acc, dur: b.dur, rank: i + 1 }; }
-      out.push({ id: c.id, name: c.name, descr: c.descr, active: c.active, per_session: c.per_session, q_time: c.q_time, show_explain: c.show_explain, aq: c.aq, play: c.per_session > 0 ? Math.min(c.per_session, c.aq) : c.aq, players: c.players, me, resume: rs ? { cur: rs.cur, total: rs.total } : null });
+      out.push({ id: c.id, name: c.name, descr: c.descr, active: c.active, per_session: c.per_session, q_time: c.q_time, show_explain: c.show_explain, aq: c.aq, play: c.per_session > 0 ? Math.min(c.per_session, c.aq) : c.aq, players: c.players, me, resume: rs ? { cur: rs.cur, total: rs.total, mode: rs.mode || "game" } : null });
     }
-    return J({ cats: out, settings: set });
+    const myNick = a.admin ? undefined : ((await db.prepare("SELECT nick FROM run_players WHERE u = ?").bind(a.u).first()) || {}).nick || null;
+    return J({ cats: out, settings: set, nick: myNick });
   }
 
   // ---------- sesi permainan ----------
@@ -525,15 +557,17 @@ async function runApi(request, env, a, path, url, body, M) {
     const cat = await db.prepare("SELECT * FROM run_cats WHERE id = ?").bind(+body.cat || 0).first();
     if (!cat) return runErr("Kategori tidak ditemukan.", 404);
     if (!cat.active && !a.admin) return runErr("Kategori ini sedang dinonaktifkan.", 403);
+    const mode = body.mode === "quiz" ? "quiz" : "game"; // quiz = mode soal saja (tanpa game 3D)
     // lanjutkan sesi yang belum selesai pada kategori yang sama; sesi kategori lain dihentikan
     await db.prepare("UPDATE run_sessions SET status = 'abandoned' WHERE u = ? AND status IN ('ready', 'active') AND cat_id <> ?").bind(a.u, cat.id).run();
     let old = await db.prepare("SELECT * FROM run_sessions WHERE u = ? AND cat_id = ? AND status IN ('ready', 'active') ORDER BY started DESC LIMIT 1").bind(a.u, cat.id).first();
+    if (old && (old.mode || "game") !== mode) { await db.prepare("UPDATE run_sessions SET status = 'abandoned' WHERE id = ?").bind(old.id).run(); old = null; } // ganti mode = sesi baru
     if (old) { old = await runSync(db, old); if (old.status === "ready" || old.status === "active") return J(await runView(db, old, { resumed: true })); }
     const pool = (await db.prepare("SELECT id, num, q, a, b, c, d, e, ans, expl, img FROM run_questions WHERE cat_id = ? AND active = 1 AND verified = 1").bind(cat.id).all()).results;
     if (!pool.length) return runErr("Kategori ini belum memiliki soal aktif. Hubungi admin.", 409, { empty: true });
     const total = cat.per_session > 0 ? Math.min(cat.per_session, pool.length) : pool.length, pick = shuffle(pool).slice(0, total);
     const sid = b64(crypto.getRandomValues(new Uint8Array(12)));
-    await db.prepare("INSERT INTO run_sessions (id, u, cat_id, cat_name, status, total, requested, q_time, show_explain, started) VALUES (?, ?, ?, ?, 'ready', ?, ?, ?, ?, ?)").bind(sid, a.u, cat.id, cat.name, total, cat.per_session, cat.q_time, cat.show_explain, t).run();
+    await db.prepare("INSERT INTO run_sessions (id, u, cat_id, cat_name, status, total, requested, q_time, show_explain, started, mode) VALUES (?, ?, ?, ?, 'ready', ?, ?, ?, ?, ?, ?)").bind(sid, a.u, cat.id, cat.name, total, cat.per_session, cat.q_time, cat.show_explain, t, mode).run();
     const ins = pick.map((q, i) => db.prepare("INSERT INTO run_answers (sid, idx, qid, snap) VALUES (?, ?, ?, ?)").bind(sid, i, q.id, JSON.stringify({ q: q.q, a: q.a, b: q.b, c: q.c, d: q.d, e: q.e, ans: q.ans, expl: q.expl, img: q.img, num: q.num })));
     for (let i = 0; i < ins.length; i += 40) await db.batch(ins.slice(i, i + 40));
     return J(await runView(db, await runGet(db, sid)));
@@ -587,20 +621,29 @@ async function runApi(request, env, a, path, url, body, M) {
       const q = JSON.parse(r.snap);
       return { num: q.num, q: q.q, o: { A: q.a, B: q.b, C: q.c, D: q.d, E: q.e }, img: q.img || "", ans: q.ans, expl: ex ? q.expl || "" : null, chosen: r.chosen, correct: !!r.correct };
     });
-    return J({ s: { id: s.id, u: s.u, cat_id: s.cat_id, cat_name: s.cat_name, total: s.total, score: s.score, correct: s.correct, wrong: s.wrong, blank: s.blank, acc: s.acc, dur: s.dur, rank: s.rank, fin: s.fin }, items, explain: ex });
+    const own = (await db.prepare("SELECT nick FROM run_players WHERE u = ?").bind(s.u).first()) || {}, mine = s.u === a.u && !a.admin;
+    return J({ nick: own.nick || null, needNick: mine && !own.nick, s: { id: s.id, u: s.u, mode: s.mode || "game", cat_id: s.cat_id, cat_name: s.cat_name, total: s.total, score: s.score, correct: s.correct, wrong: s.wrong, blank: s.blank, acc: s.acc, dur: s.dur, rank: s.rank, fin: s.fin }, items, explain: ex });
   }
   if (path === "history" && M === "GET") {
-    const r = await db.prepare("SELECT id, cat_id, cat_name, fin, score, total, correct, wrong, blank, acc, dur, rank FROM run_sessions WHERE u = ? AND status = 'done' ORDER BY fin DESC LIMIT 100").bind(a.u).all();
+    const r = await db.prepare("SELECT id, cat_id, cat_name, mode, fin, score, total, correct, wrong, blank, acc, dur, rank FROM run_sessions WHERE u = ? AND status = 'done' ORDER BY fin DESC LIMIT 100").bind(a.u).all();
     return J({ rows: r.results });
   }
   if (path === "lb" && M === "GET") {
     const cat = qp("cat"), since = runSince(qp("p")), N = 50;
-    if (cat === "global") {
-      const all = await runGlobal(db, since), me = all.find((x) => x.u === a.u);
-      return J({ rows: all.slice(0, N), me: me ? { rank: me.rank } : null, count: all.length });
-    }
-    const all = await runBoard(db, +cat || 0, since), me = all.find((x) => x.u === a.u);
-    return J({ rows: all.slice(0, N), me: me ? { rank: me.rank } : null, count: all.length });
+    const all = cat === "global" ? await runGlobal(db, since) : await runBoard(db, +cat || 0, since), me = all.find((x) => x.u === a.u), nm = await runNicks(db);
+    const rows = await Promise.all(all.slice(0, N).map(async (x) => { // nama yang tampil = nama samaran TERKINI → ikut berubah di seluruh riwayat leaderboard
+      const o = { ...x, nick: nm.get(x.u) || (await runAnon(env, x.u)), me: x.u === a.u };
+      if (!a.admin) delete o.u; // mahasiswa lain tidak boleh tahu akun asli; admin tetap melihat
+      return o;
+    }));
+    return J({ rows, me: me ? { rank: me.rank } : null, count: all.length, nick: a.admin ? undefined : nm.get(a.u) || null });
+  }
+  if (path === "nick" && M === "POST") {
+    if (a.admin) return runErr("Admin tidak memakai nama samaran.");
+    const r = await runSetNick(db, a.u, body.nick, t);
+    if (r.err) return runErr(r.err, r.s);
+    await runAudit(db, a.u, "nama.ubah", r.nick);
+    return J({ nick: r.nick });
   }
 
   // ---------- admin ----------
@@ -611,7 +654,8 @@ async function runApi(request, env, a, path, url, body, M) {
       const one = async (sql) => (await db.prepare(sql).first()) || {};
       const tot = await one("SELECT (SELECT COUNT(*) FROM run_cats) cats, (SELECT COUNT(*) FROM run_questions WHERE active = 1 AND verified = 1) qa, (SELECT COUNT(*) FROM run_questions) qt, (SELECT COUNT(DISTINCT u) FROM run_sessions WHERE status = 'done' AND u <> 'admin') players, (SELECT COUNT(*) FROM run_sessions WHERE status = 'done' AND u <> 'admin') games, (SELECT AVG(acc) FROM run_sessions WHERE status = 'done' AND u <> 'admin') acc");
       const byCat = (await db.prepare("SELECT c.id, c.name, c.descr, c.active, c.per_session, c.q_time, c.show_explain, (SELECT COUNT(*) FROM run_questions q WHERE q.cat_id = c.id AND q.active = 1 AND q.verified = 1) aq, (SELECT COUNT(*) FROM run_questions q WHERE q.cat_id = c.id) tq, (SELECT COUNT(*) FROM run_sessions s WHERE s.cat_id = c.id AND s.status = 'done' AND s.u <> 'admin') games, (SELECT COUNT(DISTINCT u) FROM run_sessions s WHERE s.cat_id = c.id AND s.status = 'done' AND s.u <> 'admin') players, (SELECT AVG(acc) FROM run_sessions s WHERE s.cat_id = c.id AND s.status = 'done' AND s.u <> 'admin') acc FROM run_cats c ORDER BY c.sort, c.id").all()).results;
-      const recent = (await db.prepare("SELECT id, u, cat_name, fin, score, total FROM run_sessions WHERE status = 'done' AND u <> 'admin' ORDER BY fin DESC LIMIT 10").all()).results;
+      const nmap = await runNicks(db);
+      const recent = (await db.prepare("SELECT id, u, cat_name, mode, fin, score, total FROM run_sessions WHERE status = 'done' AND u <> 'admin' ORDER BY fin DESC LIMIT 10").all()).results.map((x) => ({ ...x, nick: nmap.get(x.u) || null }));
       return J({ cats: tot.cats, qActive: tot.qa, qInactive: tot.qt - tot.qa, players: tot.players, games: tot.games, acc: tot.acc || 0, byCat, recent });
     }
     if (ap === "cat" && M === "POST") {
@@ -726,6 +770,16 @@ async function runApi(request, env, a, path, url, body, M) {
       await runAudit(db, a.u, "pengaturan", JSON.stringify(v));
       return J({ ok: 1 });
     }
+    if (ap === "nicks" && M === "GET") return J({ rows: (await db.prepare("SELECT u, nick, updated FROM run_players ORDER BY nick COLLATE NOCASE").all()).results });
+    if (ap === "nick" && M === "POST") { // admin: ubah / hapus nama samaran (mis. nama tidak pantas). nick kosong = hapus
+      const u = String(body.u || "").trim().toUpperCase();
+      if (!isStu(u)) return runErr("NIM tidak valid.");
+      if (!String(body.nick || "").trim()) { await db.prepare("DELETE FROM run_players WHERE u = ?").bind(u).run(); await runAudit(db, a.u, "nama.reset", u); return J({ ok: 1 }); }
+      const r = await runSetNick(db, u, body.nick, t);
+      if (r.err) return runErr(r.err, r.s);
+      await runAudit(db, a.u, "nama.atur", u + " → " + r.nick);
+      return J({ nick: r.nick });
+    }
     if (ap === "audit" && M === "GET") return J({ rows: (await db.prepare("SELECT t, u, act, detail FROM run_audit ORDER BY id DESC LIMIT 200").all()).results });
     if (ap === "sessions" && M === "GET") {
       const rows = (await db.prepare("SELECT id, cat_id, cat_name, fin, score, total, acc, dur, rank FROM run_sessions WHERE u = ? AND status = 'done' ORDER BY fin DESC LIMIT 200").bind(qp("u").toUpperCase()).all()).results;
@@ -788,6 +842,10 @@ export default {
       return J({ ok: 1 });
     }
     if (a.mc) return J({ mc: true }, 403);
+    if (path === "ping" && M === "POST") { // detak "sedang online" dari klien (admin tidak dicatat)
+      if (!a.admin) { try { const pdb = await runDb(env); if (pdb) await pdb.prepare("INSERT INTO run_presence (u, t) VALUES (?, ?) ON CONFLICT(u) DO UPDATE SET t = excluded.t").bind(a.u, Date.now()).run(); } catch {} }
+      return J({ ok: 1 });
+    }
     if (path.startsWith("run/")) return runApi(request, env, a, path.slice(4), url, body, M);
     if (path === "dokter" || path.startsWith("dokter/")) return dokter(env, a, path, M, body);
 
@@ -827,7 +885,9 @@ export default {
       const [pw, op] = await Promise.all([all("u:"), all("a:")]), m = {};
       for (const k of op) { const u = k.name.slice(2); if (isStu(u)) m[u] = { f: (k.metadata && k.metadata.f) || 0, l: (k.metadata && k.metadata.l) || 0, p: 0 }; }
       for (const k of pw) { const u = k.name.slice(2); if (isStu(u)) m[u] = { f: 0, l: 0, ...(m[u] || {}), p: (k.metadata && k.metadata.t) || 1 }; } // p: 0 = belum, 1 = sudah (waktu tak tercatat), lainnya = waktu ganti
-      return J({ users: m, now: Date.now() });
+      const pt = {};
+      try { const pdb = await runDb(env); if (pdb) for (const r of (await pdb.prepare("SELECT u, t FROM run_presence").all()).results) if (isStu(r.u)) pt[r.u] = r.t; } catch {}
+      return J({ users: m, pt, now: Date.now() }); // pt: ping terakhir per NIM (klien menentukan "online" = now - pt < 200 dtk)
     }
     if (path === "reset" && M === "POST") {
       const u = String(body.u || "").trim().toUpperCase();
