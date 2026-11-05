@@ -986,11 +986,11 @@ function waLink(d,h,c){
   return "https://wa.me/62"+h.slice(1)+"?text="+encodeURIComponent(msg)}
 function dkItem(d){
   var p=[d.h1,d.h2].filter(Boolean).map(function(x){x=ph(x);return"<div class='mt'><a class='tag ok' href='tel:"+x+"'>📞 "+x+"</a><a class='tag' href='https://wa.me/62"+x.slice(1)+"' data-dk='wa' data-id=\""+esc(d.id)+"\" data-h='"+x+"'>Konfirmasi Kehadiran (WA)</a></div>"}).join("");
-  return"<div class='day g dk' data-n=\""+esc(String(d.n).toLowerCase())+"\"><div class='row'><b style='flex:1'>"+esc(d.n)+"</b><button class='ib g' style='height:34px' data-dk='edit' data-id=\""+esc(d.id)+"\" title='Usul ubah'>✎</button></div>"+(p||"<div class='hint'>Belum ada nomor</div>")+"</div>"}
+  return"<div class='day g dk' data-n=\""+esc(String(d.n).toLowerCase())+"\"><div class='row'><b style='flex:1'>"+esc(d.n)+"</b><button class='ib g' style='height:34px' data-dk='edit' data-id=\""+esc(d.id)+"\" title='"+(S.admin?"Ubah":"Usul ubah")+"'>✎</button><button class='ib g' style='height:34px' data-dk='del' data-id=\""+esc(d.id)+"\" title='"+(S.admin?"Hapus":"Usul hapus")+"'>🗑</button></div>"+(p||"<div class='hint'>Belum ada nomor</div>")+"</div>"}
 function pDokter(P){
   if(P[1]==="admin"&&S.admin){setTimeout(dkAdmin,0);return"<div class='sec'>PENGAJUAN DOKTER</div><div id='dka'><div class='empty'>Memuat…</div></div>"}
   setTimeout(dkInit,0);
-  return"<input id='dq' class='in' placeholder='🔍 Cari nama dokter…' autocomplete='off' style='margin-bottom:10px'><button class='btn s w' style='margin:0 0 12px' data-dk='new'>＋ Usulkan dokter baru</button><div id='dkf'></div><div id='dkl'><div class='empty'>Memuat daftar dokter…</div></div>"}
+  return"<input id='dq' class='in' placeholder='🔍 Cari nama dokter…' autocomplete='off' style='margin-bottom:10px'><button class='btn s w' style='margin:0 0 12px' data-dk='new'>＋ "+(S.admin?"Tambah dokter":"Usulkan dokter baru")+"</button>"+(S.admin?"<a class='btn s w' style='margin:0 0 12px;display:block;text-align:center' href='#/dokter/admin'>📥 Lihat pengajuan dari pengguna</a>":"")+"<div id='dkf'></div><div id='dkl'><div class='empty'>Memuat daftar dokter…</div></div>"}
 async function dkInit(){
   try{var r=await api("dokter"),el=$("dkl");if(!el)return;
     if(!r.ok||!Array.isArray(r.j)){el.innerHTML="<div class='pn g empty'>"+esc((r.j&&r.j.err)||"Daftar dokter belum bisa dimuat.")+(S.admin&&r.j&&r.j.dbg?"<br><small>Info admin: "+esc(r.j.dbg)+"</small>":"")+"</div>";return}
@@ -999,15 +999,16 @@ async function dkInit(){
   }catch(e){}}
 function dkForm(d){
   var f=$("dkf");if(!f)return;
-  f.innerHTML="<div class='pn g'><b>"+(d?"Usul ubah data":"Usulkan dokter baru")+"</b><div class='hint'>Usulan dicek admin dulu sebelum tampil di daftar.</div><label>Nama (lengkap dengan gelar)</label><input id='fn' value=\""+esc(d?d.n:"")+"\"><label>Nomor HP 1</label><input id='f1' inputmode='tel' value=\""+esc(d?ph(d.h1):"")+"\"><label>Nomor HP 2 (opsional)</label><input id='f2' inputmode='tel' value=\""+esc(d?ph(d.h2):"")+"\"><label>Catatan untuk admin (opsional)</label><input id='fc'><button class='btn w' data-dk='send'>Kirim</button><button class='btn s w' data-dk='cancel'>Batal</button><div class='err' id='fe'></div></div>";
+  f.innerHTML="<div class='pn g'><b>"+(S.admin?(d?"Ubah data dokter":"Tambah dokter"):(d?"Usul ubah data":"Usulkan dokter baru"))+"</b><div class='hint'>"+(S.admin?"Admin: perubahan langsung tersimpan ke spreadsheet, tanpa pengajuan.":"Usulan dicek admin dulu sebelum tampil di daftar.")+"</div><label>Nama (lengkap dengan gelar)</label><input id='fn' value=\""+esc(d?d.n:"")+"\"><label>Nomor HP 1</label><input id='f1' inputmode='tel' value=\""+esc(d?ph(d.h1):"")+"\"><label>Nomor HP 2 (opsional)</label><input id='f2' inputmode='tel' value=\""+esc(d?ph(d.h2):"")+"\">"+(S.admin?"":"<label>Catatan untuk admin (opsional)</label><input id='fc'>")+"<button class='btn w' data-dk='send'>"+(S.admin?"Simpan":"Kirim")+"</button><button class='btn s w' data-dk='cancel'>Batal</button><div class='err' id='fe'></div></div>";
   f.dataset.id=d?d.id:"";f.scrollIntoView({behavior:"smooth"})}
 async function dkAdmin(){
   try{var r=await api("dokter/pengajuan"),el=$("dka");if(!el)return;
     if(!r.ok||!Array.isArray(r.j)){el.innerHTML="<div class='pn g empty'>Gagal memuat.</div>";return}
     el.innerHTML=r.j.length?r.j.map(function(x){
       var old=x.tipe==="edit"&&x.old?"<div class='hint'>Data lama: "+esc(x.old.n)+" · "+esc(ph(x.old.h1))+(x.old.h2?" · "+esc(ph(x.old.h2)):"")+"</div>":"";
-      return"<div class='pn g dka' data-id=\""+esc(x.id)+"\"><span class='badge'>"+(x.tipe==="edit"?"UBAH":"BARU")+"</span><div class='hint'>Dari "+esc(x.oleh)+" · "+esc(x.waktu)+(x.cat?" · “"+esc(x.cat)+"”":"")+"</div>"+old+
-      "<label>Nama</label><input class='an' value=\""+esc(x.n)+"\"><label>Nomor HP 1</label><input class='a1' value=\""+esc(ph(x.h1))+"\"><label>Nomor HP 2</label><input class='a2' value=\""+esc(ph(x.h2))+"\"><div class='row'><button class='btn' style='flex:1' data-dk='acc'>✓ Setujui</button><button class='btn s' style='flex:1' data-dk='no'>✕ Tolak</button></div></div>"}).join(""):"<div class='pn g empty'>Tidak ada pengajuan 🎉</div>"
+      var hp=x.tipe==="hapus";
+      return"<div class='pn g dka' data-id=\""+esc(x.id)+"\"><span class='badge'>"+(x.tipe==="edit"?"UBAH":hp?"HAPUS":"BARU")+"</span><div class='hint'>Dari "+esc(x.oleh)+" · "+esc(x.waktu)+(x.cat?" · “"+esc(x.cat)+"”":"")+"</div>"+(hp?"<div class='hint'>Usul menghapus: <b>"+esc(x.n)+"</b>"+(x.old?" · "+esc(ph(x.old.h1))+(x.old.h2?" · "+esc(ph(x.old.h2)):""):" (sudah tidak ada di daftar)")+"</div>":"")+(hp?"":old)+
+      (hp?"":"<label>Nama</label><input class='an' value=\""+esc(x.n)+"\"><label>Nomor HP 1</label><input class='a1' value=\""+esc(ph(x.h1))+"\"><label>Nomor HP 2</label><input class='a2' value=\""+esc(ph(x.h2))+"\">")+"<div class='row'><button class='btn' style='flex:1' data-dk='acc'>"+(hp?"🗑 Setujui (hapus)":"✓ Setujui")+"</button><button class='btn s' style='flex:1' data-dk='no'>✕ Tolak</button></div></div>"}).join(""):"<div class='pn g empty'>Tidak ada pengajuan 🎉</div>"
   }catch(e){}}
 $("main").addEventListener("click",async function(e){
   var b=e.target.closest("[data-dk]");if(!b)return;var a=b.dataset.dk;
@@ -1015,19 +1016,26 @@ $("main").addEventListener("click",async function(e){
   else if(a==="new")dkForm(null);
   else if(a==="edit")dkForm((S.dk||[]).filter(function(x){return x.id===b.dataset.id})[0]);
   else if(a==="cancel")$("dkf").innerHTML="";
+  else if(a==="del"){var dd2=(S.dk||[]).filter(function(x){return x.id===b.dataset.id})[0];if(!dd2)return;
+    if(S.admin){if(!confirm("Hapus "+dd2.n+" dari daftar dokter? Tidak bisa dibatalkan."))return;b.disabled=true;
+      var rd=await api("dokter/kelola",{m:"POST",b:{aksi:"hapus",id:dd2.id}});if(rd.ok){toast("Dihapus ✓");dkInit()}else{b.disabled=false;toast((rd.j&&rd.j.err)||"Gagal menghapus")}}
+    else{var why=prompt("Usul hapus: "+dd2.n+"\nAlasan (opsional):","");if(why===null)return;b.disabled=true;
+      var ru=await api("dokter/ajukan",{m:"POST",b:{tipe:"hapus",id:dd2.id,n:dd2.n,h1:dd2.h1,h2:dd2.h2,cat:why.trim()}});b.disabled=false;toast(ru.ok?"Usul hapus terkirim, akan dicek admin ✓":((ru.j&&ru.j.err)||"Gagal mengirim"))}}
   else if(a==="send"){
     var n=$("fn").value.trim(),h1=ph($("f1").value),h2=ph($("f2").value),id=$("dkf").dataset.id;
     if(!n||!h1){$("fe").textContent="Nama dan Nomor HP 1 wajib diisi.";return}
     b.disabled=true;
+    if(S.admin){var ra=await api("dokter/kelola",{m:"POST",b:{aksi:id?"ubah":"tambah",id:id,n:n,h1:h1,h2:h2}});
+      if(ra.ok){$("dkf").innerHTML="";toast("Tersimpan ✓");dkInit()}else{b.disabled=false;$("fe").textContent=(ra.j&&ra.j.err)||"Gagal menyimpan."}return}
     var r=await api("dokter/ajukan",{m:"POST",b:{tipe:id?"edit":"baru",id:id,n:n,h1:h1,h2:h2,cat:$("fc").value.trim()}});
     if(r.ok){$("dkf").innerHTML="<div class='pn g'><b>✅ Terkirim</b><div class='hint'>Usulanmu akan dicek admin. Setelah disetujui, data muncul di daftar.</div></div>";toast("Terkirim, akan dicek admin ✓")}
     else{b.disabled=false;$("fe").textContent=(r.j&&r.j.err)||"Gagal mengirim."}}
   else if(a==="acc"||a==="no"){
-    var c=b.closest(".dka"),n2=c.querySelector(".an").value.trim(),p1=ph(c.querySelector(".a1").value);
-    if(a==="acc"&&(!n2||!p1)){toast("Nama dan HP 1 wajib diisi");return}
+    var c=b.closest(".dka"),an=c.querySelector(".an"),n2=an?an.value.trim():"",p1=an?ph(c.querySelector(".a1").value):"";
+    if(a==="acc"&&an&&(!n2||!p1)){toast("Nama dan HP 1 wajib diisi");return}
     b.disabled=true;
-    var r2=await api("dokter/review",{m:"POST",b:{id:c.dataset.id,aksi:a==="acc"?"acc":"tolak",n:n2,h1:p1,h2:ph(c.querySelector(".a2").value)}});
-    if(r2.ok){c.remove();toast(a==="acc"?"Disetujui & masuk spreadsheet ✓":"Ditolak")}else{b.disabled=false;toast("Gagal memproses")}}
+    var r2=await api("dokter/review",{m:"POST",b:{id:c.dataset.id,aksi:a==="acc"?"acc":"tolak",n:n2,h1:p1,h2:an?ph(c.querySelector(".a2").value):""}});
+    if(r2.ok){c.remove();toast(a==="acc"?"Disetujui & masuk spreadsheet ✓":"Ditolak")}else{b.disabled=false;toast((r2.j&&r2.j.err)||"Gagal memproses")}}
 });
 
 /* ---------- jadwal tutorial ---------- */
