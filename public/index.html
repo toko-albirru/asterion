@@ -31,7 +31,7 @@ h1{margin:0;display:inline-block;padding:0 .12em;font-family:Cinzel,Georgia,seri
 .card small{display:block;color:var(--mut);font-weight:400;font-size:12px;margin-top:2px}
 .sec{display:flex;align-items:center;gap:12px;margin:24px 2px 12px;font:600 12px Cinzel,serif;letter-spacing:.2em;color:var(--gold)}
 .sec::before,.sec::after{content:"";flex:1;height:1px;background:linear-gradient(90deg,transparent,rgba(245,192,74,.6))}.sec::after{transform:scaleX(-1)}
-.nav{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(12px + env(safe-area-inset-bottom,0));z-index:40;display:flex;gap:4px;padding:6px;border-radius:24px;width:min(420px,calc(100% - 24px));background:rgba(26,18,48,.55)}
+.nav{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(12px + env(safe-area-inset-bottom,0));z-index:40;display:flex;gap:4px;padding:6px;border-radius:24px;width:min(460px,calc(100% - 24px));background:rgba(26,18,48,.55)}
 .nav a{flex:1;min-width:0;text-align:center;text-decoration:none;color:var(--mut);font-size:10px;padding:8px 0;border-radius:18px}
 .nav a b{display:block;font-size:19px;margin-bottom:2px;font-weight:400}
 .nav a.on{color:#fff;background:linear-gradient(135deg,rgba(245,192,74,.35),rgba(245,192,74,.1));box-shadow:inset 0 0 0 1px rgba(245,192,74,.5)}
@@ -62,6 +62,10 @@ h1{margin:0;display:inline-block;padding:0 .12em;font-family:Cinzel,Georgia,seri
 .sl small{display:block;color:var(--mut);font-size:12px;margin-top:3px}
 .sl a{color:var(--gold)}
 .mt{display:flex;flex-wrap:wrap;gap:5px;margin-top:5px}
+.kg{display:flex;flex-wrap:wrap;gap:6px;margin:8px 0 4px}
+.kg button{min-width:42px;height:38px;padding:0 10px;border-radius:12px;border:1px solid var(--line);background:rgba(255,255,255,.07);color:#fff;font:600 14px Inter,sans-serif;cursor:pointer}
+.kg button.on{background:linear-gradient(135deg,rgba(245,192,74,.45),rgba(245,192,74,.15));border-color:rgba(245,192,74,.8);color:#fff}
+a.tag{text-decoration:none}
 .tag{font-size:11px;padding:2px 9px;border-radius:999px;background:rgba(255,255,255,.14);color:#fff}
 .tag.ok{background:rgba(74,222,128,.2);color:var(--ok)}.tag.warn{background:rgba(251,191,36,.2);color:var(--warn)}
 .note{font-size:12px;color:var(--warn);padding:8px 0 10px;border-top:1px solid rgba(255,255,255,.12)}
@@ -803,8 +807,8 @@ function cards(items){return items.map(function(c){return "<a class='card g' hre
 
 /* ---------- pengaturan menu / navbar / kategori (admin) ---------- */
 var UI_DEF={
-  nav:[{id:"home",n:"Beranda",i:"🏠"},{id:"materi",n:"Materi",i:"📚"},{id:"rekaman",n:"Rekaman",i:"🎬"},{id:"jadwal",n:"Jadwal",i:"🗓️"},{id:"run",n:"Run",i:"🏃"},{id:"dokter",n:"Dokter",i:"📞"}],
-  menu:[{id:"materi",n:"Materi & Rangkuman",i:"📚",s:"Per blok, lab, dan Google Drive"},{id:"rekaman",n:"Rekaman Kuliah",i:"🎬",s:"Putar langsung per tahun"},{id:"jadwal",n:"Jadwal Kuliah",i:"🗓️",s:"Terhubung ke spreadsheet"},{id:"run",n:"ASTERION RUN",i:"🏃",s:"Game 3D edukasi · jawab soal sambil berlari"},{id:"dokter",n:"Kontak Dokter",i:"📞",s:"Nomor HP dosen & dokter · bisa usul ubah/tambah"}],
+  nav:[{id:"home",n:"Beranda",i:"🏠"},{id:"materi",n:"Materi",i:"📚"},{id:"rekaman",n:"Rekaman",i:"🎬"},{id:"jadwal",n:"Jadwal",i:"🗓️"},{id:"tutor",n:"Tutor",i:"👥"},{id:"run",n:"Run",i:"🏃"},{id:"dokter",n:"Dokter",i:"📞"}],
+  menu:[{id:"materi",n:"Materi & Rangkuman",i:"📚",s:"Per blok, lab, dan Google Drive"},{id:"rekaman",n:"Rekaman Kuliah",i:"🎬",s:"Putar langsung per tahun"},{id:"jadwal",n:"Jadwal Kuliah",i:"🗓️",s:"Terhubung ke spreadsheet"},{id:"tutor",n:"Jadwal Tutorial",i:"👥",s:"Kelompok, tutor & ruang · konfirmasi WA ke tutor"},{id:"run",n:"ASTERION RUN",i:"🏃",s:"Game 3D edukasi · jawab soal sambil berlari"},{id:"dokter",n:"Kontak Dokter",i:"📞",s:"Nomor HP dosen & dokter · bisa usul ubah/tambah"}],
   mp:[{id:"blok",n:"PILIH BLOK",i:"📘"},{id:"drive",n:"DRIVE",i:"🗂️",c:"Google Drive Materi"}],
   cm:[{id:"all",n:"Seluruh Blok",i:"📖"},{id:"lab",n:"Lab",i:"🔬"}],
   cr:[{id:"kl",n:"Kuliah Lain",i:"📝"},{id:"blok",n:"Blok",i:"🧠"},{id:"lab",n:"Lab",i:"🔬"}]
@@ -815,7 +819,9 @@ function uiList(g){
   var def=UI_DEF[g],sv=(S.data&&S.data.ui&&S.data.ui[g])||[],out=[],seen={};
   sv.forEach(function(x){var d=def.filter(function(y){return y.id===x.id})[0];if(!d||seen[x.id])return;seen[x.id]=1;
     var o={id:d.id,n:(x.n||d.n),i:(x.i||d.i),h:!!x.h};if(d.s!==undefined)o.s=(x.s!==undefined&&x.s!==null?x.s:d.s);if(d.c!==undefined)o.c=(x.c||d.c);out.push(o)});
-  def.forEach(function(d){if(!seen[d.id])out.push(JSON.parse(JSON.stringify(d)))});
+  def.forEach(function(d,di){if(seen[d.id])return;var pos=out.length;
+    for(var j=di-1;j>=0;j--){var k=-1;for(var m=0;m<out.length;m++)if(out[m].id===def[j].id){k=m;break}if(k>=0){pos=k+1;break}}
+    out.splice(pos,0,JSON.parse(JSON.stringify(d)))});
   return out}
 function uiSet(g,list){S.data.ui=S.data.ui||{};S.data.ui[g]=list}
 function uiName(id){var m=uiList("menu").filter(function(x){return x.id===id})[0];return m?m.n:null}
@@ -937,9 +943,14 @@ function ph(x){x=String(x||"").replace(/\D/g,"");if(!x)return"";if(x.indexOf("62
 
 /* ---------- chat WA otomatis ke dokter ---------- */
 function waSalam(){var h=+new Intl.DateTimeFormat("en-GB",{hour:"2-digit",hour12:false,timeZone:"Asia/Jakarta"}).format(new Date())%24;return h>=4&&h<11?"pagi":h>=11&&h<15?"siang":h>=15&&h<18?"sore":"malam"}
-function waLink(d,h){
-  var u=String(S.u).toUpperCase(),nm=(window.MHS||{})[u]||"[Nama]",
-  msg="Selamat "+waSalam()+", "+d.n+". Mohon maaf mengganggu waktunya 🙏🏻\n\n"+
+function waLink(d,h,c){
+  var u=String(S.u).toUpperCase(),nm=(window.MHS||{})[u]||"[Nama]",dn=(c&&c.nama)||d.n,
+  msg=c?"Selamat "+waSalam()+", "+dn+". Mohon maaf mengganggu waktunya 🙏🏻\n\n"+
+  "Saya "+nm+" dengan NIM "+u+" dari Prodi Pendidikan Dokter, Fakultas Kedokteran UNS angkatan 2025.\n\n"+
+  "Saya sebagai perwakilan dari Tutor "+c.kel+" hendak mengonfirmasi kehadiran dokter pada Tutorial ("+c.sk+" "+c.pt+") yang akan dibimbing oleh "+dn+" pada\n\n"+
+  "Hari : "+c.tgl+"\nJam : "+c.jam+"\nTempat : "+c.ruang+"\n\n"+
+  "Terima kasih sebelumnya dan mohon maaf menganggu waktunya 🙏🏻":
+  "Selamat "+waSalam()+", "+d.n+". Mohon maaf mengganggu waktunya 🙏🏻\n\n"+
   "Saya "+nm+" dengan NIM "+u+" dari Prodi Pendidikan Dokter, Fakultas Kedokteran UNS angkatan 2025.\n\n"+
   "Saya sebagai perwakilan dari Tutor [isi] hendak mengonfirmasi kehadiran dokter pada [Tutor/Skill Lab/Course/Field Lab] yang akan dibimbing oleh "+d.n+" pada\n\n"+
   "Hari : \nJam : \nTempat : \n\n"+
@@ -991,12 +1002,64 @@ $("main").addEventListener("click",async function(e){
     if(r2.ok){c.remove();toast(a==="acc"?"Disetujui & masuk spreadsheet ✓":"Ditolak")}else{b.disabled=false;toast("Gagal memproses")}}
 });
 
+/* ---------- jadwal tutorial ---------- */
+var NM_STOP={};"dr drg prof ir apt skm mkm mkes msc mmed mmeded phd sp spa spak sppd spk spgk sppk spmk spog spf spkj spp spb spbs spot kgs mph mpd mh mm sfarm farm kes ed clinepid mclinepid biomed sci cm fm finasim kpti ak gk pa pk mk dsc kga pd og kj an bs ot mbiomed".split(" ").forEach(function(x){NM_STOP[x]=1});
+function nameTok(n){return String(n||"").normalize("NFD").replace(/[\u0300-\u036f]/g,"").toLowerCase().split(",")[0].split(/[^a-z]+/).filter(function(x){return x.length>1&&!NM_STOP[x]})}
+/* cocokkan nama tutor dengan Kontak Dokter (gelar & urutan penulisan boleh beda) */
+function dkFind(name){
+  var a=nameTok(name);if(!a.length||!S.dk)return null;var best=[],bs=0;
+  S.dk.forEach(function(d){var b=nameTok(d.n);if(!b.length)return;
+    var inter=a.filter(function(x){return b.indexOf(x)>=0}).length,mn=Math.min(a.length,b.length);
+    if(inter<mn||inter<Math.min(2,mn))return;
+    var sc=inter/(a.length+b.length-inter);if(sc>bs){bs=sc;best=[d]}else if(sc===bs)best.push(d)});
+  return best.length===1?best[0]:null}
+function tgKey(){return"ast.tg."+String(S.u||"").toUpperCase()}
+function tgGet(){try{return localStorage.getItem(tgKey())||""}catch(e){return""}}
+function tgSet(v){try{if(v)localStorage.setItem(tgKey(),v);else localStorage.removeItem(tgKey())}catch(e){}}
+function tutCard(it,k){
+  var iso=jkt(),today=it.iso&&it.iso===iso,past=it.iso&&it.iso<iso,n=it.iso?Math.round((Date.parse(it.iso)-Date.parse(iso))/864e5):9,d=dkFind(it.tutor),wa="";
+  if(d)wa=[d.h1,d.h2].filter(Boolean).map(function(x){x=ph(x);return"<a class='tag ok' href='tel:"+x+"'>📞 "+x+"</a><a class='tag' href='https://wa.me/62"+x.slice(1)+"' data-tw='"+k+"' data-h='"+x+"'>Konfirmasi Kehadiran (WA)</a>"}).join("");
+  else if(S.dk)wa="<a class='tag' href='#/dokter'>＋ Nomor belum ada · usulkan di Kontak Dokter</a>";
+  return"<div class='day g"+(today?" today":"")+"'"+(past?" style='opacity:.55'":"")+"><h3>"+esc(it.sk+" · "+it.pt)+(today?"<span class='badge'>HARI INI</span>":n===1?"<span class='badge'>BESOK</span>":"")+"</h3>"+
+  "<div class='sl'><div class='tm'>"+esc(it.jam)+"</div><div class='bd'><b>"+esc(it.tutor||"—")+"</b><div class='mt'><span class='tag'>Kelompok "+esc(it.kel)+"</span><span class='tag'>📍 "+esc(it.ruang)+"</span><span class='tag'>📅 "+esc(it.tgl)+"</span></div>"+(wa?"<div class='mt'>"+wa+"</div>":"")+"</div></div></div>"}
+function pTutor(){
+  setTimeout(tInit,0);
+  return"<div class='sec'>JADWAL TUTORIAL</div><div id='tt'><div id='ttop'></div><input id='tq' class='in' placeholder='🔍 Cari tutor, ruang, atau tanggal…' autocomplete='off' style='margin:6px 0 12px'><div id='tl'><div class='empty'>Memuat jadwal tutorial…</div></div></div>"}
+async function tInit(){
+  var el=$("tl");if(!el)return;
+  if(!S.tut){var r=await api("tutor");if(!$("tl"))return;
+    if(!r.ok||!r.j||!r.j.tabs){$("tl").innerHTML="<div class='pn g empty'>"+esc((r.j&&r.j.err)||"Jadwal tutorial belum bisa dimuat.")+"</div>";return}
+    S.tut=r.j}
+  S.ti=Math.min(S.ti||0,S.tut.tabs.length-1);
+  $("tq").oninput=tList;tTop();tList();
+  if(!S.dk&&!S.dkTry){S.dkTry=1;api("dokter").then(function(r2){if(r2.ok&&Array.isArray(r2.j)){S.dk=r2.j;if($("tl"))tList()}})}}
+function tTop(){
+  var t=S.tut.tabs[S.ti],g=tgGet(),ks=[];t.items.forEach(function(x){if(ks.indexOf(x.kel)<0)ks.push(x.kel)});
+  ks.sort(function(a,b){return(+a||0)-(+b||0)});
+  $("ttop").innerHTML=(S.tut.tabs.length>1?"<select id='tutSel' class='in' style='margin-bottom:10px' aria-label='Pilih blok'>"+S.tut.tabs.map(function(x,i){return"<option value='"+i+"'"+(i===S.ti?" selected":"")+">"+esc(x.n)+"</option>"}).join("")+"</select>":"<div class='hint' style='margin:0 4px 6px'>"+esc(t.n)+"</div>")+
+  "<div class='pn g' style='margin-bottom:10px'><b>Kelompok tutorial kamu</b><div class='hint' style='margin:4px 0 0'>Pilih sekali, tersimpan di perangkat ini. Ketuk lagi untuk membatalkan.</div><div class='kg'>"+ks.map(function(k){return"<button data-tg='"+esc(k)+"'"+(String(k)===g?" class='on'":"")+">"+esc(k)+"</button>"}).join("")+"</div></div>"}
+function tList(){
+  var t=S.tut&&S.tut.tabs[S.ti],el=$("tl");if(!t||!el)return;
+  var q=($("tq")||{value:""}).value.trim().toLowerCase(),g=tgGet(),out;
+  if(q)out=t.items.filter(function(x){return(x.tutor+" "+x.ruang+" "+x.tgl+" "+x.sk+" "+x.pt+" kelompok "+x.kel).toLowerCase().indexOf(q)>=0});
+  else if(g)out=t.items.filter(function(x){return String(x.kel)===g});
+  else{el.innerHTML="<div class='pn g empty'>Pilih nomor kelompokmu di atas untuk melihat jadwal tutorialnya, atau cari nama tutor.</div>";S.tutView=[];return}
+  out=out.map(function(x,i){return[x,i]}).sort(function(a,b){return a[0].iso<b[0].iso?-1:a[0].iso>b[0].iso?1:a[0].jam<b[0].jam?-1:a[0].jam>b[0].jam?1:a[1]-b[1]}).map(function(x){return x[0]});
+  S.tutView=out;
+  el.innerHTML=out.length?(q?"":"<div class='hint' style='margin:0 4px 10px'>Jadwal Kelompok "+esc(g)+" · "+out.length+" pertemuan</div>")+out.map(tutCard).join(""):"<div class='pn g empty'>Tidak ada yang cocok.</div>"}
+$("main").addEventListener("change",function(e){if(e.target.id!=="tutSel")return;S.ti=+e.target.value||0;tTop();tList()});
+$("main").addEventListener("click",function(e){
+  var w=e.target.closest("[data-tw]");
+  if(w){var it=(S.tutView||[])[+w.dataset.tw],d=it&&dkFind(it.tutor);if(d)w.href=waLink(d,w.dataset.h,{kel:it.kel,sk:it.sk,pt:it.pt,tgl:it.tgl,jam:it.jam,ruang:it.ruang,nama:it.tutor});return}
+  var c=e.target.closest("[data-tg]");
+  if(c){var v=c.dataset.tg;tgSet(tgGet()===v?"":v);tTop();tList()}});
+
 /* ---------- router ---------- */
-var TT={atur:"ATUR MENU",home:"ASTERION",materi:"MATERI & RANGKUMAN",rekaman:"REKAMAN KULIAH",jadwal:"JADWAL KULIAH",run:"ASTERION RUN",dokter:"KONTAK DOKTER"};
+var TT={atur:"ATUR MENU",home:"ASTERION",materi:"MATERI & RANGKUMAN",rekaman:"REKAMAN KULIAH",jadwal:"JADWAL KULIAH",tutor:"JADWAL TUTORIAL",run:"ASTERION RUN",dokter:"KONTAK DOKTER"};
 function route(){
   if(!S.data)return;
   var P=location.hash.replace(/^#\/?/,"").split("/").filter(Boolean),tab=P[0]||"home",v;
-  if(tab==="materi")v=pMateri(P);else if(tab==="rekaman")v=pRekaman(P);else if(tab==="jadwal")v=pJadwal(P);else if(tab==="run"&&window.pRun)v=window.pRun(P);else if(tab==="dokter")v=pDokter(P);else if(tab==="atur")v=pAtur();else{tab="home";v=pHome()}
+  if(tab==="materi")v=pMateri(P);else if(tab==="rekaman")v=pRekaman(P);else if(tab==="jadwal")v=pJadwal(P);else if(tab==="tutor")v=pTutor(P);else if(tab==="run"&&window.pRun)v=window.pRun(P);else if(tab==="dokter")v=pDokter(P);else if(tab==="atur")v=pAtur();else{tab="home";v=pHome()}
   renderNav();$("main").innerHTML=v;$("ttl").textContent=(tab!=="home"&&tab!=="atur"&&uiName(tab)?uiName(tab).toUpperCase():TT[tab]);
   $("back").hidden=P.length<2;$("back").href="#/"+P.slice(0,-1).join("/");
   [].forEach.call(document.querySelectorAll(".nav a"),function(a){a.classList.toggle("on",a.dataset.t===tab)});
