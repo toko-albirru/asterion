@@ -222,13 +222,17 @@
     if (!r) { toast("Koneksi terputus. Coba lagi."); Q.busy = false; btns.forEach(function (x) { x.disabled = false; }); return; }
     if (!r.ok) return quizResync(Q, r);
     var j = r.j, t0 = performance.now(); Q.score = j.score;
-    var hit = btns.filter(function (x) { return x.dataset.v2 === ans; })[0]; btns.forEach(function (x) { x.classList.remove("sel"); });
-    if (hit) hit.classList.add(j.correct ? "ok" : "no");
-    var f = g("qzF"), key = j.ans || "";
-    btns.forEach(function (x) { if (key && x.dataset.v2 === key) x.classList.add("key"); });
-    var verdict = j.correct ? "<span class='rn-s-ok'>✔ Benar</span>" : j.blank ? "<span class='rn-s-warn'>⏰ Waktu habis — tidak dijawab</span>" : "<span class='rn-s-bad'>✘ Salah</span>";
+    var f = g("qzF"), key = j.ans || ""; // tampilan sama dengan halaman pembahasan: opsi kunci hijau (✔ KUNCI), jawaban salah merah (✘ jawabanmu)
+    btns.forEach(function (x) {
+      var Lt = x.dataset.v2, isKey = !!key && Lt === key, isMine = Lt === ans; x.classList.remove("sel", "ok", "no", "key", "bad");
+      if (isKey) x.classList.add("key"); else if (isMine) x.classList.add("bad");
+      var tg = (isKey ? "<i class='rn-s-ok'>✔ KUNCI</i>" : "") + (isMine && !isKey ? "<i class='rn-s-bad'>✘ jawabanmu</i>" : isMine ? "<i>jawabanmu</i>" : "");
+      if (tg) x.insertAdjacentHTML("beforeend", tg);
+    });
+    var stt = j.correct ? ["BENAR", "rn-s-ok", "+1"] : j.blank ? ["TIDAK DIJAWAB", "rn-s-warn", "0"] : ["SALAH", "rn-s-bad", "0"];
+    var info = "<div class='hint' style='margin:8px 2px;text-align:left;font-weight:400'>Jawaban pemain: <b>" + (ans || "—") + "</b> · Kunci: <b class='rn-s-ok'>" + esc(key || "—") + "</b> · Status: <b class='" + stt[1] + "'>" + stt[0] + "</b> · Skor: <b>" + stt[2] + "</b></div>";
     var exH = j.explain ? (j.expl ? "<div class='rn-ex' style='text-align:left'><b>Pembahasan</b><br>" + esc(j.expl) + "</div>" : "<div class='rn-ex no' style='text-align:left'>Pembahasan belum tersedia untuk soal ini.</div>") : "";
-    if (f) { f.style.textAlign = "center"; f.innerHTML = verdict + (key ? "<div style='margin-top:4px'>Kunci jawaban: <b class='rn-s-ok' style='font-size:18px'>" + esc(key) + "</b></div>" : "") + exH + "<div style='margin-top:12px'><button class='btn' data-ra='qz-next'>" + (j.done ? "Lihat hasil ▶" : "Lanjut ▶") + "</button></div>"; try { f.scrollIntoView({ block: "nearest", behavior: "smooth" }); } catch (e) {} }
+    if (f) { f.style.textAlign = "center"; f.innerHTML = info + exH + "<div style='margin-top:12px'><button class='btn' data-ra='qz-next'>" + (j.done ? "Lihat hasil ▶" : "Lanjut ▶") + "</button></div>"; try { f.scrollIntoView({ block: "nearest", behavior: "smooth" }); } catch (e) {} }
     var tm = g("qzT"); if (tm) { tm.textContent = ""; tm.className = "rn-qt"; }
     Q.review = j; // timer soal berikutnya baru berjalan setelah "Lanjut" ditekan (server menahan sesi sampai resume)
   }
