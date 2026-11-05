@@ -1017,7 +1017,7 @@ function tutorItems(rows) {
     for (const k of ["sk", "pt", "jm"]) { const v = g(r, C[k]); if (v) cur[k] = v; }
     const kel = g(r, C.kl), tutor = fixName(g(r, C.tu));
     if (!kel && !tutor) continue;
-    items.push({ sk: cur.sk, pt: cur.pt, tgl: cur.tg, iso: (parseTgl(cur.tg) || {}).iso || "", jam: cur.jm, kel: /^\d+$/.test(kel) ? +kel : kel, tutor, ruang: g(r, C.rg) });
+    items.push({ sk: cur.sk, pt: cur.pt, tgl: cur.tg, iso: (parseTgl(cur.tg) || {}).iso || "", jam: cur.jm, kel: /^\d+(\.0+)?$/.test(kel) ? Math.round(+kel) : kel, tutor, ruang: g(r, C.rg) });
   }
   return items;
 }
