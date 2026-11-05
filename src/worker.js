@@ -66,6 +66,15 @@ async function auth(req, env) {
   const admin = u === "admin";
   return { u, admin, mc: !admin && !(await env.LINKS.get("u:" + u)) };
 }
+// catat kapan mahasiswa membuka web: a:NIM (metadata f = pertama, l = terakhir). Tulis paling sering 1x/12 jam agar hemat kuota KV.
+async function seen(env, u, force) {
+  if (u === "admin") return;
+  try {
+    const k = "a:" + u, now = Date.now(), { metadata: m } = await env.LINKS.getWithMetadata(k);
+    if (m && !force && now - m.l < 432e5) return;
+    await env.LINKS.put(k, "1", { metadata: { f: (m && m.f) || now, l: now } });
+  } catch {}
+}
 const getSite = async (env) => {
   const s = await env.LINKS.get("site", "json");
   if (!s) return SEED;
@@ -763,6 +772,7 @@ export default {
       const rec = await env.LINKS.get("u:" + u, "json");
       const ok = rec ? (await pbk(p, rec.s)) === rec.h : p.trim().toUpperCase() === u;
       if (!ok) return J({ err: 1 }, 401);
+      await seen(env, u, true);
       return J({ token: await mint(u, env), u, admin: false, mc: !rec });
     }
 
@@ -773,7 +783,8 @@ export default {
       const np = String(body.np || "");
       if (a.admin || np.length < 6 || np.length > 100 || np.toUpperCase() === a.u) return J({ err: "Password minimal 6 karakter dan tidak boleh sama dengan username." }, 400);
       const s = b64(crypto.getRandomValues(new Uint8Array(12)));
-      await env.LINKS.put("u:" + a.u, JSON.stringify({ s, h: await pbk(np, s) }));
+      await env.LINKS.put("u:" + a.u, JSON.stringify({ s, h: await pbk(np, s), t: Date.now() }), { metadata: { t: Date.now() } });
+      await seen(env, a.u, true);
       return J({ ok: 1 });
     }
     if (a.mc) return J({ mc: true }, 403);
@@ -781,7 +792,7 @@ export default {
     if (path === "dokter" || path.startsWith("dokter/")) return dokter(env, a, path, M, body);
 
     if (path === "data") {
-      if (M === "GET") return J(await getSite(env));
+      if (M === "GET") { await seen(env, a.u); return J(await getSite(env)); }
       if (M === "PUT") {
         if (!a.admin) return J({ err: "admin" }, 403);
         if (!valid(body)) return J({ err: "invalid" }, 400);
@@ -809,6 +820,14 @@ export default {
         await env.LINKS.put("h:" + id, h, { metadata: { t: Date.now() } });
         return J({ id });
       }
+    }
+    if (path === "users" && M === "GET") { // admin: status akun mahasiswa (buka web / ganti password)
+      if (!a.admin) return J({ err: "admin" }, 403);
+      const all = async (prefix) => { const out = []; let cursor; do { const r = await env.LINKS.list({ prefix, cursor }); out.push(...r.keys); cursor = r.list_complete ? undefined : r.cursor; } while (cursor); return out; };
+      const [pw, op] = await Promise.all([all("u:"), all("a:")]), m = {};
+      for (const k of op) { const u = k.name.slice(2); if (isStu(u)) m[u] = { f: (k.metadata && k.metadata.f) || 0, l: (k.metadata && k.metadata.l) || 0, p: 0 }; }
+      for (const k of pw) { const u = k.name.slice(2); if (isStu(u)) m[u] = { f: 0, l: 0, ...(m[u] || {}), p: (k.metadata && k.metadata.t) || 1 }; } // p: 0 = belum, 1 = sudah (waktu tak tercatat), lainnya = waktu ganti
+      return J({ users: m, now: Date.now() });
     }
     if (path === "reset" && M === "POST") {
       const u = String(body.u || "").trim().toUpperCase();
