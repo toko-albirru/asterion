@@ -622,6 +622,10 @@ async function zipRemote(r,url,hd){
     var nl=dv.getUint16(q+28,true),el=dv.getUint16(q+30,true),cl=dv.getUint16(q+32,true),nm=td.decode(cd.subarray(q+46,q+46+nl));
     ent[nm]={mt:dv.getUint16(q+10,true),cs:dv.getUint32(q+20,true),o:dv.getUint32(q+42,true),nl:nl};q+=46+nl+el+cl}
   if(!ent["ppt/presentation.xml"])return null;
+  return zipRange(url,hd,ent)}
+
+function zipRange(url,hd,ent){
+  async function rng(a,b){var x=await fetch(url,{headers:Object.assign({range:"bytes="+a+"-"+b},hd)});if(x.status!==206)throw new Error("range");return new Uint8Array(await x.arrayBuffer())}
   var rawP={};
   function cut(en,buf,base){var s0=en.o-base;if(s0<0||s0+30>buf.length)return null;var v=new DataView(buf.buffer,buf.byteOffset,buf.length);if(v.getUint32(s0,true)!==0x04034b50)return null;
     var ds=s0+30+v.getUint16(s0+26,true)+v.getUint16(s0+28,true);if(ds+en.cs>buf.length)return null;return buf.subarray(ds,ds+en.cs)}
@@ -641,19 +645,34 @@ async function zipRemote(r,url,hd){
     prefetch:function(ns){load(ns);return Promise.all(ns.map(function(x){return rawP[x]}).filter(Boolean)).catch(function(){})},
     core:function(){return Object.keys(ent).filter(function(x){return ent[x].cs<2097152&&(x==="ppt/presentation.xml"||x==="ppt/_rels/presentation.xml.rels"||/^ppt\/(slides|slideLayouts|slideMasters|theme|notesSlides)\/.*\.(xml|rels)$/.test(x))})}}}
 
+function zipPack(j,url,hd){
+  var P=j.p,E={};Object.keys(j.e).forEach(function(x){var v=j.e[x];E[x]={o:v[0],cs:v[1],nl:v[2],mt:v[3]}});
+  var z=zipRange(url,hd,E),f0=z.file;
+  z.file=function(x){if(P[x]!==undefined)return{async:function(t){return Promise.resolve(t==="string"?P[x]:new TextEncoder().encode(P[x]).buffer)}};return f0(x)};
+  z.core=function(){return[]};return z}
+
 async function pptView(m,id,k){
   pvStatus(m,"Membuka presentasi…");
-  var url=fUrl(id,k),hd={authorization:"Bearer "+S.t},deck=null,sl=null,old=false,
-    r=await fetch(url,{headers:Object.assign({range:"bytes=-131072"},hd)});
-  if(!pvAlive(m)){try{r.body.cancel()}catch(e){}return}
-  /* jalur cepat: baca daftar isi ZIP dari ujung file, lalu ambil hanya XML slide & catatan (gambar diambil saat slide tampil) */
-  if(r.status===206){
-    try{var z=await zipRemote(r,url,hd);
-      if(z){pvStep(m,40,"Membaca slide & catatan…");await z.prefetch(z.core());if(!pvAlive(m))return;
-        pvStep(m,80,"Membaca slide & catatan…");deck=await pptxOpen(z);sl=deck.sl}}
+  var t0=performance.now(),via="",url=fUrl(id,k),hd={authorization:"Bearer "+S.t},deck=null,sl=null,old=false;
+  /* jalur 1: server membaca ZIP dan mengirim paket kecil (teks slide + catatan) */
+  if(!k){
+    try{pvStep(m,30,"Membaca slide & catatan…");var pr=await fetch(fUrl(id,"pack"),{headers:hd});
+      if(!pvAlive(m))return;
+      if(pr.ok){var pj=await pr.json();if(pj&&pj.p&&!pj.nr){deck=await pptxOpen(zipPack(pj,url,hd));sl=deck.sl;via="server"}}}
     catch(e){deck=null;sl=null}
-    if(!pvAlive(m)){if(deck)deck.free();return}
-    if(!deck)r=await fetch(url,{headers:hd})}
+    if(!pvAlive(m)){if(deck)deck.free();return}}
+  /* jalur 2: browser membaca ZIP lewat Range */
+  var r=null;
+  if(!deck){
+    r=await fetch(url,{headers:Object.assign({range:"bytes=-131072"},hd)});
+    if(!pvAlive(m)){try{r.body.cancel()}catch(e){}return}
+    if(r.status===206){
+      try{var z=await zipRemote(r,url,hd);
+        if(z){pvStep(m,60,"Membaca slide & catatan…");await z.prefetch(z.core());if(!pvAlive(m))return;
+          deck=await pptxOpen(z);sl=deck.sl;via="range"}}
+      catch(e){deck=null;sl=null}
+      if(!pvAlive(m)){if(deck)deck.free();return}
+      if(!deck)r=await fetch(url,{headers:hd})}}
   /* jalur cadangan: unduh penuh (Google Slides, .ppt lama, atau server tanpa Range) */
   if(!deck){
     if(!r.ok)throw new Error("http "+r.status);
@@ -663,7 +682,7 @@ async function pptView(m,id,k){
     var buf=await new Blob(ch).arrayBuffer();if(!pvAlive(m))return;
     pvStatus(m,"Membaca slide & catatan…");
     var u8=new Uint8Array(buf);old=u8[0]===0xD0&&u8[1]===0xCF;
-    if(old)sl=pptOld(buf);else{deck=await pptxOpen(await JSZip.loadAsync(buf));sl=deck.sl}
+    if(old)sl=pptOld(buf);else{deck=await pptxOpen(await JSZip.loadAsync(buf));sl=deck.sl}via="penuh";
     if(!pvAlive(m)){if(deck)deck.free();return}}
   m._deck=deck;
   var withN=sl.filter(function(q){return q.n}).length,cur=0,fs=15,mode=deck?"own":"drive",tok=0,
@@ -674,7 +693,7 @@ async function pptView(m,id,k){
     sl.map(function(q,i){return"<option value='"+i+"'>"+(i+1)+". "+esc(q.t||"Slide "+(i+1))+(q.n?" 📝":"")+"</option>"}).join("")+"</select><button class='g' data-n='1' aria-label='Slide berikutnya'>›</button><span class='ct'></span>"+
     (deck?"<button class='g' data-v='1' title='Ganti tampilan slide'>Drive</button>":"")+"<button class='g' data-f='-1' aria-label='Kecilkan huruf'>A−</button><button class='g' data-f='1' aria-label='Besarkan huruf'>A+</button></div><div class='nh2'></div><div class='nb' tabindex='0'></div></div></div>";
   var pp=m.querySelector(".pp"),sg=pp.querySelector(".sg"),sel=pp.querySelector("select"),nb=pp.querySelector(".nb"),ct=pp.querySelector(".ct"),hint=pp.querySelector(".nh2"),vb=pp.querySelector("[data-v]");
-  function hn(){hint.textContent=mode==="own"?sl.length+" slide · "+withN+" punya catatan · gulir untuk pindah slide, catatan ikut berganti":(deck?"Tampilan Drive: slide & catatan tidak otomatis sinkron, pilih nomor slide yang sama. ":"Format .ppt: slide tampil dari Google Drive (tidak otomatis sinkron), pilih nomor slide yang sama. ")+sl.length+" slide · "+withN+" punya catatan"}
+  function hn(){hint.textContent=mode==="own"?sl.length+" slide · "+withN+" punya catatan · gulir untuk pindah slide, catatan ikut berganti · "+via+" "+((performance.now()-t0)/1000).toFixed(1)+"s":(deck?"Tampilan Drive: slide & catatan tidak otomatis sinkron, pilih nomor slide yang sama. ":"Format .ppt: slide tampil dari Google Drive (tidak otomatis sinkron), pilih nomor slide yang sama. ")+sl.length+" slide · "+withN+" punya catatan"}
   var sc=null,sws=[],io=null,raf=0;
   function dims(){var W=deck.W,H=deck.H,w=Math.max(120,Math.min(sg.clientWidth-16,(sg.clientHeight-24)*W/H,1600))*zoom;return{w:w,h:w*H/W,k:w/W}}
   var zl=tl.querySelector("span");
