@@ -4,7 +4,7 @@
 (function () {
   "use strict";
   var LET = ["A", "B", "C", "D", "E"], COL = [0xb18cff, 0x4cc9f0, 0x4ade80, 0xfbbf24, 0xff6b9a], CSSC = ["#b18cff", "#4cc9f0", "#4ade80", "#fbbf24", "#ff6b9a"];
-  var LW = 2.4, LANES = 5, SPEED = 20, GATE_DIST = 95, GATE_MIN = 24, FB_MS = 1400;
+  var LW = 2.4, LANES = 5, SPEED = 20, GATE_DIST = 95, GATE_MIN = 24, FB_MS = 2400;
   var laneX = function (i) { return (i - 2) * LW; };
   var THREE_URL = "https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js", p3;
   function loadThree() {
@@ -69,7 +69,7 @@
     ".rg-ready.pulse{animation:rgp .6s infinite alternate}" +
     ".rg-lane{padding:8px 14px;border-radius:999px;font-weight:700;background:rgba(20,12,44,.78);border:2px solid #fff;color:#fff}" +
     ".rg-msg{position:absolute;left:0;right:0;top:38%;text-align:center;pointer-events:none;font:900 clamp(34px,10vw,64px) Cinzel,Georgia,serif;color:#fff;text-shadow:0 4px 24px rgba(0,0,0,.7)}" +
-    ".rg-msg.pop{animation:rgpop .9s ease-out both}.rg-msg.ok{color:#4ade80}.rg-msg.bad{color:#f87171}.rg-msg.blank{color:#cbd5e1}.rg-msg small{display:block;font:600 15px Inter,sans-serif;margin-top:4px;color:#e9ddff}" +
+    ".rg-msg.pop{animation:rgpop .9s ease-out both}.rg-msg.pop.long{animation-duration:2.3s}.rg-msg.ok{color:#4ade80}.rg-msg.bad{color:#f87171}.rg-msg.blank{color:#cbd5e1}.rg-msg small.rg-key{color:#fde68a;font-size:18px;margin-top:8px}.rg-msg small.rg-key b{color:#4ade80;font-size:24px}.rg-msg small{display:block;font:600 15px Inter,sans-serif;margin-top:4px;color:#e9ddff}" +
     "@keyframes rgpop{0%{transform:scale(.4);opacity:0}25%{transform:scale(1.12);opacity:1}70%{transform:scale(1);opacity:1}100%{transform:scale(1);opacity:0}}" +
     ".rg-flash{position:absolute;inset:0;pointer-events:none;opacity:0}.rg-flash.ok{animation:rgfl .6s ease-out;background:radial-gradient(circle,rgba(74,222,128,.0),rgba(74,222,128,.5))}.rg-flash.bad{animation:rgfl .6s ease-out;background:radial-gradient(circle,rgba(248,113,113,0),rgba(248,113,113,.55))}" +
     "@keyframes rgfl{0%{opacity:1}100%{opacity:0}}" +
@@ -370,9 +370,10 @@
     }
     function feedback(r, letter) {
       var lane = letter ? LET.indexOf(letter) : st.lane, x = laneX(lane);
-      if (r.blank) { msg("WAKTU HABIS<small>Tidak dijawab · 0 poin</small>", "blank"); sfx.blank(); flash("bad"); }
-      else if (r.correct) { msg("BENAR! +1", "ok"); sfx.ok(); flash("ok"); burst(x, 1.4, 0, 0x4ade80, 26); burst(x, 1.4, 0, 0xf5c04a, 18); st.score = r.score != null ? r.score : st.score + 1; }
-      else { msg("SALAH<small>0 poin · lanjut ke soal berikutnya</small>", "bad"); sfx.bad(); flash("bad"); shake(); burst(x, 1.4, 0, 0xf87171, 22); if (r.score != null) st.score = r.score; }
+      var kn = r.ans ? "<small class='rg-key'>Kunci jawaban: <b>" + r.ans + "</b></small>" : "";
+      if (r.blank) { msg("WAKTU HABIS<small>Tidak dijawab · 0 poin</small>" + kn, "blank long"); sfx.blank(); flash("bad"); }
+      else if (r.correct) { msg("BENAR! +1" + kn, "ok long"); sfx.ok(); flash("ok"); burst(x, 1.4, 0, 0x4ade80, 26); burst(x, 1.4, 0, 0xf5c04a, 18); st.score = r.score != null ? r.score : st.score + 1; }
+      else { msg("SALAH<small>0 poin · lanjut ke soal berikutnya</small>" + kn, "bad long"); sfx.bad(); flash("bad"); shake(); burst(x, 1.4, 0, 0xf87171, 22); if (r.score != null) st.score = r.score; }
       $("rgS").textContent = "✔ " + st.score;
     }
     async function submitAnswer(letter) {
@@ -401,7 +402,7 @@
     }
     function onGatePass() {
       var lane = st.lane, L = LET[lane]; st.gate.done = true;
-      if (TUT) { var ok = L === "C"; st.phase = "fb"; feedback({ correct: ok, blank: false, score: 0 }, L); st.locked = true; setTimeout(function () { if (!st.destroyed) finishGame(); }, 1300); return; }
+      if (TUT) { var ok = L === "C"; st.phase = "fb"; feedback({ correct: ok, blank: false, score: 0, ans: "C" }, L); st.locked = true; setTimeout(function () { if (!st.destroyed) finishGame(); }, 1300); return; }
       submitAnswer(L);
     }
 
