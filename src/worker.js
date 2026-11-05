@@ -484,8 +484,10 @@ async function runRecord(db, s, ans, t, expired) {
   const u = await db.prepare("UPDATE run_answers SET chosen = ?, correct = ?, ms = ?, answered = 1 WHERE sid = ? AND idx = ? AND answered = 0").bind(blank ? null : ans, correct ? 1 : 0, ms, s.id, s.cur).run();
   if (!u.meta.changes) return null;
   if (s.cur + 1 >= s.total) await runFinish(db, s, t);
+  else if ((s.mode || "game") === "quiz") // mode soal: timer soal berikutnya baru jalan setelah pemain menekan "Lanjut" (resume), supaya sempat membaca kunci & pembahasan
+    await db.prepare("UPDATE run_sessions SET cur = cur + 1, qstart = ?, paused_at = ?, score = score + ? WHERE id = ? AND cur = ?").bind(t, t, correct ? 1 : 0, s.id, s.cur).run();
   else await db.prepare("UPDATE run_sessions SET cur = cur + 1, qstart = ?, score = score + ? WHERE id = ? AND cur = ?").bind(t, correct ? 1 : 0, s.id, s.cur).run();
-  return { correct, blank, expired: !!expired };
+  return { correct, blank, expired: !!expired, ans: q.ans, expl: q.expl || "" };
 }
 // jeda yang terlalu lama berakhir sendiri (waktu soal berjalan lagi)
 async function runUnpause(db, s) {
@@ -608,7 +610,10 @@ async function runApi(request, env, a, path, url, body, M) {
     const r = await runRecord(db, s, ans, t, el > lim + RUN_GRACE);
     if (!r) return runErr("Soal ini sudah dijawab.", 409);
     const n = await runGet(db, s.id);
-    return J({ ...r, score: n.score, done: n.status === "done", cur: n.cur });
+    // kunci jawaban dibuka segera setelah soal ini dijawab (soal ini sudah terkunci, tidak bisa dijawab ulang);
+    // pembahasan hanya dikirim di mode soal dan bila fitur pembahasan aktif
+    const quiz = (s.mode || "game") === "quiz", ex = quiz && (await runSettings(db)).explain && s.show_explain ? true : false;
+    return J({ ...r, expl: ex ? r.expl : null, explain: ex, score: n.score, done: n.status === "done", cur: n.cur });
   }
 
   // ---------- hasil, riwayat, leaderboard ----------
