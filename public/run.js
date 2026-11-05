@@ -173,7 +173,7 @@
       if (!r.ok) { toast((r.j && r.j.err) || "Gagal memulai"); location.replace("#/run"); return; }
       var p = r.j;
       if (p.adjusted) toast("Soal aktif hanya " + p.total + " (target " + p.requested + "): sesi disesuaikan.");
-      var Q = RS.quiz = { k: k, sid: p.sid, name: "", qs: p.qs, total: p.total, qTime: p.q_time * 1000, cur: p.cur, score: p.score, hist: {}, view: null, dl: 0, busy: false, paused: false, tm: 0, fb: 0, kd: null };
+      var Q = RS.quiz = { k: k, cid: cid, sid: p.sid, name: "", qs: p.qs, total: p.total, qTime: p.q_time * 1000, cur: p.cur, score: p.score, hist: {}, view: null, dl: 0, busy: false, paused: false, tm: 0, fb: 0, kd: null };
       Q.kd = function (e) { if (!RS.quiz || RS.quiz !== Q || e.ctrlKey || e.metaKey || e.altKey) return; var t = e.target && e.target.tagName; if (t === "INPUT" || t === "TEXTAREA" || t === "SELECT") return; if (Q.review && (e.key === "Enter" || e.key === " ")) { e.preventDefault(); if (Q.view == null) quizNext(); return; } var L = String(e.key || "").toUpperCase(); if (LET.indexOf(L) >= 0 && !Q.review) quizAnswer(L); };
       document.addEventListener("keydown", Q.kd);
       var c = (RS.cats || []).filter(function (x) { return x.id === cid; })[0]; Q.name = c ? c.name : "";
@@ -209,7 +209,7 @@
       "<div class='rn-prog'><i id='qzBar' style='width:100%;transition:none'></i></div>" +
       "<div class='pn g' style='padding:14px'>" + String(q.img || "").split(",").filter(Boolean).map(function (id) { return "<img alt='Gambar soal' src='/api/run/img/" + encodeURIComponent(id) + "'>"; }).join("") + "<div class='q'>" + esc(q.q) + "</div>";
     LET.forEach(function (L, i) { if (!q.o[L]) return; h += "<button class='rn-op rn-qo' data-ra='qz-ans' data-v2='" + L + "'><b style='background:" + CSSC[i] + "'>" + L + "</b><span>" + esc(q.o[L]) + "</span></button>"; });
-    h += "<div class='rn-qf' id='qzF'></div></div><div class='rn-row' style='margin-top:10px'>" + (RS.set && RS.set.pause ? "<button class='btn s sm' data-ra='qz-pause'>⏸ Jeda</button>" : "") + "<button class='btn s sm' data-ra='qz-exit'>✕ Keluar</button></div></div>";
+    h += "<div class='rn-qf' id='qzF'></div></div><div class='rn-row' style='margin-top:10px'>" + (RS.set && RS.set.pause ? "<button class='btn s sm' data-ra='qz-pause'>⏸ Jeda</button>" : "") + "<button class='btn s sm' data-ra='qz-reset'>🔄 Reset ujian</button><button class='btn s sm' data-ra='qz-exit'>✕ Keluar</button></div></div>";
     setRR(h); window.scrollTo(0, 0);
     var rem = Q.dl - performance.now(), el = g("qzT"); if (el) { el.textContent = "⏱ " + fdur(Math.max(0, rem)); el.className = "rn-qt" + (rem < 10000 ? " low" : ""); }
   }
@@ -276,6 +276,15 @@
     if (!r.ok) { toast((r.j && r.j.err) || "Gagal melanjutkan"); return; }
     if (r.j.status === "done") { quizStop(); location.replace("#/run/result/" + Q.sid); return; }
     Q.paused = false; Q.cur = r.j.cur; Q.score = r.j.score; Q.dl = performance.now() + (r.j.remaining == null ? Q.qTime : r.j.remaining); quizDraw();
+  }
+  async function quizReset() { // ulang dari awal: sesi sekarang dibatalkan (skor tidak dihitung), soal diacak ulang
+    var Q = RS.quiz; if (!Q || Q.paused || Q.nexting) return;
+    if (!confirm("Reset ujian? Semua jawaban di sesi ini dihapus dan kamu mulai lagi dari soal 1 (skor sesi ini tidak dihitung).")) return;
+    var sid = Q.sid, cid = Q.cid, k = Q.k; Q.paused = true; // kunci layar selama proses reset
+    var r; try { r = await rapi("abandon", { m: "POST", b: { sid: sid } }); } catch (e) { if (e === 0) return; r = null; }
+    if (!RS.quiz || RS.quiz !== Q) return;
+    if (!r || !r.ok) { Q.paused = false; toast((r && r.j && r.j.err) || "Gagal mereset. Coba lagi."); return; }
+    quizFlow(cid, k);
   }
   async function quizExit() {
     var Q = RS.quiz; if (!Q) return;
@@ -642,6 +651,7 @@
       else if (a === "qz-pause") quizPause();
       else if (a === "qz-resume") quizResume();
       else if (a === "qz-exit") quizExit();
+      else if (a === "qz-reset") quizReset();
       else if (a === "rv-n" || a === "rv-p") { var L = rvList(), p = L.indexOf(rv.i) + (a === "rv-n" ? 1 : -1); if (p >= 0 && p < L.length) { rv.i = L[p]; rvDraw(); } }
       else if (a === "rv-go") { rv.i = +v; rvDraw(); } else if (a === "rv-f") { rv.f = v; rv.i = -1; rvDraw(); }
       else if (a === "cat-save") {
