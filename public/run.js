@@ -173,8 +173,8 @@
       if (!r.ok) { toast((r.j && r.j.err) || "Gagal memulai"); location.replace("#/run"); return; }
       var p = r.j;
       if (p.adjusted) toast("Soal aktif hanya " + p.total + " (target " + p.requested + "): sesi disesuaikan.");
-      var Q = RS.quiz = { k: k, sid: p.sid, name: "", qs: p.qs, total: p.total, qTime: p.q_time * 1000, cur: p.cur, score: p.score, dl: 0, busy: false, paused: false, tm: 0, fb: 0, kd: null };
-      Q.kd = function (e) { if (!RS.quiz || RS.quiz !== Q || e.ctrlKey || e.metaKey || e.altKey) return; var t = e.target && e.target.tagName; if (t === "INPUT" || t === "TEXTAREA" || t === "SELECT") return; if (Q.review && (e.key === "Enter" || e.key === " ")) { e.preventDefault(); quizNext(); return; } var L = String(e.key || "").toUpperCase(); if (LET.indexOf(L) >= 0 && !Q.review) quizAnswer(L); };
+      var Q = RS.quiz = { k: k, sid: p.sid, name: "", qs: p.qs, total: p.total, qTime: p.q_time * 1000, cur: p.cur, score: p.score, hist: {}, view: null, dl: 0, busy: false, paused: false, tm: 0, fb: 0, kd: null };
+      Q.kd = function (e) { if (!RS.quiz || RS.quiz !== Q || e.ctrlKey || e.metaKey || e.altKey) return; var t = e.target && e.target.tagName; if (t === "INPUT" || t === "TEXTAREA" || t === "SELECT") return; if (Q.review && (e.key === "Enter" || e.key === " ")) { e.preventDefault(); if (Q.view == null) quizNext(); return; } var L = String(e.key || "").toUpperCase(); if (LET.indexOf(L) >= 0 && !Q.review) quizAnswer(L); };
       document.addEventListener("keydown", Q.kd);
       var c = (RS.cats || []).filter(function (x) { return x.id === cid; })[0]; Q.name = c ? c.name : "";
       if (p.status === "ready") {
@@ -222,20 +222,30 @@
     if (!r) { toast("Koneksi terputus. Coba lagi."); Q.busy = false; btns.forEach(function (x) { x.disabled = false; }); return; }
     if (!r.ok) return quizResync(Q, r);
     var j = r.j, t0 = performance.now(); Q.score = j.score;
-    var f = g("qzF"), key = j.ans || ""; // tampilan sama dengan halaman pembahasan: opsi kunci hijau (✔ KUNCI), jawaban salah merah (✘ jawabanmu)
-    btns.forEach(function (x) {
-      var Lt = x.dataset.v2, isKey = !!key && Lt === key, isMine = Lt === ans; x.classList.remove("sel", "ok", "no", "key", "bad");
-      if (isKey) x.classList.add("key"); else if (isMine) x.classList.add("bad");
-      var tg = (isKey ? "<i class='rn-s-ok'>✔ KUNCI</i>" : "") + (isMine && !isKey ? "<i class='rn-s-bad'>✘ jawabanmu</i>" : isMine ? "<i>jawabanmu</i>" : "");
-      if (tg) x.insertAdjacentHTML("beforeend", tg);
-    });
-    var stt = j.correct ? ["BENAR", "rn-s-ok", "+1"] : j.blank ? ["TIDAK DIJAWAB", "rn-s-warn", "0"] : ["SALAH", "rn-s-bad", "0"];
+    Q.hist[idx] = { q: Q.qs[idx], ans: ans, j: j }; Q.view = null;
+    Q.review = j; quizShowRev(Q, idx); // timer soal berikutnya baru berjalan setelah "Lanjut" ditekan (server menahan sesi sampai resume)
+  }
+  function quizRevTag(Lt, key, ans) { var isKey = !!key && Lt === key, isMine = Lt === ans; return { cls: isKey ? "key" : isMine ? "bad" : "", tg: (isKey ? "<i class='rn-s-ok'>✔ KUNCI</i>" : "") + (isMine && !isKey ? "<i class='rn-s-bad'>✘ jawabanmu</i>" : isMine ? "<i>jawabanmu</i>" : "") }; }
+  function quizRevInfo(x) { // kunci + status + pembahasan (sama dengan halaman pembahasan)
+    var j = x.j, ans = x.ans, key = j.ans || "", stt = j.correct ? ["BENAR", "rn-s-ok", "+1"] : j.blank ? ["TIDAK DIJAWAB", "rn-s-warn", "0"] : ["SALAH", "rn-s-bad", "0"];
     var info = "<div class='hint' style='margin:8px 2px;text-align:left;font-weight:400'>Jawaban pemain: <b>" + (ans || "—") + "</b> · Kunci: <b class='rn-s-ok'>" + esc(key || "—") + "</b> · Status: <b class='" + stt[1] + "'>" + stt[0] + "</b> · Skor: <b>" + stt[2] + "</b></div>";
     var exH = j.explain ? (j.expl ? "<div class='rn-ex' style='text-align:left'><b>Pembahasan</b><br>" + esc(j.expl) + "</div>" : "<div class='rn-ex no' style='text-align:left'>Pembahasan belum tersedia untuk soal ini.</div>") : "";
-    if (f) { f.style.textAlign = "center"; f.innerHTML = info + exH + "<div style='margin-top:12px'><button class='btn' data-ra='qz-next'>" + (j.done ? "Lihat hasil ▶" : "Lanjut ▶") + "</button></div>"; try { f.scrollIntoView({ block: "nearest", behavior: "smooth" }); } catch (e) {} }
-    var tm = g("qzT"); if (tm) { tm.textContent = ""; tm.className = "rn-qt"; }
-    Q.review = j; // timer soal berikutnya baru berjalan setelah "Lanjut" ditekan (server menahan sesi sampai resume)
+    return info + exH;
   }
+  function quizShowRev(Q, idx) { // tampilan setelah menjawab: opsi kunci hijau, jawaban salah merah
+    var x = Q.hist[idx], j = x.j, key = j.ans || "", btns = [].slice.call(document.querySelectorAll("#rr .rn-qo")), f = g("qzF");
+    btns.forEach(function (b) { var t = quizRevTag(b.dataset.v2, key, x.ans); b.disabled = true; b.classList.remove("sel", "ok", "no", "key", "bad"); if (t.cls) b.classList.add(t.cls); if (t.tg) b.insertAdjacentHTML("beforeend", t.tg); });
+    if (f) { f.style.textAlign = "center"; f.innerHTML = quizRevInfo(x) + "<div class='rn-row' style='justify-content:center;margin-top:12px'>" + (idx > 0 ? "<button class='btn s' data-ra='qz-hp' data-v2='" + (idx - 1) + "'>‹ Soal sebelumnya</button>" : "") + "<button class='btn' data-ra='qz-next'>" + (j.done ? "Lihat hasil ▶" : "Lanjut ▶") + "</button></div>"; try { f.scrollIntoView({ block: "nearest", behavior: "smooth" }); } catch (e) {} }
+    var tm = g("qzT"); if (tm) { tm.textContent = ""; tm.className = "rn-qt"; }
+  }
+  function quizHist(i) { // lihat soal sebelumnya (hanya baca); timer tetap ditahan karena soal sekarang sudah dijawab
+    var Q = RS.quiz; if (!Q || !Q.review || Q.nexting) return; var x = Q.hist[i]; if (!x) return; Q.view = i; var q = x.q, key = x.j.ans || "";
+    var h = "<div class='rn-qz'><div class='rn-hd'><b>Tinjau soal " + (i + 1) + "/" + Q.total + "</b><span class='sp'></span><span class='tag'>Skor " + Q.score + "</span></div><div class='pn g' style='padding:14px'>" + String(q.img || "").split(",").filter(Boolean).map(function (id) { return "<img alt='Gambar soal' src='/api/run/img/" + encodeURIComponent(id) + "'>"; }).join("") + "<div class='q'>" + esc(q.q) + "</div>";
+    LET.forEach(function (L, k) { if (!q.o[L]) return; var t = quizRevTag(L, key, x.ans); h += "<div class='rn-op " + t.cls + "'><b style='background:" + CSSC[k] + "'>" + L + "</b><span>" + esc(q.o[L]) + "</span>" + t.tg + "</div>"; });
+    h += quizRevInfo(x) + "<div class='rn-row' style='justify-content:center;margin-top:12px'>" + (i > 0 ? "<button class='btn s' data-ra='qz-hp' data-v2='" + (i - 1) + "'>‹ Sebelumnya</button>" : "") + (i < Q.cur ? "<button class='btn s' data-ra='qz-hp' data-v2='" + (i + 1) + "'>Berikutnya ›</button>" : "") + "<button class='btn' data-ra='qz-hb'>↩ Kembali ke soal " + (Q.cur + 1) + "</button></div></div></div>";
+    setRR(h); window.scrollTo(0, 0);
+  }
+  function quizBack() { var Q = RS.quiz; if (!Q || !Q.review || Q.view == null) return; Q.view = null; quizDraw(); quizShowRev(Q, Q.cur); }
   async function quizNext() {
     var Q = RS.quiz; if (!Q || !Q.review || Q.nexting) return; var j = Q.review;
     if (j.done) { quizStop(); location.replace("#/run/result/" + Q.sid); return; }
@@ -627,6 +637,8 @@
       else if (a === "qz-begin") quizBegin();
       else if (a === "qz-ans") quizAnswer(b.dataset.v2);
       else if (a === "qz-next") quizNext();
+      else if (a === "qz-hp") quizHist(+b.dataset.v2);
+      else if (a === "qz-hb") quizBack();
       else if (a === "qz-pause") quizPause();
       else if (a === "qz-resume") quizResume();
       else if (a === "qz-exit") quizExit();
