@@ -834,6 +834,7 @@ export default {
         } catch {}
         return J({ n });
       }
+      if (k === "pack") { try { return await pptxPack(id, env, uc); } catch (err) { return J({ err: "pack gagal" }, 502); } }
       const src = k === "slides" ? `https://docs.google.com/presentation/d/${id}/export/pptx`
         : env.DRIVE_API_KEY ? `https://www.googleapis.com/drive/v3/files/${id}?alt=media&supportsAllDrives=true&key=${env.DRIVE_API_KEY}` : uc;
       const h = { ...UA }, rg = request.headers.get("range");
@@ -860,6 +861,69 @@ export default {
     return J({ err: "not found" }, 404);
   },
 };
+
+
+// ===== PPTX PACK: baca ZIP di sisi server, kirim hanya XML slide + catatan (kecil) ke browser =====
+async function pptxPack(id, env, uc) {
+  const key = env.DRIVE_API_KEY, api = key ? `https://www.googleapis.com/drive/v3/files/${id}?alt=media&supportsAllDrives=true&key=${key}` : null;
+  const get = async (range) => {
+    const h = { ...UA, ...(range ? { range } : {}) };
+    let r = api ? await fetch(api, { headers: h }) : null;
+    if (!r || (!r.ok && r.status !== 206)) r = await fetch(uc, { headers: h });
+    return r;
+  };
+  const bad = (m, s = 502) => J({ err: m }, s);
+  let r = await get("bytes=-262144");
+  if (r.status !== 200 && r.status !== 206) return bad("File tidak bisa diambil dari Drive.");
+  if (/text\/html/i.test(r.headers.get("content-type") || "")) return bad("Drive tidak memberi file.", 403);
+  if (r.status === 200 && +r.headers.get("content-length") > 150 * 1048576) { try { await r.body.cancel(); } catch {} return bad("terlalu besar", 413); }
+  const tb = new Uint8Array(await r.arrayBuffer());
+  let total = tb.length, full = r.status === 200 ? tb : null;
+  if (r.status === 206) { const m = (r.headers.get("content-range") || "").match(/\/(\d+)\s*$/); if (!m) return bad("tanpa ukuran"); total = +m[1]; }
+  let nr = false; // Drive tidak mendukung Range -> browser harus unduh penuh (gambar tak bisa diambil per bagian)
+  if (full) { try { const x = await get("bytes=0-1"); nr = x.status !== 206; try { await x.body.cancel(); } catch {} } catch { nr = true; } }
+  const ts = total - tb.length, tv = new DataView(tb.buffer, tb.byteOffset, tb.length);
+  let e = tb.length - 22; while (e >= 0 && tv.getUint32(e, true) !== 0x06054b50) e--;
+  if (e < 0) return bad("bukan pptx", 415);
+  const cnt = tv.getUint16(e + 10, true), csz = tv.getUint32(e + 12, true), cof = tv.getUint32(e + 16, true);
+  if (cnt === 0xFFFF || cof === 0xFFFFFFFF) return bad("zip64", 415);
+  const rng = async (a, b) => {
+    if (full) return full.subarray(a, b + 1);
+    const x = await get(`bytes=${a}-${b}`); if (x.status !== 206) throw new Error("range");
+    return new Uint8Array(await x.arrayBuffer());
+  };
+  const cd = cof >= ts ? tb.subarray(cof - ts, cof - ts + csz) : await rng(cof, cof + csz - 1);
+  const dv = new DataView(cd.buffer, cd.byteOffset, cd.length), td = new TextDecoder(), ent = {};
+  for (let q = 0, n = 0; n < cnt && q + 46 <= cd.length; n++) {
+    if (dv.getUint32(q, true) !== 0x02014b50) break;
+    const nl = dv.getUint16(q + 28, true), el = dv.getUint16(q + 30, true), cl = dv.getUint16(q + 32, true);
+    ent[td.decode(cd.subarray(q + 46, q + 46 + nl))] = { mt: dv.getUint16(q + 10, true), cs: dv.getUint32(q + 20, true), o: dv.getUint32(q + 42, true), nl };
+    q += 46 + nl + el + cl;
+  }
+  if (!ent["ppt/presentation.xml"]) return bad("bukan pptx", 415);
+  const isCore = (x) => ent[x].cs < 2097152 && (x === "ppt/presentation.xml" || x === "ppt/_rels/presentation.xml.rels" || /^ppt\/(slides|slideLayouts|slideMasters|theme|notesSlides)\/.*\.(xml|rels)$/.test(x));
+  const core = Object.keys(ent).filter(isCore).sort((a, b) => ent[a].o - ent[b].o);
+  const gs = []; let g = null;
+  for (const x of core) { const en = ent[x], end = en.o + 30 + en.nl + 64 + en.cs;
+    if (g && en.o - g.end <= 262144 && end - g.a <= 16777216) { g.n.push(x); g.end = Math.max(g.end, end); } else { g = { a: en.o, end: Math.min(end, total), n: [x] }; gs.push(g); } }
+  const cutZ = (en, buf, base) => { const s0 = en.o - base; if (s0 < 0 || s0 + 30 > buf.length) return null; const v = new DataView(buf.buffer, buf.byteOffset, buf.length);
+    if (v.getUint32(s0, true) !== 0x04034b50) return null; const ds = s0 + 30 + v.getUint16(s0 + 26, true) + v.getUint16(s0 + 28, true);
+    return ds + en.cs > buf.length ? null : buf.subarray(ds, ds + en.cs); };
+  const inflate = async (u) => new Uint8Array(await new Response(new Blob([u]).stream().pipeThrough(new DecompressionStream("deflate-raw"))).arrayBuffer());
+  const parts = {};
+  await Promise.all(gs.map(async (gr) => {
+    const buf = await rng(gr.a, gr.end - 1);
+    await Promise.all(gr.n.map(async (x) => {
+      const en = ent[x]; let raw = cutZ(en, buf, gr.a);
+      if (!raw) { const b2 = await rng(en.o, Math.min(total - 1, en.o + 30 + en.nl + 4096 + en.cs - 1)); raw = cutZ(en, b2, en.o); }
+      if (!raw) return;
+      parts[x] = td.decode(en.mt === 0 ? raw : await inflate(raw));
+    }));
+  }));
+  const e2 = {};
+  for (const x of Object.keys(ent)) if (!(x in parts) && x.startsWith("ppt/") && ent[x].cs) e2[x] = [ent[x].o, ent[x].cs, ent[x].nl, ent[x].mt];
+  return new Response(JSON.stringify({ p: parts, e: e2, nr }), { headers: { "content-type": "application/json", "cache-control": "private, max-age=600" } });
+}
 
 // ===== KONTAK DOKTER (terhubung ke Google Sheets via Apps Script) ================
 const DOKTER_URL = "https://script.google.com/macros/s/AKfycbyTdyhwjAF40-GUb8G1gnVaHGYJXbnj2kOvyllDDnOeUDbj5MomF57CHSpYpjXoi7p7/exec";
