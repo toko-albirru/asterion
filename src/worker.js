@@ -1133,15 +1133,29 @@ async function dokter(env, a, path, M, body) {
       return l ? J(l) : J({ err: "Daftar dokter tidak bisa dimuat." }, 502);
     }
     if (path === "dokter/ajukan" && M === "POST") {
-      const n = String(body.n || "").trim().slice(0, 200), h1 = dkDigits(body.h1);
-      if (!n || !h1) return J({ err: "Nama dan Nomor HP 1 wajib diisi." }, 400);
-      const r = await dkCall(env, { act: "submit", tipe: body.tipe === "edit" ? "edit" : "baru", id: String(body.id || "").slice(0, 20), n, h1, h2: dkDigits(body.h2), cat: String(body.cat || "").slice(0, 300), oleh: a.u });
+      const tipe = body.tipe === "edit" ? "edit" : body.tipe === "hapus" ? "hapus" : "baru", n = String(body.n || "").trim().slice(0, 200), h1 = dkDigits(body.h1);
+      if (tipe === "hapus") { if (!body.id) return J({ err: "Dokter tidak dikenali." }, 400); }
+      else if (!n || !h1) return J({ err: "Nama dan Nomor HP 1 wajib diisi." }, 400);
+      const r = await dkCall(env, { act: "submit", tipe, id: String(body.id || "").slice(0, 20), n, h1, h2: dkDigits(body.h2), cat: String(body.cat || "").slice(0, 300), oleh: a.u });
       return r.ok ? J({ ok: 1 }) : J({ err: "Gagal mengirim." }, 502);
     }
     if (!a.admin) return J({ err: "Khusus admin." }, 403);
+    if (path === "dokter/kelola" && M === "POST") { // admin: tambah / ubah / hapus langsung, tanpa pengajuan
+      const aksi = String(body.aksi || ""), id = String(body.id || "").slice(0, 20), n = String(body.n || "").trim().slice(0, 200), h1 = dkDigits(body.h1), h2 = dkDigits(body.h2);
+      let r;
+      if (aksi === "hapus") { if (!id) return J({ err: "Dokter tidak dikenali." }, 400); r = await dkCall(env, { act: "delete", id }); }
+      else if (aksi === "tambah" || aksi === "ubah") {
+        if (!n || !h1) return J({ err: "Nama dan Nomor HP 1 wajib diisi." }, 400);
+        if (aksi === "ubah" && !id) return J({ err: "Dokter tidak dikenali." }, 400);
+        r = await dkCall(env, aksi === "tambah" ? { act: "add", n, h1, h2 } : { act: "update", id, n, h1, h2 });
+      } else return J({ err: "Aksi tidak dikenal." }, 400);
+      try { await caches.default.delete(new Request("https://cache.local/dokter/list")); } catch {}
+      return J(r, r.err ? 400 : 200);
+    }
     if (path === "dokter/pengajuan" && M === "GET") { const r = await dkCall(env, { act: "pending" }); return Array.isArray(r) ? J(r) : J({ err: "Gagal memuat." }, 502); }
     if (path === "dokter/review" && M === "POST") {
       const r = await dkCall(env, { act: "review", id: String(body.id || ""), aksi: body.aksi === "acc" ? "acc" : "tolak", n: String(body.n || "").slice(0, 200), h1: dkDigits(body.h1), h2: dkDigits(body.h2) });
+      try { await caches.default.delete(new Request("https://cache.local/dokter/list")); } catch {}
       return J(r, r.err ? 400 : 200);
     }
   } catch { return J({ err: "Gagal terhubung ke spreadsheet." }, 502); }
