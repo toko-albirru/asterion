@@ -491,12 +491,14 @@ async function pptxOpen(z){
     var chain=[defTxt,mst,mph?xPath(mph,"txBody/lstStyle"):null,lph?xPath(lph,"txBody/lstStyle"):null,xK1(tb,"lstStyle")];
     var own=xK1(tb,"bodyPr"),lb=lph?xPath(lph,"txBody/bodyPr"):null,mb=mph?xPath(mph,"txBody/bodyPr"):null;
     function ba(n,df){var a=xA(own,n,null);if(a==null)a=xA(lb,n,null);if(a==null)a=xA(mb,n,null);return a==null?df:a}
-    var pad=[ba("tIns",45720),ba("rIns",91440),ba("bIns",45720),ba("lIns",91440)].map(function(v){return(+v)/E}),an=ba("anchor","t"),nw=ba("wrap","square")==="none",fs=1,na=xK1(own,"normAutofit");if(na)fs=+xA(na,"fontScale",100000)/1e5;
+    var pad=[ba("tIns",45720),ba("rIns",91440),ba("bIns",45720),ba("lIns",91440)].map(function(v){return(+v)/E}),an=ba("anchor","t"),nw=ba("wrap","square")==="none",fs=1,lnR=0,na=null; /* autofit: bodyPr slide → layout → master; fontScale & lnSpcReduction dipakai, sisanya diperkecil otomatis bila masih meluap (seperti PowerPoint/Slides) */
+    [own,lb,mb].some(function(b){if(!b)return false;var n=xK1(b,"normAutofit");if(n){na=n;return true}return !!(xK1(b,"noAutofit")||xK1(b,"spAutoFit"))});
+    if(na){fs=+xA(na,"fontScale",100000)/1e5;lnR=+xA(na,"lnSpcReduction",0)/1e5}
     var fr=st?xK1(st,"fontRef"):null,dfc=fr?colorOf(fr,ctx.X):null;
     var box=document.createElement("div");box.style.cssText="position:absolute;inset:0;display:flex;flex-direction:column;justify-content:"+(an==="ctr"?"center":an==="b"?"flex-end":"flex-start")+";padding:"+pad[0]+"px "+pad[1]+"px "+pad[2]+"px "+pad[3]+"px;box-sizing:border-box;"+(nw?"white-space:nowrap;":"");
-    renderParas(tb,chain,ctx,box,fs,dfc);d.appendChild(box)}
+    if(na)box.dataset.af="1";renderParas(tb,chain,ctx,box,fs,dfc,lnR);d.appendChild(box)}
 
-  function renderParas(tb,chain,ctx,box,fs,dfc){
+  function renderParas(tb,chain,ctx,box,fs,dfc,lnR){lnR=lnR||0;var KV=function(v){return"calc("+v+"px * var(--k,1))"};
     var cnt={},X=ctx.X,th=X.th;
     xKids(tb,"p").forEach(function(p){
       var pp=xK1(p,"pPr"),lv=+xA(pp,"lvl",0),o=lvl(chain,lv);if(pp)addP(o,pp);
@@ -507,9 +509,9 @@ async function pptxOpen(z){
       var al=o.a.algn||"l",sty="margin:0;padding-left:"+Math.max(0,ml)+"px;text-indent:"+ind+"px;text-align:"+(al==="ctr"?"center":al==="r"?"right":al==="just"?"justify":"left")+";white-space:"+(box.style.whiteSpace||"pre-wrap")+";overflow-wrap:break-word;";
       var spc=function(n,sz){if(!n)return 0;var pc=xK1(n,"spcPct"),pt=xK1(n,"spcPts");return pc?(+xA(pc,"val",0)/1e5)*sz*1.2:pt?(+xA(pt,"val",0)/100)*96/72:0};
       var psz=ptsPx(fsz)*fs;
-      sty+="margin-top:"+spc(o.spcBef,psz)+"px;margin-bottom:"+spc(o.spcAft,psz)+"px;";
+      sty+="margin-top:calc("+spc(o.spcBef,psz)*(1-lnR)+"px * var(--k,1) * var(--l,1));margin-bottom:calc("+spc(o.spcAft,psz)*(1-lnR)+"px * var(--k,1) * var(--l,1));";
       var ls=o.lnSpc?xK1(o.lnSpc,"spcPct"):null,lp=o.lnSpc?xK1(o.lnSpc,"spcPts"):null;
-      sty+="line-height:"+(ls?(+xA(ls,"val",1e5)/1e5*1.2).toFixed(3):lp?(+xA(lp,"val",0)/100*96/72)+"px":"1.2")+";";
+      sty+="line-height:"+(ls?"calc("+((+xA(ls,"val",1e5)/1e5*1.2)*(1-lnR)).toFixed(3)+" * var(--l,1))":lp?"calc("+(+xA(lp,"val",0)/100*96/72)*(1-lnR)+"px * var(--k,1) * var(--l,1))":"calc("+(1.2*(1-lnR)).toFixed(3)+" * var(--l,1))")+";";
       div.style.cssText=sty;
       var first=true,color0=null,txt=0;
       rprs.forEach(function(rn){
@@ -517,10 +519,10 @@ async function pptxOpen(z){
         var tn=xK1(rn,"t"),t=tn?tn.textContent:"";if(!t)return;txt++;
         var r=Object.assign({},o.r),rp=xK1(rn,"rPr");if(rp)addR(r,rp);
         var sp2=document.createElement("span"),sz=ptsPx(r.sz?+r.sz:1800)*fs,c=r.sf&&!(dfc&&r.sfi<=1)?colorOf(r.sf,X):null;if(!c)c=dfc||"#000";if(first)color0=c;
-        var s2="font-size:"+sz+"px;color:"+c+";";
+        var s2="font-size:"+KV(sz)+";color:"+c+";";
         if(r.b==="1")s2+="font-weight:700;";if(r.i==="1")s2+="font-style:italic;";
         if(r.u&&r.u!=="none")s2+="text-decoration:underline;";if(r.strike&&r.strike!=="noStrike")s2+="text-decoration:line-through;";
-        if(r.baseline&&+r.baseline>0)s2+="vertical-align:super;font-size:"+sz*.7+"px;";else if(r.baseline&&+r.baseline<0)s2+="vertical-align:sub;font-size:"+sz*.7+"px;";
+        if(r.baseline&&+r.baseline>0)s2+="vertical-align:super;font-size:"+KV(sz*.7)+";";else if(r.baseline&&+r.baseline<0)s2+="vertical-align:sub;font-size:"+KV(sz*.7)+";";
         var fn=r.lat||"";fn=fn==="+mj-lt"?th.mj:fn==="+mn-lt"?th.mn:fn;if(fn&&fn.charAt(0)!=="+")s2+="font-family:'"+fn.replace(/'/g,"")+"',Calibri,Carlito,Arial,sans-serif;";
         sp2.style.cssText=s2;sp2.textContent=t;div.appendChild(sp2);first=false});
       /* bullet */
@@ -532,8 +534,8 @@ async function pptxOpen(z){
         else if(bn==="buBlip")bt="•"}
       if(!bt||!bu||bu.localName==="buNone")cnt[lv]=0;
       for(var q in cnt)if(+q>lv)cnt[q]=0;
-      if(bt){var bs=document.createElement("span"),bc=o.buClr?colorOf(o.buClr,X):null,w=Math.max(8,-ind);bs.textContent=bt;bs.style.cssText="display:inline-block;text-indent:0;width:"+w+"px;color:"+(bc||color0||dfc||"#000")+";font-size:"+psz*(o.buSzPct?+xA(o.buSzPct,"val",1e5)/1e5:1)+"px;";div.insertBefore(bs,div.firstChild)}
-      if(!div.firstChild){var z0=document.createElement("span");z0.textContent="\u200b";z0.style.fontSize=psz+"px";div.appendChild(z0)}
+      if(bt){var bs=document.createElement("span"),bc=o.buClr?colorOf(o.buClr,X):null,w=Math.max(8,-ind);bs.textContent=bt;bs.style.cssText="display:inline-block;text-indent:0;width:"+w+"px;color:"+(bc||color0||dfc||"#000")+";font-size:"+KV(psz*(o.buSzPct?+xA(o.buSzPct,"val",1e5)/1e5:1))+";";div.insertBefore(bs,div.firstChild)}
+      if(!div.firstChild){var z0=document.createElement("span");z0.textContent="\u200b";z0.style.fontSize=KV(psz);div.appendChild(z0)}
       box.appendChild(div)})}
 
   async function table(tbl,ctx,d,PW,T){
@@ -592,6 +594,9 @@ function pptOld(buf){
   if(!order.length)throw new Error("tanpa slide");
   order.forEach(function(o,i){if(o.t||o.b.length||!sc[i])return;sc[i].forEach(function(x){if(!o.t&&(x.h===0||x.h===6))o.t=x.t.replace(/\s+/g," ");else o.b.push(x.t)})});
   return order.map(function(o){return{t:o.t,n:notes[o.id]||"",b:o.b}})}
+/* teks yang meluap kotaknya (normAutofit) diperkecil sampai muat — hanya untuk kotak yang memang berautofit */
+function pptAutoFit(st){[].forEach.call(st.querySelectorAll("[data-af]"),function(b){b.style.setProperty("--k","1");b.style.setProperty("--l","1");
+  for(var i=0;i<24&&b.scrollHeight>b.clientHeight+1;i++){b.style.setProperty("--k",Math.max(.4,1-.025*(i+1)));b.style.setProperty("--l",Math.max(.8,1-.05*(i+1)))}})}
 /* .ppt lama: slide digambar sendiri sebagai kartu teks (judul + isi) supaya bisa digulir/digeser dan catatan ikut berganti seperti .pptx */
 function oldDeck(sl){var W=960,H=540;
   function mk(i){var q=sl[i],st=document.createElement("div"),tx=(q.b||[]).join("\n").split(/\n+/).filter(Boolean),n=tx.join("").length,fz=n>1100?17:n>800?20:n>550?23:n>320?26:30;
@@ -712,15 +717,15 @@ async function pptView(m,id,k){
     if(old){sl=pptOld(buf);deck=oldDeck(sl)}else{deck=await pptxOpen(await JSZip.loadAsync(buf));sl=deck.sl}via="penuh";
     if(!pvAlive(m)){if(deck)deck.free();return}}
   m._deck=deck;
-  var withN=sl.filter(function(q){return q.n}).length,cur=0,fs=15,mode=deck?"own":"drive",tok=0,
+  var withN=sl.filter(function(q){return q.n}).length,cur=0,fs=15,mode=deck&&!old?"own":"drive",tok=0,
     src=k==="slides"?"https://docs.google.com/presentation/d/"+encodeURIComponent(id)+"/preview":"https://drive.google.com/file/d/"+encodeURIComponent(id)+"/preview";
   var tl=m.querySelector(".tl"),zoom=1;
   tl.innerHTML=deck?"<button class='g' data-z='-1' aria-label='Perkecil slide'>−</button><span title='Klik untuk reset zoom' style='cursor:pointer'>100%</span><button class='g' data-z='1' aria-label='Perbesar slide'>＋</button>":"";
   m.querySelector(".bd").innerHTML="<div class='pp'><div class='sg'></div><div class='spl' role='separator' aria-label='Geser untuk mengubah ukuran slide dan catatan' title='Geser untuk ubah ukuran (klik 2x untuk reset)'><i></i></div><div class='nt'><div class='nh'><button class='g' data-n='-1' aria-label='Slide sebelumnya'>‹</button><select class='in' aria-label='Pilih slide'>"+
     sl.map(function(q,i){return"<option value='"+i+"'>"+(i+1)+". "+esc(q.t||"Slide "+(i+1))+(q.n?" 📝":"")+"</option>"}).join("")+"</select><button class='g' data-n='1' aria-label='Slide berikutnya'>›</button><span class='ct'></span>"+
-    (deck?"<button class='g' data-v='1' title='Ganti tampilan slide'>Drive</button>":"")+"<button class='g' data-f='-1' aria-label='Kecilkan huruf'>A−</button><button class='g' data-f='1' aria-label='Besarkan huruf'>A+</button></div><div class='nh2'></div><div class='nb' tabindex='0'></div></div></div>";
+    (deck?"<button class='g' data-v='1' title='Ganti tampilan slide'>"+(old?"Sinkron":"Drive")+"</button>":"")+"<button class='g' data-f='-1' aria-label='Kecilkan huruf'>A−</button><button class='g' data-f='1' aria-label='Besarkan huruf'>A+</button></div><div class='nh2'></div><div class='nb' tabindex='0'></div></div></div>";
   var pp=m.querySelector(".pp"),sg=pp.querySelector(".sg"),sel=pp.querySelector("select"),nb=pp.querySelector(".nb"),ct=pp.querySelector(".ct"),hint=pp.querySelector(".nh2"),vb=pp.querySelector("[data-v]");
-  function hn(){hint.textContent=mode==="own"?sl.length+" slide · "+withN+" punya catatan · gulir untuk pindah slide, catatan ikut berganti · "+via+" "+((performance.now()-t0)/1000).toFixed(1)+"s"+(old?" · .ppt lama: tampil teks judul & isi saja, tekan Drive untuk tampilan asli":""):(deck?"Tampilan Drive: slide & catatan tidak otomatis sinkron, pilih nomor slide yang sama. ":"Format .ppt: slide tampil dari Google Drive (tidak otomatis sinkron), pilih nomor slide yang sama. ")+sl.length+" slide · "+withN+" punya catatan"}
+  function hn(){hint.textContent=mode==="own"?sl.length+" slide · "+withN+" punya catatan · gulir untuk pindah slide, catatan ikut berganti · "+via+" "+((performance.now()-t0)/1000).toFixed(1)+"s"+(old?" · .ppt lama: tampil teks judul & isi saja, tekan Drive untuk tampilan asli":""):(deck?"Tampilan Drive (asli): slide & catatan tidak otomatis sinkron, pilih nomor slide yang sama."+(old?" Tekan Sinkron untuk geser slide + catatan otomatis (hanya teks). ":" "):"Format .ppt: slide tampil dari Google Drive (tidak otomatis sinkron), pilih nomor slide yang sama. ")+sl.length+" slide · "+withN+" punya catatan"}
   var sc=null,sws=[],io=null,raf=0;
   function dims(){var W=deck.W,H=deck.H,w=Math.max(120,Math.min(sg.clientWidth-16,(sg.clientHeight-24)*W/H,1600))*zoom;return{w:w,h:w*H/W,k:w/W}}
   var zl=tl.querySelector("span");
@@ -729,7 +734,7 @@ async function pptView(m,id,k){
   tl.addEventListener("click",function(e){var b=e.target.closest("[data-z]");if(b)setZoom(zoom*(+b.dataset.z>0?1.25:.8));else if(e.target===zl)setZoom(1)});
   function fit(){if(!sc||!deck)return;var d=dims();sws.forEach(function(w){w.style.width=d.w+"px";w.style.height=d.h+"px";var st=w.firstElementChild;if(st)st.style.transform="scale("+d.k+")"})}
   function put(i){var w=sws[i];if(!w||w.firstElementChild)return;
-    deck.draw(i).then(function(st){if(!pvAlive(m)||!sc||w.firstElementChild||!w._vis)return;st.style.left="0";st.style.top="0";st.style.transformOrigin="0 0";w.appendChild(st);fit()}).catch(function(){w.textContent="Slide tidak bisa digambar"})}
+    deck.draw(i).then(function(st){if(!pvAlive(m)||!sc||w.firstElementChild||!w._vis)return;st.style.left="0";st.style.top="0";st.style.transformOrigin="0 0";w.appendChild(st);fit();pptAutoFit(st)}).catch(function(){w.textContent="Slide tidak bisa digambar"})}
   function onScr(){if(raf)return;raf=requestAnimationFrame(function(){raf=0;if(!sc)return;var y=sc.scrollTop+sc.clientHeight/3,k=0;for(var j=0;j<sws.length;j++){if(sws[j].offsetTop+sws[j].offsetHeight>y){k=j;break}}if(k!==cur)setCur(k)})}
   function buildOwn(){
     sg.innerHTML="";sc=document.createElement("div");sc.className="sc";sg.appendChild(sc);
@@ -746,7 +751,7 @@ async function pptView(m,id,k){
   sel.onchange=function(){go(+sel.value)};
   pp.addEventListener("click",function(e){var b=e.target.closest("[data-n],[data-f],[data-v]");if(!b)return;
     if(b.dataset.n)go(cur+(+b.dataset.n));
-    else if(b.dataset.v){mode=mode==="own"?"drive":"own";b.textContent=mode==="own"?"Drive":"Cepat";tl.style.display=mode==="own"?"":"none";pp.classList.toggle("own",mode==="own");hn();if(mode==="own")buildOwn();else showDrive()}
+    else if(b.dataset.v){mode=mode==="own"?"drive":"own";b.textContent=mode==="own"?"Drive":(old?"Sinkron":"Cepat");tl.style.display=mode==="own"?"":"none";pp.classList.toggle("own",mode==="own");hn();if(mode==="own")buildOwn();else showDrive()}
     else{fs=Math.max(11,Math.min(30,fs+(+b.dataset.f>0?2:-2)));nb.style.setProperty("--nf",fs+"px")}});
   m._kd=function(e){if(/^(INPUT|TEXTAREA)$/.test((e.target||{}).tagName||""))return;var k2=e.key;if(k2==="ArrowRight"||k2==="PageDown")go(cur+1);else if(k2==="ArrowLeft"||k2==="PageUp")go(cur-1)};
   document.addEventListener("keydown",m._kd);
@@ -760,7 +765,7 @@ async function pptView(m,id,k){
   function dEnd(){if(!dg)return;dg=false;spl.classList.remove("dr");try{localStorage.setItem("ast.ntf",String(nt.offsetHeight/pp.clientHeight))}catch(e){}}
   spl.addEventListener("pointerup",dEnd);spl.addEventListener("pointercancel",dEnd);
   spl.addEventListener("dblclick",function(){nt.style.height="";try{localStorage.removeItem("ast.ntf")}catch(e){}});
-  if(deck){pp.classList.add("own");buildOwn()}else showDrive();
+  if(deck&&mode==="own"){pp.classList.add("own");buildOwn()}else{if(deck)tl.style.display="none";showDrive()}
   hn();setCur(0)}
 
 async function pvOpen(id,name,k){
