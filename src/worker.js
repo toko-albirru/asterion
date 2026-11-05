@@ -950,6 +950,7 @@ export default {
         return J({ n });
       }
       if (k === "pack") { try { return await pptxPack(id, env, uc); } catch (err) { return J({ err: "pack gagal" }, 502); } }
+      if (k === "pdfslides") { try { return await slidesPdf(id, env, url.searchParams.get("n") === "1"); } catch (err) { return J({ err: "konversi gagal: " + String(err && err.message || err).slice(0, 200) }, 502); } }
       const src = k === "slides" ? `https://docs.google.com/presentation/d/${id}/export/pptx`
         : env.DRIVE_API_KEY ? `https://www.googleapis.com/drive/v3/files/${id}?alt=media&supportsAllDrives=true&key=${env.DRIVE_API_KEY}` : uc;
       const h = { ...UA }, rg = request.headers.get("range");
@@ -978,6 +979,57 @@ export default {
   },
 };
 
+
+// ===== TAMPILAN ASLI SLIDE: PPTX -> Google Slides (salinan sementara) -> PDF -> di-cache =====
+// Butuh secret GOOGLE_SA_JSON (isi file kunci service account, JSON utuh). Tanpa itu endpoint menjawab 501 dan web memakai penggambar bawaan.
+let _saTok = null;
+async function saToken(env) {
+  if (_saTok && _saTok.exp > Date.now() + 60000) return _saTok.t;
+  let sa; try { sa = JSON.parse(env.GOOGLE_SA_JSON); } catch { throw new Error("GOOGLE_SA_JSON bukan JSON valid"); }
+  if (!sa.client_email || !sa.private_key) throw new Error("GOOGLE_SA_JSON tidak lengkap");
+  const b64u = (x) => btoa(typeof x === "string" ? x : String.fromCharCode(...new Uint8Array(x))).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+  const now = Math.floor(Date.now() / 1000), enc = new TextEncoder();
+  const head = b64u(JSON.stringify({ alg: "RS256", typ: "JWT" })), claim = b64u(JSON.stringify({ iss: sa.client_email, scope: "https://www.googleapis.com/auth/drive", aud: "https://oauth2.googleapis.com/token", iat: now, exp: now + 3300 }));
+  const pem = sa.private_key.replace(/-----[A-Z ]+-----/g, "").replace(/\s+/g, ""), der = Uint8Array.from(atob(pem), (c) => c.charCodeAt(0));
+  const key = await crypto.subtle.importKey("pkcs8", der, { name: "RSASSA-PKCS1-v1_5", hash: "SHA-256" }, false, ["sign"]);
+  const sig = await crypto.subtle.sign("RSASSA-PKCS1-v1_5", key, enc.encode(head + "." + claim));
+  const r = await fetch("https://oauth2.googleapis.com/token", { method: "POST", headers: { "content-type": "application/x-www-form-urlencoded" }, body: "grant_type=" + encodeURIComponent("urn:ietf:params:oauth:grant-type:jwt-bearer") + "&assertion=" + head + "." + claim + "." + b64u(sig) });
+  const j = await r.json().catch(() => ({}));
+  if (!r.ok || !j.access_token) throw new Error("token Google ditolak: " + (j.error_description || j.error || r.status));
+  _saTok = { t: j.access_token, exp: Date.now() + (j.expires_in || 3300) * 1000 };
+  return _saTok.t;
+}
+async function slidesPdf(id, env, native) {
+  if (!env.GOOGLE_SA_JSON) return J({ err: "GOOGLE_SA_JSON belum diatur" }, 501);
+  const tok = await saToken(env), H = { authorization: "Bearer " + tok };
+  const PH = { "content-type": "application/pdf", "cache-control": "private, max-age=86400" };
+  // versi file (berubah bila dosen mengganti file di Drive) -> kunci cache
+  let ver = "0";
+  try { const mr = await fetch(`https://www.googleapis.com/drive/v3/files/${id}?fields=md5Checksum,modifiedTime&supportsAllDrives=true`, { headers: H }); if (mr.ok) { const mj = await mr.json(); ver = String(mj.md5Checksum || mj.modifiedTime || "0").replace(/[^\w]/g, "").slice(0, 40); } } catch {}
+  const key = "slidespdf/" + id + "-" + ver, kvKey = "sp:" + id + ":" + ver;
+  try { if (env.RUN_FILES) { const o = await env.RUN_FILES.get(key); if (o) return new Response(o.body, { headers: PH }); } } catch {}
+  try { if (env.LINKS) { const b = await env.LINKS.get(kvKey, "arrayBuffer"); if (b) return new Response(b, { headers: PH }); } } catch {}
+  let nid = id, tmp = false;
+  try {
+    if (!native) {
+      const cr = await fetch(`https://www.googleapis.com/drive/v3/files/${id}/copy?supportsAllDrives=true&fields=id`, { method: "POST", headers: { ...H, "content-type": "application/json" }, body: JSON.stringify({ name: "asterion-tmp-" + id.slice(0, 8), mimeType: "application/vnd.google-apps.presentation" }) });
+      const cj = await cr.json().catch(() => ({}));
+      if (!cr.ok || !cj.id) throw new Error("salin/konversi gagal (" + cr.status + "): " + ((cj.error && cj.error.message) || "pastikan file dibagikan 'siapa saja yang memiliki link'"));
+      nid = cj.id; tmp = true;
+    }
+    let r = await fetch(`https://docs.google.com/presentation/d/${nid}/export/pdf`, { headers: H });
+    if (!r.ok) r = await fetch(`https://www.googleapis.com/drive/v3/files/${nid}/export?mimeType=application/pdf`, { headers: H });
+    if (!r.ok) throw new Error("ekspor PDF gagal (" + r.status + ")");
+    const buf = await r.arrayBuffer();
+    if (new Uint8Array(buf.slice(0, 4)).join() !== "37,80,68,70") throw new Error("hasil ekspor bukan PDF");
+    let saved = false;
+    try { if (env.RUN_FILES) { await env.RUN_FILES.put(key, buf, { httpMetadata: { contentType: "application/pdf" } }); saved = true; } } catch {}
+    if (!saved) { try { if (env.LINKS && buf.byteLength < 24 * 1048576) await env.LINKS.put(kvKey, buf, { expirationTtl: 60 * 86400 }); } catch {} }
+    return new Response(buf, { headers: PH });
+  } finally {
+    if (tmp && nid !== id) { try { await fetch(`https://www.googleapis.com/drive/v3/files/${nid}?supportsAllDrives=true`, { method: "DELETE", headers: H }); } catch {} }
+  }
+}
 
 // ===== PPTX PACK: baca ZIP di sisi server, kirim hanya XML slide + catatan (kecil) ke browser =====
 async function pptxPack(id, env, uc) {
