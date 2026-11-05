@@ -573,22 +573,33 @@ function pptOld(buf){
   function walk(s,e,f){while(s+8<=e){var vi=bv.getUint16(s,true),ty=bv.getUint16(s+2,true),len=bv.getUint32(s+4,true),bs=s+8,be=bs+len;if(be>e)break;var cont=(vi&15)===15;if(f(ty,vi>>4,bs,be)!==false&&cont)walk(bs,be,f);s=be}}
   function txt(ty,s,e){return new TextDecoder(ty===4000?"utf-16le":"windows-1252").decode(b.subarray(s,e))}
   function clean(t){return t.replace(/\r\n|\r|\v/g,"\n").replace(/\u0000/g,"").trim()}
-  var dS=-1,dE=-1,notes={};
+  var dS=-1,dE=-1,notes={},sc=[];
   walk(0,b.length,function(ty,inst,s,e){
     if(ty===1000){dS=s;dE=e}
     else if(ty===1008){var ref=null,t="",flag=false;
       walk(s,e,function(t2,i2,s2,e2){if(t2===1009)ref=bv.getUint32(s2,true);else if(t2===3999)flag=bv.getUint32(s2,true)===2;else if((t2===4000||t2===4008)&&flag){t+=(t?"\n":"")+clean(txt(t2,s2,e2));flag=false}});
       if(ref!=null&&t)notes[ref]=t}
+    else if(ty===1006){var tb=[],h2=-1; /* cadangan: teks dari isi slide (file yang tidak menyimpan daftar teks di SlideListWithText) */
+      walk(s,e,function(t2,i2,s2,e2){if(t2===3999)h2=bv.getUint32(s2,true);else if(t2===4000||t2===4008){var x=clean(txt(t2,s2,e2));if(x)tb.push({h:h2,t:x})}});sc.push(tb)}
     return false});
   if(dS<0)throw new Error("tanpa dokumen");
   var order=[],cur=null,hd=-1;
   walk(dS,dE,function(ty,inst,s,e){
     if(ty===4080)return inst===0;
-    if(ty===1011){cur={id:bv.getInt32(s+12,true),t:""};order.push(cur)}
+    if(ty===1011){cur={id:bv.getInt32(s+12,true),t:"",b:[]};order.push(cur)}
     else if(ty===3999&&cur)hd=bv.getUint32(s,true);
-    else if((ty===4000||ty===4008)&&cur&&!cur.t&&(hd===0||hd===6))cur.t=clean(txt(ty,s,e)).replace(/\s+/g," ")});
+    else if((ty===4000||ty===4008)&&cur){var tx=clean(txt(ty,s,e));if(!cur.t&&(hd===0||hd===6))cur.t=tx.replace(/\s+/g," ");else if(tx)cur.b.push(tx)}});
   if(!order.length)throw new Error("tanpa slide");
-  return order.map(function(o){return{t:o.t,n:notes[o.id]||""}})}
+  order.forEach(function(o,i){if(o.t||o.b.length||!sc[i])return;sc[i].forEach(function(x){if(!o.t&&(x.h===0||x.h===6))o.t=x.t.replace(/\s+/g," ");else o.b.push(x.t)})});
+  return order.map(function(o){return{t:o.t,n:notes[o.id]||"",b:o.b}})}
+/* .ppt lama: slide digambar sendiri sebagai kartu teks (judul + isi) supaya bisa digulir/digeser dan catatan ikut berganti seperti .pptx */
+function oldDeck(sl){var W=960,H=540;
+  function mk(i){var q=sl[i],st=document.createElement("div"),tx=(q.b||[]).join("\n").split(/\n+/).filter(Boolean),n=tx.join("").length,fz=n>1100?17:n>800?20:n>550?23:n>320?26:30;
+    st.style.cssText="position:absolute;left:0;top:0;width:"+W+"px;height:"+H+"px;box-sizing:border-box;padding:44px 56px;background:#fff;color:#1d1d2b;overflow:hidden;font-family:Calibri,Carlito,Arial,sans-serif;line-height:1.25;border-top:14px solid #5b3fb5";
+    var h=document.createElement("div");h.textContent=q.t||"Slide "+(i+1);h.style.cssText="font-size:"+(q.t&&q.t.length>60?34:44)+"px;font-weight:700;color:#2a1f5c;margin-bottom:22px";st.appendChild(h);
+    tx.forEach(function(t){var p=document.createElement("div");p.textContent=t;p.style.cssText="font-size:"+fz+"px;margin:0 0 "+Math.round(fz/3)+"px;padding-left:1.1em;text-indent:-1.1em";p.insertBefore(document.createTextNode("• "),p.firstChild);st.appendChild(p)});
+    var f=document.createElement("div");f.textContent=(i+1)+" / "+sl.length;f.style.cssText="position:absolute;right:22px;bottom:12px;font-size:16px;color:#999";st.appendChild(f);return st}
+  return{sl:sl,W:W,H:H,free:function(){},draw:function(i){return Promise.resolve(mk(i))}}}
 
 async function pdfView(m,id){
   pvStatus(m,"Memuat pembaca PDF…");
@@ -698,7 +709,7 @@ async function pptView(m,id,k){
     var buf=await new Blob(ch).arrayBuffer();if(!pvAlive(m))return;
     pvStatus(m,"Membaca slide & catatan…");
     var u8=new Uint8Array(buf);old=u8[0]===0xD0&&u8[1]===0xCF;
-    if(old)sl=pptOld(buf);else{deck=await pptxOpen(await JSZip.loadAsync(buf));sl=deck.sl}via="penuh";
+    if(old){sl=pptOld(buf);deck=oldDeck(sl)}else{deck=await pptxOpen(await JSZip.loadAsync(buf));sl=deck.sl}via="penuh";
     if(!pvAlive(m)){if(deck)deck.free();return}}
   m._deck=deck;
   var withN=sl.filter(function(q){return q.n}).length,cur=0,fs=15,mode=deck?"own":"drive",tok=0,
@@ -709,7 +720,7 @@ async function pptView(m,id,k){
     sl.map(function(q,i){return"<option value='"+i+"'>"+(i+1)+". "+esc(q.t||"Slide "+(i+1))+(q.n?" 📝":"")+"</option>"}).join("")+"</select><button class='g' data-n='1' aria-label='Slide berikutnya'>›</button><span class='ct'></span>"+
     (deck?"<button class='g' data-v='1' title='Ganti tampilan slide'>Drive</button>":"")+"<button class='g' data-f='-1' aria-label='Kecilkan huruf'>A−</button><button class='g' data-f='1' aria-label='Besarkan huruf'>A+</button></div><div class='nh2'></div><div class='nb' tabindex='0'></div></div></div>";
   var pp=m.querySelector(".pp"),sg=pp.querySelector(".sg"),sel=pp.querySelector("select"),nb=pp.querySelector(".nb"),ct=pp.querySelector(".ct"),hint=pp.querySelector(".nh2"),vb=pp.querySelector("[data-v]");
-  function hn(){hint.textContent=mode==="own"?sl.length+" slide · "+withN+" punya catatan · gulir untuk pindah slide, catatan ikut berganti · "+via+" "+((performance.now()-t0)/1000).toFixed(1)+"s":(deck?"Tampilan Drive: slide & catatan tidak otomatis sinkron, pilih nomor slide yang sama. ":"Format .ppt: slide tampil dari Google Drive (tidak otomatis sinkron), pilih nomor slide yang sama. ")+sl.length+" slide · "+withN+" punya catatan"}
+  function hn(){hint.textContent=mode==="own"?sl.length+" slide · "+withN+" punya catatan · gulir untuk pindah slide, catatan ikut berganti · "+via+" "+((performance.now()-t0)/1000).toFixed(1)+"s"+(old?" · .ppt lama: tampil teks judul & isi saja, tekan Drive untuk tampilan asli":""):(deck?"Tampilan Drive: slide & catatan tidak otomatis sinkron, pilih nomor slide yang sama. ":"Format .ppt: slide tampil dari Google Drive (tidak otomatis sinkron), pilih nomor slide yang sama. ")+sl.length+" slide · "+withN+" punya catatan"}
   var sc=null,sws=[],io=null,raf=0;
   function dims(){var W=deck.W,H=deck.H,w=Math.max(120,Math.min(sg.clientWidth-16,(sg.clientHeight-24)*W/H,1600))*zoom;return{w:w,h:w*H/W,k:w/W}}
   var zl=tl.querySelector("span");
