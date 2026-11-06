@@ -982,6 +982,18 @@ export default {
 
 // ===== TAMPILAN ASLI SLIDE: PPTX -> Google Slides (salinan sementara) -> PDF -> di-cache =====
 // Butuh secret GOOGLE_SA_JSON (isi file kunci service account, JSON utuh). Tanpa itu endpoint menjawab 501 dan web memakai penggambar bawaan.
+let _gTok = null;
+async function gToken(env) { // utama: OAuth akun Google pribadi (punya kuota Drive); cadangan: service account (tak bisa menyalin file)
+  if (env.GOOGLE_OAUTH_REFRESH_TOKEN && env.GOOGLE_OAUTH_CLIENT_ID && env.GOOGLE_OAUTH_CLIENT_SECRET) {
+    if (_gTok && _gTok.exp > Date.now() + 60000) return _gTok.t;
+    const r = await fetch("https://oauth2.googleapis.com/token", { method: "POST", headers: { "content-type": "application/x-www-form-urlencoded" }, body: new URLSearchParams({ client_id: env.GOOGLE_OAUTH_CLIENT_ID, client_secret: env.GOOGLE_OAUTH_CLIENT_SECRET, refresh_token: env.GOOGLE_OAUTH_REFRESH_TOKEN, grant_type: "refresh_token" }) });
+    const j = await r.json().catch(() => ({}));
+    if (!r.ok || !j.access_token) throw new Error("token OAuth ditolak: " + (j.error_description || j.error || r.status));
+    _gTok = { t: j.access_token, exp: Date.now() + (j.expires_in || 3300) * 1000 };
+    return _gTok.t;
+  }
+  return saToken(env);
+}
 let _saTok = null;
 async function saToken(env) {
   if (_saTok && _saTok.exp > Date.now() + 60000) return _saTok.t;
@@ -999,36 +1011,62 @@ async function saToken(env) {
   _saTok = { t: j.access_token, exp: Date.now() + (j.expires_in || 3300) * 1000 };
   return _saTok.t;
 }
+async function gasCall(env, params) {
+  const u = new URL(env.GAS_URL); for (const k in params) u.searchParams.set(k, params[k]); u.searchParams.set("key", env.GAS_KEY || "");
+  const r = await fetch(u.toString(), { redirect: "follow" }); const t = await r.text(); let j;
+  try { j = JSON.parse(t); } catch { throw new Error("Apps Script membalas bukan JSON (cek deploy: Who has access = Anyone)"); }
+  if (j.err) throw new Error(j.err);
+  return j;
+}
+function b64buf(b) { const bin = atob(b), a = new Uint8Array(bin.length); for (let i = 0; i < bin.length; i++) a[i] = bin.charCodeAt(i); return a.buffer; }
 async function slidesPdf(id, env, native) {
-  if (!env.GOOGLE_SA_JSON) return J({ err: "GOOGLE_SA_JSON belum diatur" }, 501);
-  const tok = await saToken(env), H = { authorization: "Bearer " + tok };
+  const useGas = !!env.GAS_URL, useG = !!(env.GOOGLE_OAUTH_REFRESH_TOKEN || env.GOOGLE_SA_JSON);
+  if (!useGas && !useG) return J({ err: "kredensial Google belum diatur" }, 501);
   const PH = { "content-type": "application/pdf", "cache-control": "private, max-age=86400" };
-  // versi file (berubah bila dosen mengganti file di Drive) -> kunci cache
-  let ver = "0";
-  try { const mr = await fetch(`https://www.googleapis.com/drive/v3/files/${id}?fields=md5Checksum,modifiedTime&supportsAllDrives=true`, { headers: H }); if (mr.ok) { const mj = await mr.json(); ver = String(mj.md5Checksum || mj.modifiedTime || "0").replace(/[^\w]/g, "").slice(0, 40); } } catch {}
+  const H = useGas ? null : { authorization: "Bearer " + await gToken(env) };
+  // versi file (berubah bila dosen mengganti file di Drive) dicek paling sering tiap 12 jam
+  let ver = "0", pv = "", pts = 0; const vk = "spv:" + id;
+  try { if (env.LINKS) { const rec = await env.LINKS.get(vk); if (rec) { const q = rec.split("|"); pv = q[0]; pts = Number(q[1]) || 0; } } } catch {}
+  if (pv && Date.now() - pts < 12 * 3600e3) ver = pv;
+  else {
+    let got = "";
+    try {
+      if (useGas) got = String((await gasCall(env, { id, meta: 1 })).ver || "");
+      else { const mr = await fetch(`https://www.googleapis.com/drive/v3/files/${id}?fields=md5Checksum,modifiedTime&supportsAllDrives=true`, { headers: H }); if (mr.ok) { const mj = await mr.json(); got = String(mj.md5Checksum || mj.modifiedTime || ""); } }
+    } catch {}
+    ver = (got || pv || "0").replace(/[^\w]/g, "").slice(0, 40);
+    try { if (env.LINKS) await env.LINKS.put(vk, ver + "|" + Date.now(), { expirationTtl: 60 * 86400 }); } catch {}
+  }
   const key = "slidespdf/" + id + "-" + ver, kvKey = "sp:" + id + ":" + ver;
   try { if (env.RUN_FILES) { const o = await env.RUN_FILES.get(key); if (o) return new Response(o.body, { headers: PH }); } } catch {}
   try { if (env.LINKS) { const b = await env.LINKS.get(kvKey, "arrayBuffer"); if (b) return new Response(b, { headers: PH }); } } catch {}
-  let nid = id, tmp = false;
-  try {
-    if (!native) {
-      const cr = await fetch(`https://www.googleapis.com/drive/v3/files/${id}/copy?supportsAllDrives=true&fields=id`, { method: "POST", headers: { ...H, "content-type": "application/json" }, body: JSON.stringify({ name: "asterion-tmp-" + id.slice(0, 8), mimeType: "application/vnd.google-apps.presentation" }) });
-      const cj = await cr.json().catch(() => ({}));
-      if (!cr.ok || !cj.id) throw new Error("salin/konversi gagal (" + cr.status + "): " + ((cj.error && cj.error.message) || "pastikan file dibagikan 'siapa saja yang memiliki link'"));
-      nid = cj.id; tmp = true;
+  let buf;
+  if (useGas) {
+    const j = await gasCall(env, { id, n: native ? "1" : "0" });
+    if (!j.b64) throw new Error("Apps Script tidak mengirim PDF");
+    buf = b64buf(j.b64);
+  } else {
+    let nid = id, tmp = false;
+    try {
+      if (!native) {
+        const cr = await fetch(`https://www.googleapis.com/drive/v3/files/${id}/copy?supportsAllDrives=true&fields=id`, { method: "POST", headers: { ...H, "content-type": "application/json" }, body: JSON.stringify({ name: "asterion-tmp-" + id.slice(0, 8), mimeType: "application/vnd.google-apps.presentation" }) });
+        const cj = await cr.json().catch(() => ({}));
+        if (!cr.ok || !cj.id) throw new Error("salin/konversi gagal (" + cr.status + "): " + ((cj.error && cj.error.message) || "pastikan file dibagikan 'siapa saja yang memiliki link'"));
+        nid = cj.id; tmp = true;
+      }
+      let r = await fetch(`https://docs.google.com/presentation/d/${nid}/export/pdf`, { headers: H });
+      if (!r.ok) r = await fetch(`https://www.googleapis.com/drive/v3/files/${nid}/export?mimeType=application/pdf`, { headers: H });
+      if (!r.ok) throw new Error("ekspor PDF gagal (" + r.status + ")");
+      buf = await r.arrayBuffer();
+    } finally {
+      if (tmp && nid !== id) { try { await fetch(`https://www.googleapis.com/drive/v3/files/${nid}?supportsAllDrives=true`, { method: "DELETE", headers: H }); } catch {} }
     }
-    let r = await fetch(`https://docs.google.com/presentation/d/${nid}/export/pdf`, { headers: H });
-    if (!r.ok) r = await fetch(`https://www.googleapis.com/drive/v3/files/${nid}/export?mimeType=application/pdf`, { headers: H });
-    if (!r.ok) throw new Error("ekspor PDF gagal (" + r.status + ")");
-    const buf = await r.arrayBuffer();
-    if (new Uint8Array(buf.slice(0, 4)).join() !== "37,80,68,70") throw new Error("hasil ekspor bukan PDF");
-    let saved = false;
-    try { if (env.RUN_FILES) { await env.RUN_FILES.put(key, buf, { httpMetadata: { contentType: "application/pdf" } }); saved = true; } } catch {}
-    if (!saved) { try { if (env.LINKS && buf.byteLength < 24 * 1048576) await env.LINKS.put(kvKey, buf, { expirationTtl: 60 * 86400 }); } catch {} }
-    return new Response(buf, { headers: PH });
-  } finally {
-    if (tmp && nid !== id) { try { await fetch(`https://www.googleapis.com/drive/v3/files/${nid}?supportsAllDrives=true`, { method: "DELETE", headers: H }); } catch {} }
   }
+  if (new Uint8Array(buf.slice(0, 4)).join() !== "37,80,68,70") throw new Error("hasil ekspor bukan PDF");
+  let saved = false;
+  try { if (env.RUN_FILES) { await env.RUN_FILES.put(key, buf, { httpMetadata: { contentType: "application/pdf" } }); saved = true; } } catch {}
+  if (!saved) { try { if (env.LINKS && buf.byteLength < 24 * 1048576) await env.LINKS.put(kvKey, buf, { expirationTtl: 60 * 86400 }); } catch {} }
+  return new Response(buf, { headers: PH });
 }
 
 // ===== PPTX PACK: baca ZIP di sisi server, kirim hanya XML slide + catatan (kecil) ke browser =====
