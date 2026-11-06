@@ -112,11 +112,11 @@ a.tag{text-decoration:none}
 .pbar{width:min(260px,70%);height:6px;border-radius:99px;background:rgba(255,255,255,.15);overflow:hidden}
 .pbar i{display:block;height:100%;width:0;background:var(--gold);transition:width .2s}
 .pp{position:absolute;inset:0;display:flex;flex-direction:column}
-.pv-m .fs{flex:none;position:relative;z-index:3;display:flex;gap:6px;align-items:center;padding:8px 10px;background:rgba(22,18,34,.96);border-bottom:1px solid rgba(255,255,255,.1)}
-.pv-m .fs input{flex:1;min-width:0;margin:0;padding:8px 12px;font-size:14px}
-.pv-m .fs .fc{flex:none;font:600 12px Inter,sans-serif;color:var(--mut);min-width:58px;text-align:center;white-space:nowrap}
-.pv-m .fs button{flex:none;height:36px;min-width:36px;padding:0 8px;border-radius:10px;color:#fff;font:600 14px Inter,sans-serif;cursor:pointer}
-.pv-m .fs+.pdfc{top:53px}
+.pv-m .bar .fs{flex:none;display:flex;gap:4px;align-items:center}
+.pv-m .bar .fs input{width:150px;height:36px;margin:0;padding:0 10px;font-size:13px;border-radius:12px}
+.pv-m .bar .fs .fc{flex:none;font:600 11px Inter,sans-serif;color:var(--mut);min-width:40px;text-align:center;white-space:nowrap}
+.pv-m .bar .fs button{min-width:32px;padding:0 6px}
+@media(max-width:640px){.pv-m .bar .fs input{width:92px}.pv-m .bar .fs .fc{min-width:34px}}
 mark.qm{background:#ffd54a;color:#000;border-radius:2px;padding:0}
 mark.qm.qc{background:#ff9100;outline:2px solid #fff}
 .pdfc .hl{position:absolute;inset:0;pointer-events:none}
@@ -708,7 +708,7 @@ async function pdfView(m,id){
   var pdf=await task.promise;if(!pvAlive(m)){pdf.destroy();return}
   m._pdf=pdf;
   var N=pdf.numPages,bd=m.querySelector(".bd"),tl=m.querySelector(".tl"),zoom=1;
-  bd.innerHTML=qBar("Cari teks di PDF, mis. SJS")+"<div class='pdfc'></div>";var c=bd.lastChild;
+  bd.innerHTML="<div class='pdfc'></div>";var c=bd.firstChild;tl.insertAdjacentHTML("beforebegin",qBar("Cari… mis. SJS"));
   tl.innerHTML="<button class='g' data-z='-1' aria-label='Perkecil'>−</button><span>1 / "+N+"</span><button class='g' data-z='1' aria-label='Perbesar'>＋</button>";
   var info=tl.querySelector("span"),pgs=[],vis=new Set(),p1=await pdf.getPage(1),v1=p1.getViewport({scale:1});
   var wd=function(){var ar=v1.width/v1.height;return Math.max(120,Math.min(c.clientWidth-16,(c.clientHeight-24)*ar,1600))*zoom};
@@ -727,7 +727,7 @@ async function pdfView(m,id){
   function free(d){if(d._t){try{d._t.cancel()}catch(e){}}d.innerHTML="";d._ok=0}
   var io=new IntersectionObserver(function(es){es.forEach(function(e){if(e.isIntersecting){vis.add(e.target);draw(e.target)}else{vis.delete(e.target);free(e.target)}})},{root:c,rootMargin:"1200px 0px"});
   /* ----- cari teks: indeks teks tiap halaman dibuat sekali (di latar belakang), sorotan digambar di atas kanvas ----- */
-  var fsb=bd.querySelector(".fs"),fi=fsb.querySelector("input"),fc=fsb.querySelector(".fc"),px=new Array(N),pxP=null,pq="",ph=[],pi=-1;
+  var fsb=m.querySelector(".fs"),fi=fsb.querySelector("input"),fc=fsb.querySelector(".fc"),px=new Array(N),pxP=null,pq="",ph=[],pi=-1;
   function curPg(){var y=c.scrollTop+c.clientHeight/3,k=0;for(var j=0;j<pgs.length;j++){if(pgs[j].offsetTop+pgs[j].offsetHeight>y){k=j;break}}return k}
   function pIndex(){if(pxP)return pxP;pxP=(async function(){var tot=0;
     for(var i=0;i<N;i++){if(!pvAlive(m))return;
@@ -866,12 +866,13 @@ async function pptView(m,id,k){
     src=k==="slides"?"https://docs.google.com/presentation/d/"+encodeURIComponent(id)+"/preview":"https://drive.google.com/file/d/"+encodeURIComponent(id)+"/preview";
   var tl=m.querySelector(".tl"),zoom=1;
   tl.innerHTML=deck?"<button class='g' data-z='-1' aria-label='Perkecil slide'>−</button><span title='Klik untuk reset zoom' style='cursor:pointer'>100%</span><button class='g' data-z='1' aria-label='Perbesar slide'>＋</button>":"";
-  m.querySelector(".bd").innerHTML="<div class='pp'>"+qBar("Cari teks di slide & catatan, mis. SJS")+"<div class='sg'></div><div class='spl' role='separator' aria-label='Geser untuk mengubah ukuran slide dan catatan' title='Geser untuk ubah ukuran (klik 2x untuk reset)'><i></i></div><div class='nt'><div class='nh'><button class='g' data-n='-1' aria-label='Slide sebelumnya'>‹</button><select class='in' aria-label='Pilih slide'>"+
+  m.querySelector(".bd").innerHTML="<div class='pp'><div class='sg'></div><div class='spl' role='separator' aria-label='Geser untuk mengubah ukuran slide dan catatan' title='Geser untuk ubah ukuran (klik 2x untuk reset)'><i></i></div><div class='nt'><div class='nh'><button class='g' data-n='-1' aria-label='Slide sebelumnya'>‹</button><select class='in' aria-label='Pilih slide'>"+
     sl.map(function(q,i){return"<option value='"+i+"'>"+(i+1)+". "+esc(q.t||"Slide "+(i+1))+(q.n?" 📝":"")+"</option>"}).join("")+"</select><button class='g' data-n='1' aria-label='Slide berikutnya'>›</button><span class='ct'></span>"+
     (deck?"<button class='g' data-v='1' title='Ganti tampilan slide'>"+(old?"Sinkron":"Drive")+"</button>":"")+"<button class='g' data-f='-1' aria-label='Kecilkan huruf'>A−</button><button class='g' data-f='1' aria-label='Besarkan huruf'>A+</button></div><div class='nh2'></div><div class='nb' tabindex='0'></div></div></div>";
+  tl.insertAdjacentHTML("beforebegin",qBar("Cari… mis. SJS"));
   var pp=m.querySelector(".pp"),sg=pp.querySelector(".sg"),sel=pp.querySelector("select"),nb=pp.querySelector(".nb"),ct=pp.querySelector(".ct"),hint=pp.querySelector(".nh2"),vb=pp.querySelector("[data-v]");
   function hn(){hint.textContent=mode==="own"?sl.length+" slide · "+withN+" punya catatan · gulir untuk pindah slide, catatan ikut berganti · "+via+" "+((performance.now()-t0)/1000).toFixed(1)+"s"+(old?" · .ppt lama: tampil teks judul & isi saja, tekan Drive untuk tampilan asli":"")+(m._pe?" · tampilan asli: "+m._pe:""):(deck?"Tampilan Drive (asli): slide & catatan tidak otomatis sinkron, pilih nomor slide yang sama."+(old?" Tekan Sinkron untuk geser slide + catatan otomatis (hanya teks). ":" "):"Format .ppt: slide tampil dari Google Drive (tidak otomatis sinkron), pilih nomor slide yang sama. ")+sl.length+" slide · "+withN+" punya catatan"}
-  var sc=null,sws=[],io=null,raf=0,fsb=pp.querySelector(".fs"),fi=fsb.querySelector("input"),fc=fsb.querySelector(".fc"),qs="",hits=[],hi=-1,qcur=null,ft2;
+  var sc=null,sws=[],io=null,raf=0,fsb=m.querySelector(".fs"),fi=fsb.querySelector("input"),fc=fsb.querySelector(".fc"),qs="",hits=[],hi=-1,qcur=null,ft2;
   function dims(){var W=deck.W,H=deck.H,w=Math.max(120,Math.min(sg.clientWidth-16,(sg.clientHeight-24)*W/H,1600))*zoom;return{w:w,h:w*H/W,k:w/W}}
   var zl=tl.querySelector("span");
   function setZoom(v){zoom=Math.max(.5,Math.min(4,v));if(zl)zl.textContent=Math.round(zoom*100)+"%";fit();
@@ -916,7 +917,7 @@ async function pptView(m,id,k){
   document.addEventListener("keydown",m._kd);
   if(window.ResizeObserver){m._ro=new ResizeObserver(fit);m._ro.observe(sg)}
   var spl=pp.querySelector(".spl"),nt=pp.querySelector(".nt");
-  function setNt(h){var mx=pp.clientHeight-spl.offsetHeight-120-fsb.offsetHeight;h=Math.max(90,Math.min(mx,h));nt.style.height=h+"px";return h}
+  function setNt(h){var mx=pp.clientHeight-spl.offsetHeight-120;h=Math.max(90,Math.min(mx,h));nt.style.height=h+"px";return h}
   try{var sv=+localStorage.getItem("ast.ntf");if(sv>0&&sv<1)setNt(pp.clientHeight*sv)}catch(e){}
   var dg=false;
   spl.addEventListener("pointerdown",function(e){dg=true;spl.classList.add("dr");try{spl.setPointerCapture(e.pointerId)}catch(_){}e.preventDefault()});
