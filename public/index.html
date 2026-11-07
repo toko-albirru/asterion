@@ -112,11 +112,17 @@ a.tag{text-decoration:none}
 .pbar{width:min(260px,70%);height:6px;border-radius:99px;background:rgba(255,255,255,.15);overflow:hidden}
 .pbar i{display:block;height:100%;width:0;background:var(--gold);transition:width .2s}
 .pp{position:absolute;inset:0;display:flex;flex-direction:column}
-.pv-m .bar .fs{flex:none;display:flex;gap:4px;align-items:center}
-.pv-m .bar .fs input{width:150px;height:36px;margin:0;padding:0 10px;font-size:13px;border-radius:12px}
-.pv-m .bar .fs .fc{flex:none;font:600 11px Inter,sans-serif;color:var(--mut);min-width:40px;text-align:center;white-space:nowrap}
-.pv-m .bar .fs button{min-width:32px;padding:0 6px}
-@media(max-width:640px){.pv-m .bar .fs input{width:92px}.pv-m .bar .fs .fc{min-width:34px}}
+.pv-m .bar .fs{flex:none;display:flex;align-items:center;gap:6px}
+.pv-m .bar .fs .fso{width:36px;padding:0;justify-content:center}
+.pv-m .bar .fs .fso svg,.pv-m .bar .fsx svg{width:16px;height:16px;display:block;fill:none;stroke:currentColor;stroke-width:2.2;stroke-linecap:round;stroke-linejoin:round}
+.pv-m .bar .fs.on .fso{color:var(--gold);border-color:var(--gold)}
+.pv-m .bar .fsx{display:none;align-items:center;gap:2px;height:36px;padding:0 4px 0 12px;border-radius:12px;border:1px solid var(--line);background:rgba(10,6,28,.55)}
+.pv-m .bar .fs.on .fsx{display:flex}
+.pv-m .bar .fsx input{width:130px;height:34px;border:0;background:transparent;padding:0;margin:0;font:500 13px Inter,sans-serif;color:#fff;outline:none;border-radius:0;box-shadow:none}
+.pv-m .bar .fsx .fc{flex:none;font:600 11px Inter,sans-serif;color:var(--mut);min-width:38px;text-align:center;white-space:nowrap}
+.pv-m .bar .fsx button{width:28px;min-width:28px;height:28px;padding:0;border:0;border-radius:8px;background:transparent;color:#cfc8e8;justify-content:center}
+.pv-m .bar .fsx button:hover,.pv-m .bar .fsx button:active{background:rgba(255,255,255,.14);color:#fff}
+@media(max-width:640px){.pv-m .bar .fsx input{width:84px}.pv-m .bar .fsx .fc{min-width:32px}}
 mark.qm{background:#ffd54a;color:#000;border-radius:2px;padding:0}
 mark.qm.qc{background:#ff9100;outline:2px solid #fff}
 .pdfc .hl{position:absolute;inset:0;pointer-events:none}
@@ -684,7 +690,9 @@ function pptAutoFit(st){[].forEach.call(st.querySelectorAll("[data-af]"),functio
 function qNorm(t){return(t||"").replace(/\s+/g," ").trim().toLowerCase()}
 function qLow(t){var l=t.toLowerCase();if(l.length===t.length)return l;return t.split("").map(function(c){var x=c.toLowerCase();return x.length===1?x:c}).join("")}
 function qCount(h,q){var n=0,i=0;if(!q||!h)return 0;h=qLow(h.replace(/\s+/g," "));while((i=h.indexOf(q,i))>=0){n++;i+=q.length}return n}
-function qBar(ph){return"<div class='fs'><input class='in' type='search' enterkeyhint='search' autocomplete='off' spellcheck='false' placeholder='"+ph+"' aria-label='Cari teks'><span class='fc'></span><button class='g' data-sk='-1' aria-label='Hasil sebelumnya'>↑</button><button class='g' data-sk='1' aria-label='Hasil berikutnya'>↓</button></div>"}
+function qBar(ph){var I=function(d){return"<svg viewBox='0 0 24 24' aria-hidden='true'>"+d+"</svg>"};
+  return"<div class='fs'><button class='g fso' data-st='1' title='Cari teks (Ctrl+F)' aria-label='Cari teks'>"+I("<circle cx='11' cy='11' r='6.5'/><path d='M16 16l4.5 4.5'/>")+"</button><div class='fsx'><input type='search' enterkeyhint='search' autocomplete='off' spellcheck='false' placeholder='"+ph+"' aria-label='Cari teks'><span class='fc'></span><button data-sk='-1' title='Sebelumnya (Shift+Enter)' aria-label='Hasil sebelumnya'>"+I("<path d='M6 15l6-6 6 6'/>")+"</button><button data-sk='1' title='Berikutnya (Enter)' aria-label='Hasil berikutnya'>"+I("<path d='M6 9l6 6 6-6'/>")+"</button><button data-st='0' title='Tutup pencarian' aria-label='Tutup pencarian'>"+I("<path d='M6 6l12 12M18 6L6 18'/>")+"</button></div></div>"}
+function qToggle(fsb,on){var i=fsb.querySelector("input");fsb.classList.toggle("on",on);if(on){i.focus();i.select()}else if(i.value){i.value="";i.dispatchEvent(new Event("input"))}}
 function qUnmark(root){[].forEach.call(root.querySelectorAll("mark.qm"),function(k){var p=k.parentNode;p.replaceChild(document.createTextNode(k.textContent),k);p.normalize()})}
 function qMark(root,q){qUnmark(root);if(!q)return[];var ms=[],w=document.createTreeWalker(root,NodeFilter.SHOW_TEXT),ns=[],n;while(n=w.nextNode())ns.push(n);
   ns.forEach(function(t){var v=t.nodeValue,l=qLow(v),i=l.indexOf(q);if(i<0||l.length!==v.length)return;var f=document.createDocumentFragment(),p=0;
@@ -708,7 +716,7 @@ async function pdfView(m,id){
   var pdf=await task.promise;if(!pvAlive(m)){pdf.destroy();return}
   m._pdf=pdf;
   var N=pdf.numPages,bd=m.querySelector(".bd"),tl=m.querySelector(".tl"),zoom=1;
-  bd.innerHTML="<div class='pdfc'></div>";var c=bd.firstChild;tl.insertAdjacentHTML("beforebegin",qBar("Cari… mis. SJS"));
+  bd.innerHTML="<div class='pdfc'></div>";var c=bd.firstChild;tl.insertAdjacentHTML("beforebegin",qBar("Cari, mis. SJS"));
   tl.innerHTML="<button class='g' data-z='-1' aria-label='Perkecil'>−</button><span>1 / "+N+"</span><button class='g' data-z='1' aria-label='Perbesar'>＋</button>";
   var info=tl.querySelector("span"),pgs=[],vis=new Set(),p1=await pdf.getPage(1),v1=p1.getViewport({scale:1});
   var wd=function(){var ar=v1.width/v1.height;return Math.max(120,Math.min(c.clientWidth-16,(c.clientHeight-24)*ar,1600))*zoom};
@@ -756,9 +764,9 @@ async function pdfView(m,id){
     if(ph.length){var cp=curPg(),j=0;for(;j<ph.length;j++)if(ph[j].p>=cp)break;pJump(j<ph.length?j:0)}else pShow()}
   var ft2;fi.addEventListener("focus",function(){pIndex()});
   fi.addEventListener("input",function(){clearTimeout(ft2);ft2=setTimeout(pRun,200)});
-  fi.addEventListener("keydown",function(e){if(e.key==="Enter"){e.preventDefault();clearTimeout(ft2);if(qNorm(fi.value)!==pq)pRun();else pJump(pi+(e.shiftKey?-1:1))}else if(e.key==="Escape"&&fi.value){fi.value="";pRun();e.stopPropagation()}});
-  fsb.addEventListener("click",function(e){var b=e.target.closest("[data-sk]");if(b)pJump(pi+(+b.dataset.sk))});
-  m._kf=function(e){if((e.ctrlKey||e.metaKey)&&(e.key==="f"||e.key==="F")){e.preventDefault();fi.focus();fi.select()}};document.addEventListener("keydown",m._kf);
+  fi.addEventListener("keydown",function(e){if(e.key==="Enter"){e.preventDefault();clearTimeout(ft2);if(qNorm(fi.value)!==pq)pRun();else pJump(pi+(e.shiftKey?-1:1))}else if(e.key==="Escape"){e.stopPropagation();if(fi.value){fi.value="";pRun()}else qToggle(fsb,false)}});
+  fsb.addEventListener("click",function(e){var t=e.target.closest("[data-st]");if(t){qToggle(fsb,t.dataset.st==="1"?!fsb.classList.contains("on"):false);return}var b=e.target.closest("[data-sk]");if(b)pJump(pi+(+b.dataset.sk))});
+  m._kf=function(e){if((e.ctrlKey||e.metaKey)&&(e.key==="f"||e.key==="F")){e.preventDefault();qToggle(fsb,true)}};document.addEventListener("keydown",m._kf);
   size();pgs.forEach(function(d){io.observe(d)});
   var raf=0;c.addEventListener("scroll",function(){if(raf)return;raf=requestAnimationFrame(function(){raf=0;var y=c.scrollTop+c.clientHeight/3,k=0;for(var j=0;j<pgs.length;j++){if(pgs[j].offsetTop+pgs[j].offsetHeight>y){k=j;break}}info.textContent=(k+1)+" / "+N})});
   function relayout(){var r=c.scrollHeight?c.scrollTop/c.scrollHeight:0;size();c.scrollTop=r*c.scrollHeight;vis.forEach(draw)}
@@ -869,7 +877,7 @@ async function pptView(m,id,k){
   m.querySelector(".bd").innerHTML="<div class='pp'><div class='sg'></div><div class='spl' role='separator' aria-label='Geser untuk mengubah ukuran slide dan catatan' title='Geser untuk ubah ukuran (klik 2x untuk reset)'><i></i></div><div class='nt'><div class='nh'><button class='g' data-n='-1' aria-label='Slide sebelumnya'>‹</button><select class='in' aria-label='Pilih slide'>"+
     sl.map(function(q,i){return"<option value='"+i+"'>"+(i+1)+". "+esc(q.t||"Slide "+(i+1))+(q.n?" 📝":"")+"</option>"}).join("")+"</select><button class='g' data-n='1' aria-label='Slide berikutnya'>›</button><span class='ct'></span>"+
     (deck?"<button class='g' data-v='1' title='Ganti tampilan slide'>"+(old?"Sinkron":"Drive")+"</button>":"")+"<button class='g' data-f='-1' aria-label='Kecilkan huruf'>A−</button><button class='g' data-f='1' aria-label='Besarkan huruf'>A+</button></div><div class='nh2'></div><div class='nb' tabindex='0'></div></div></div>";
-  tl.insertAdjacentHTML("beforebegin",qBar("Cari… mis. SJS"));
+  tl.insertAdjacentHTML("beforebegin",qBar("Cari, mis. SJS"));
   var pp=m.querySelector(".pp"),sg=pp.querySelector(".sg"),sel=pp.querySelector("select"),nb=pp.querySelector(".nb"),ct=pp.querySelector(".ct"),hint=pp.querySelector(".nh2"),vb=pp.querySelector("[data-v]");
   function hn(){hint.textContent=mode==="own"?sl.length+" slide · "+withN+" punya catatan · gulir untuk pindah slide, catatan ikut berganti · "+via+" "+((performance.now()-t0)/1000).toFixed(1)+"s"+(old?" · .ppt lama: tampil teks judul & isi saja, tekan Drive untuk tampilan asli":"")+(m._pe?" · tampilan asli: "+m._pe:""):(deck?"Tampilan Drive (asli): slide & catatan tidak otomatis sinkron, pilih nomor slide yang sama."+(old?" Tekan Sinkron untuk geser slide + catatan otomatis (hanya teks). ":" "):"Format .ppt: slide tampil dari Google Drive (tidak otomatis sinkron), pilih nomor slide yang sama. ")+sl.length+" slide · "+withN+" punya catatan"}
   var sc=null,sws=[],io=null,raf=0,fsb=m.querySelector(".fs"),fi=fsb.querySelector("input"),fc=fsb.querySelector(".fc"),qs="",hits=[],hi=-1,qcur=null,ft2;
@@ -906,9 +914,9 @@ async function pptView(m,id,k){
     sws.forEach(function(w){var st=w.firstElementChild;if(st)qMark(st,qs)});setCur(cur);
     if(hits.length){var j=0;for(;j<hits.length;j++)if(hits[j].i>=cur)break;qJump(j<hits.length?j:0)}else qShow()}
   fi.addEventListener("input",function(){clearTimeout(ft2);ft2=setTimeout(qRun,180)});
-  fi.addEventListener("keydown",function(e){if(e.key==="Enter"){e.preventDefault();clearTimeout(ft2);if(qNorm(fi.value)!==qs)qRun();else qJump(hi+(e.shiftKey?-1:1))}else if(e.key==="Escape"&&fi.value){fi.value="";qRun();e.stopPropagation()}});
-  fsb.addEventListener("click",function(e){var b=e.target.closest("[data-sk]");if(b)qJump(hi+(+b.dataset.sk))});
-  m._kf=function(e){if((e.ctrlKey||e.metaKey)&&(e.key==="f"||e.key==="F")){e.preventDefault();fi.focus();fi.select()}};document.addEventListener("keydown",m._kf);
+  fi.addEventListener("keydown",function(e){if(e.key==="Enter"){e.preventDefault();clearTimeout(ft2);if(qNorm(fi.value)!==qs)qRun();else qJump(hi+(e.shiftKey?-1:1))}else if(e.key==="Escape"){e.stopPropagation();if(fi.value){fi.value="";qRun()}else qToggle(fsb,false)}});
+  fsb.addEventListener("click",function(e){var t=e.target.closest("[data-st]");if(t){qToggle(fsb,t.dataset.st==="1"?!fsb.classList.contains("on"):false);return}var b=e.target.closest("[data-sk]");if(b)qJump(hi+(+b.dataset.sk))});
+  m._kf=function(e){if((e.ctrlKey||e.metaKey)&&(e.key==="f"||e.key==="F")){e.preventDefault();qToggle(fsb,true)}};document.addEventListener("keydown",m._kf);
   pp.addEventListener("click",function(e){var b=e.target.closest("[data-n],[data-f],[data-v]");if(!b)return;
     if(b.dataset.n)go(cur+(+b.dataset.n));
     else if(b.dataset.v){mode=mode==="own"?"drive":"own";b.textContent=mode==="own"?"Drive":(old?"Sinkron":"Cepat");tl.style.display=mode==="own"?"":"none";pp.classList.toggle("own",mode==="own");hn();if(mode==="own")buildOwn();else showDrive()}
