@@ -22,7 +22,7 @@
     ".rn-cat{padding:14px}.rn-cat b{font-size:16px}.rn-cat .mt{margin:8px 0}.rn-me{font-size:12px;color:var(--gold);margin:4px 0 8px}" +
     ".rn-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(110px,1fr));gap:8px;margin:12px 0}.rn-st{border-radius:16px;padding:12px 8px;text-align:center}.rn-st b{display:block;font-size:22px}.rn-st small{color:var(--mut);font-size:11px}" +
     ".rn-big{text-align:center;padding:22px 10px}.rn-big .sc{font:900 54px Cinzel,serif;background:linear-gradient(180deg,#fff,var(--gold));-webkit-background-clip:text;background-clip:text;color:transparent}.rn-big small{color:var(--mut)}" +
-    ".rn-lb{display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:14px;margin-bottom:6px}.rn-lb.me{box-shadow:0 0 0 2px rgba(245,192,74,.7)}.rn-lb .r{width:38px;text-align:center;font-weight:700;color:var(--gold)}.rn-lb .n{flex:1;min-width:0}.rn-lb .n small{display:block;color:var(--mut);font-size:11px}.rn-lb .v{text-align:right;font-weight:700}.rn-lb .v small{display:block;color:var(--mut);font-weight:400;font-size:11px}" +
+    ".rn-lb{display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:14px;margin-bottom:6px}.rn-lb.me{box-shadow:0 0 0 2px rgba(245,192,74,.7)}.rn-lb .r{flex:0 0 38px;width:38px;text-align:center;font-weight:700;color:var(--gold);line-height:1}.rn-lb .n{flex:1;min-width:0;line-height:1.35}.rn-lb .n b{display:inline-block;max-width:100%;overflow-wrap:anywhere}.rn-lb .n small{display:block;color:var(--mut);font-size:11px;margin-top:2px;line-height:1.35;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.rn-lb .v{flex:0 0 auto;min-width:64px;text-align:right;font-weight:700;line-height:1.2}.rn-lb .v small{display:block;color:var(--mut);font-weight:400;font-size:10px;margin-top:2px;white-space:nowrap}.rn-hist .card{align-items:center}.rn-hist .card .t{min-width:0;line-height:1.4}.rn-hist .card .t small{display:block;margin-top:3px;line-height:1.4;overflow-wrap:anywhere}.rn-hist .card .v{flex:0 0 auto;min-width:62px;line-height:1.25}#tl .sl .tm{width:76px;font-variant-numeric:tabular-nums}#tl .sl .bd b{display:block;line-height:1.45;overflow-wrap:anywhere}#tl .sl .mt{gap:6px;margin-top:6px}#tl .sl .tag{max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}" +
     ".rn-rv{border-radius:20px;padding:14px;margin-bottom:12px}.rn-rv .q{white-space:pre-line;line-height:1.5;margin:6px 0 10px;overflow-wrap:anywhere}.rn-rv img{max-width:100%;border-radius:10px;background:#fff;margin-bottom:8px}" +
     ".rn-op{display:flex;gap:8px;padding:8px 10px;border-radius:12px;margin-bottom:5px;background:rgba(255,255,255,.06);border:1px solid transparent;font-size:14px;line-height:1.4;overflow-wrap:anywhere}.rn-op b{flex:none;width:24px;height:24px;border-radius:50%;display:grid;place-items:center;color:#161222;font-size:12px}" +
     ".rn-op.key{border-color:var(--ok);background:rgba(74,222,128,.14)}.rn-op.bad{border-color:var(--bad);background:rgba(248,113,113,.14)}.rn-op i{margin-left:auto;font-style:normal;font-size:11px;white-space:nowrap;padding-left:6px}" +
@@ -43,12 +43,12 @@
     ".rn-op,.rn-qo{flex-wrap:wrap}.rn-pf input.in{margin:6px 0;padding:9px;border-radius:10px;border:1px solid var(--line);background:rgba(10,6,28,.5);color:#fff;font:400 15px Inter,sans-serif}" +
     ".ex-hd{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:8px}.ex-hd .sp{flex:1}" +
     ".ex-nums{display:flex;flex-wrap:wrap;gap:5px;margin:8px 0}.ex-nums button{width:34px;height:34px;border-radius:10px;border:1px solid var(--line);background:rgba(255,255,255,.08);color:#fff;font-size:12px;cursor:pointer;font-family:inherit}" +
-    ".ex-nums .ans{background:rgba(74,222,128,.35);border-color:var(--ok)}.ex-nums .flg{box-shadow:inset 0 0 0 2px var(--warn);color:var(--warn);font-weight:700}.ex-nums .cur{outline:2px solid var(--gold)}" +
-    ".rn-qo.pick{border-color:var(--gold);background:rgba(245,192,74,.18)}.rn-flag{border-color:var(--warn);color:var(--warn)}";
+    ".ex-nums .ans{background:rgba(74,222,128,.35);border-color:var(--ok)}.ex-nums .flg{background:rgba(236,72,153,.55);border-color:#f472b6;color:#fff;font-weight:700;box-shadow:inset 0 0 0 2px #f472b6}.ex-nums .flg.ans{background:linear-gradient(135deg,rgba(74,222,128,.45),rgba(236,72,153,.6))}.ex-nums .cur{outline:2px solid var(--gold)}" +
+    ".rn-qo.pick{border-color:var(--gold);background:rgba(245,192,74,.18)}.rn-flag{border-color:#f472b6;color:#fff;background:rgba(236,72,153,.35)}.rn-flag:hover{border-color:#fb7fb8}";
   (function () { var s = document.createElement("style"); s.textContent = CSS; document.head.appendChild(s); })();
 
   function errBox(r) {
-    if (r && r.s === 503) return "<div class='pn g'><b>⚙️ Database belum dipasang</b><div class='hint'>ASTERION RUN memakai Cloudflare D1 (binding <code>DB</code>). Admin: ikuti <b>PANDUAN.md</b> (buat database, jalankan migrasi, pasang binding, deploy ulang). Fitur lain ASTERION tetap berjalan normal.</div></div>";
+    if (r && r.s === 503) return "<div class='pn g'><b>⚙️ Database belum dipasang</b><div class='hint'>GAME KUIS memakai Cloudflare D1 (binding <code>DB</code>). Admin: ikuti <b>PANDUAN.md</b> (buat database, jalankan migrasi, pasang binding, deploy ulang). Fitur lain ASTERION tetap berjalan normal.</div></div>";
     return "<div class='pn g empty'>" + esc((r && r.j && r.j.err) || "Gagal memuat. Coba lagi.") + "</div>";
   }
   function destroyGame() { if (RS.game) { try { RS.game.destroy(); } catch (e) {} RS.game = null; document.body.style.overflow = ""; } }
@@ -83,7 +83,7 @@
   async function home(k) {
     var r = await rapi("cats"); if (!alive(k)) return; if (!r.ok) return setRR(errBox(r));
     RS.cats = r.j.cats; RS.set = r.j.settings;
-    var h = "<div class='rn-hero g'><h1>ASTERION RUN</h1><div class='yr' style='color:var(--gold);letter-spacing:.35em;font-size:11px'>3D · EDUKASI · KEDOKTERAN</div><p>Berlari di lintasan lima jalur dan jawab soal dengan melewati gerbang <b>A–E</b> — atau pilih <b>Mode Soal</b> kalau mau langsung mengerjakan soal tanpa game. Skor: benar +1, salah/kosong 0. Waktu <b>per soal</b>. Setelah selesai, kamu mendapat pembahasan semua soal.</p>" +
+    var h = "<div class='rn-hero g'><h1>GAME KUIS</h1><div class='yr' style='color:var(--gold);letter-spacing:.35em;font-size:11px'>3D · EDUKASI · KEDOKTERAN</div><p>Berlari di lintasan lima jalur dan jawab soal dengan melewati gerbang <b>A–E</b> — atau pilih <b>Mode Soal</b> kalau mau langsung mengerjakan soal tanpa game. Skor: benar +1, salah/kosong 0. Waktu <b>per soal</b>. Setelah selesai, kamu mendapat pembahasan semua soal.</p>" +
       "<div class='rn-row'><a class='btn s' href='#/run/lb/global'>🌍 Leaderboard global</a><a class='btn s' href='#/run/hist'>🕘 Riwayat</a><a class='btn s' href='#/run/tutorial'>🎮 Tutorial</a>" + (S.admin ? "<a class='btn' href='#/run/admin'>⚙️ Panel Admin</a>" : "") + "</div></div>";
     RS.nick = r.j.nick; RS.prefs = r.j.prefs;
     h += nickBar() + prefsBar() + "<div class='sec'>PILIH KATEGORI</div>";
@@ -314,7 +314,7 @@
   }
   async function quizReset() { // ulang dari awal: sesi sekarang dibatalkan (skor tidak dihitung), soal diacak ulang
     var Q = RS.quiz; if (!Q || Q.paused || Q.nexting) return;
-    if (!confirm("Reset ujian? Semua jawaban di sesi ini dihapus dan kamu mulai lagi dari soal 1 (skor sesi ini tidak dihitung).")) return;
+    if (!(await Dlg.confirm("Reset ujian? Semua jawaban di sesi ini dihapus dan kamu mulai lagi dari soal 1 (skor sesi ini tidak dihitung).", { title: "Reset ujian", icon: "♻️", okText: "Ya, reset", danger: true }))) return;
     var sid = Q.sid, cid = Q.cid, k = Q.k; Q.paused = true; // kunci layar selama proses reset
     var r; try { r = await rapi("abandon", { m: "POST", b: { sid: sid } }); } catch (e) { if (e === 0) return; r = null; }
     if (!RS.quiz || RS.quiz !== Q) return;
@@ -323,7 +323,7 @@
   }
   async function quizExit() {
     var Q = RS.quiz; if (!Q) return;
-    if (!confirm("Keluar dari sesi? Kamu bisa melanjutkannya nanti dari menu kategori." + (RS.set && RS.set.pause ? "" : " Perhatian: waktu soal yang sedang berjalan tetap berjalan."))) return;
+    if (!(await Dlg.confirm("Keluar dari sesi? Kamu bisa melanjutkannya nanti dari menu kategori." + (RS.set && RS.set.pause ? "" : "\n\nPerhatian: waktu soal yang sedang berjalan tetap berjalan."), { title: "Keluar sesi", icon: "🚪", okText: "Keluar", danger: true }))) return;
     if (RS.set && RS.set.pause && !Q.paused && !Q.busy) { try { await rapi("pause", { m: "POST", b: { sid: Q.sid } }); } catch (e) {} }
     quizStop(); location.hash = "#/run";
   }
@@ -337,7 +337,7 @@
       "<div class='rn-st g'><b>" + pct(s.acc) + "</b><small>Akurasi</small></div><div class='rn-st g'><b>" + fdur(s.dur) + "</b><small>Durasi</small></div><div class='rn-st g'><b>" + (s.rank ? "#" + s.rank : "—") + "</b><small>Peringkat kategori</small></div></div>" +
       "<a class='card g' href='#/run/review/" + esc(s.id) + "'><span class='i'>📖</span><span class='t'>Lihat pembahasan " + s.total + " soal<small>Semua soal: benar, salah, dan tidak dijawab</small></span><span class='a'>›</span></a>" +
       "<a class='card g' href='#/run/lb/" + s.cat_id + "'><span class='i'>🏆</span><span class='t'>Leaderboard kategori</span><span class='a'>›</span></a>" +
-      "<a class='card g' href='#/run/play/" + s.cat_id + "'><span class='i'>🔁</span><span class='t'>Main lagi</span><span class='a'>›</span></a><a class='card g' href='#/run'><span class='i'>🏠</span><span class='t'>Kembali ke ASTERION RUN</span><span class='a'>›</span></a>";
+      "<a class='card g' href='#/run/play/" + s.cat_id + "'><span class='i'>🔁</span><span class='t'>Main lagi</span><span class='a'>›</span></a><a class='card g' href='#/run'><span class='i'>🏠</span><span class='t'>Kembali ke GAME KUIS</span><span class='a'>›</span></a>";
     setRR(h);
   }
   /* ======================= MODE SIMULASI UJIAN =======================
@@ -399,7 +399,7 @@
     var E = RS.exam; if (!E || RS.route !== E.k || !g("rr")) return examStop();
     var q = E.qs[E.cur]; if (!q) return;
     var chosen = E.ans[E.cur], fl = !!E.flag[E.cur], answered = Object.keys(E.ans).length, flagged = Object.keys(E.flag).length;
-    var h = "<div class='rn-qz'><div class='rn-hd'><b>Soal " + (E.cur + 1) + "/" + E.total + "</b><span class='tag'>✍️ " + answered + " dijawab</span>" + (flagged ? "<span class='tag' style='color:var(--warn)'>🚩 " + flagged + "</span>" : "") + "<span class='sp'></span><span class='rn-qt' id='exT'></span></div>" +
+    var h = "<div class='rn-qz'><div class='rn-hd'><b>Soal " + (E.cur + 1) + "/" + E.total + "</b><span class='tag'>✍️ " + answered + " dijawab</span>" + (flagged ? "<span class='tag' style='color:#f472b6'>🚩 " + flagged + "</span>" : "") + "<span class='sp'></span><span class='rn-qt' id='exT'></span></div>" +
       "<div class='rn-prog'><i style='width:" + (E.total ? answered / E.total * 100 : 0) + "%'></i></div>" +
       "<div class='pn g' style='padding:14px'>" + imgs(q) + "<div class='q'>" + esc(q.q) + "</div>";
     LET.forEach(function (L, i) { if (!q.o[L]) return; h += "<button class='rn-op rn-qo" + (chosen === L ? " pick" : "") + "' data-ex-pick='" + L + "'><b style='background:" + CSSC[i] + "'>" + L + "</b><span>" + esc(q.o[L]) + "</span></button>"; });
@@ -444,7 +444,7 @@
   async function examSubmit(auto) {
     var E = RS.exam; if (!E || E.sent) return;
     var blank = E.total - Object.keys(E.ans).length;
-    if (!auto && !confirm("Kumpulkan ujian sekarang?" + (blank ? "\n\nMasih ada " + blank + " soal belum dijawab." : "") + "\nJawaban tidak bisa diubah setelah dikumpulkan.")) return;
+    if (!auto && !(await Dlg.confirm("Kumpulkan ujian sekarang?" + (blank ? "\n\nMasih ada " + blank + " soal belum dijawab." : "") + "\nJawaban tidak bisa diubah setelah dikumpulkan.", { title: "Kumpulkan ujian", icon: "📤", okText: "Kumpulkan", danger: true }))) return;
     E.sent = true; E.busy = true; clearInterval(E.tm);
     var r; try { r = await rapi("exam/submit", { m: "POST", b: { sid: E.sid } }); } catch (e) { if (e === 0) return; r = null; }
     if (!r || !r.ok) { E.sent = false; E.busy = false; toast((r && r.j && r.j.err) || "Gagal mengumpulkan"); examTick(); return; }
@@ -476,7 +476,7 @@
       h += "</div><div class='rn-row'><button class='btn s' data-ra='rv-p' " + (pos <= 0 ? "disabled style='opacity:.4'" : "") + ">‹ Sebelumnya</button><div class='hint' style='flex:.4;text-align:center;align-self:center;margin:0'>" + (rv.i + 1) + "/" + rv.items.length + "</div><button class='btn s' data-ra='rv-n' " + (pos >= L.length - 1 ? "disabled style='opacity:.4'" : "") + ">Berikutnya ›</button></div>" +
         "<div class='rn-row' style='margin-top:8px'><select id='rvJump' class='in' style='flex:1;min-width:150px;padding:9px;border-radius:10px;border:1px solid var(--line);background:rgba(10,6,28,.5);color:#fff;font:400 14px Inter,sans-serif'>" + L.map(function (i) { var it = rv.items[i]; return "<option value='" + i + "'" + (i === rv.i ? " selected" : "") + ">Ke nomor " + (i + 1) + (it.correct ? " ✔" : it.chosen ? " ✘" : " ○") + (it.flag ? " 🚩" : "") + "</option>"; }).join("") + "</select></div>";
     }
-    h += "<div class='rn-row' style='margin-top:12px'><a class='btn s' href='#/run/result/" + esc(rv.sid) + "'>↩ Ringkasan hasil</a><a class='btn s' href='#/run'>🏠 Dashboard ASTERION RUN</a></div>";
+    h += "<div class='rn-row' style='margin-top:12px'><a class='btn s' href='#/run/result/" + esc(rv.sid) + "'>↩ Ringkasan hasil</a><a class='btn s' href='#/run'>🏠 Dashboard GAME KUIS</a></div>";
     setRR(h); window.scrollTo(0, 0);
     var jp = g("rvJump"); if (jp) jp.addEventListener("change", function () { rv.i = +jp.value; rvDraw(); });
   }
@@ -485,7 +485,9 @@
     var r = await rapi("history"); if (!alive(k)) return; if (!r.ok) return setRR(errBox(r));
     var h = "<div class='sec'>RIWAYAT PERMAINAN</div>";
     if (!r.j.rows.length) h += "<div class='pn g empty'>Belum ada permainan selesai.</div>";
+    if (r.j.rows.length) h += "<div class='rn-hist'>";
     r.j.rows.forEach(function (x) { h += "<a class='card g' href='#/run/result/" + esc(x.id) + "'><span class='i'>" + (x.mode === "quiz" ? "📝" : "🎮") + "</span><span class='t'>" + esc(x.cat_name) + "<small>" + fdate(x.fin) + " · ✔" + x.correct + " ✘" + x.wrong + " ○" + x.blank + " · " + fdur(x.dur) + (x.rank ? " · peringkat #" + x.rank : "") + "</small></span><span class='v' style='text-align:right;font-weight:700'>" + x.score + "/" + x.total + "<small style='display:block;color:var(--mut);font-weight:400'>" + pct(x.acc) + "</small></span></a>"; });
+    if (r.j.rows.length) h += "</div>";
     setRR(h);
   }
 
@@ -532,7 +534,7 @@
   }
   async function adminHome(k) {
     var r = await rapi("admin/stats"); if (!alive(k)) return; if (!r.ok) return setRR(errBox(r)); var d = r.j;
-    var h = "<div class='sec'>PANEL ASTERION RUN</div>" + anav("") + "<div class='rn-grid'>" + [["Kategori", d.cats], ["Soal aktif", d.qActive], ["Soal nonaktif", d.qInactive], ["Mahasiswa bermain", d.players], ["Total permainan", d.games], ["Rata² akurasi", pct(d.acc)]].map(function (x) { return "<div class='rn-st g'><b>" + x[1] + "</b><small>" + x[0] + "</small></div>"; }).join("") + "</div>";
+    var h = "<div class='sec'>PANEL GAME KUIS</div>" + anav("") + "<div class='rn-grid'>" + [["Kategori", d.cats], ["Soal aktif", d.qActive], ["Soal nonaktif", d.qInactive], ["Mahasiswa bermain", d.players], ["Total permainan", d.games], ["Rata² akurasi", pct(d.acc)]].map(function (x) { return "<div class='rn-st g'><b>" + x[1] + "</b><small>" + x[0] + "</small></div>"; }).join("") + "</div>";
     h += "<div class='sec'>PER KATEGORI</div><div class='pn g rn-sc'><table class='rn-tb'><tr><th>Kategori</th><th>Soal</th><th>Main</th><th>Pemain</th><th>Akurasi</th></tr>" + d.byCat.map(function (c) { return "<tr><td><a href='#/run/admin/q/" + c.id + "' style='color:var(--gold)'>" + esc(c.name) + "</a>" + (c.active ? "" : " " + tag("off", "warn")) + "</td><td>" + c.aq + "/" + c.tq + "</td><td>" + c.games + "</td><td>" + c.players + "</td><td>" + (c.games ? pct(c.acc) : "—") + "</td></tr>"; }).join("") + "</table></div>";
     h += "<div class='sec'>AKTIVITAS TERBARU</div><div class='pn g rn-sc'>" + (d.recent.length ? "<table class='rn-tb'>" + d.recent.map(function (x) { return "<tr><td>" + fdate(x.fin) + "</td><td>" + esc(nmOf(x.u)) + "<small style='display:block;color:var(--mut)'>" + esc(x.u) + (x.nick ? " · “" + esc(x.nick) + "”" : "") + "</small></td><td>" + (x.mode === "quiz" ? "📝 " : "🎮 ") + esc(x.cat_name) + "</td><td><a href='#/run/review/" + esc(x.id) + "' style='color:var(--gold)'>" + x.score + "/" + x.total + "</a></td></tr>"; }).join("") + "</table>" : "<div class='empty'>Belum ada aktivitas.</div>") + "</div>";
     setRR(h);
@@ -701,7 +703,7 @@
   }
   async function pvSave() {
     var im = RS.imp, items = im.items.filter(function (x) { return x.active !== false; }), warn = items.filter(function (x) { return x.status === "warn"; }).length;
-    if (warn && !confirm(warn + " soal berstatus KUNING (perlu pemeriksaan). Dengan menyimpan, kamu menyatakan sudah memeriksanya. Lanjutkan?")) return;
+    if (warn && !(await Dlg.confirm(warn + " soal berstatus KUNING (perlu pemeriksaan). Dengan menyimpan, kamu menyatakan sudah memeriksanya. Lanjutkan?", { title: "Simpan soal?", icon: "⚠️", okText: "Lanjutkan" }))) return;
     var box = g("rnSv"), added = 0, dup = 0, filled = 0, errs = [], pend = [], seen = {};
     items.forEach(function (x) { (x.imgs || []).forEach(function (m) { if (!m.id && m.data) pend.push(m); }); });
     for (var u = 0; u < pend.length; u++) { // gambar disimpan permanen di server lebih dulu (ID dari isi → aman diulang)
@@ -782,12 +784,12 @@
     var a = b.dataset.ra, id = +b.dataset.id, i = +b.dataset.i, v = b.dataset.v2, rv = RS.rv, im = RS.imp;
     try {
       if (a === "cat-reset") { // ulang dari awal: batalkan sesi yang sedang berjalan di kategori ini (mode game maupun mode soal)
-        if (b.disabled) return; if (!confirm("Reset ujian di kategori ini? Progres sesi yang sedang berjalan dihapus dan kamu bisa mulai lagi dari soal 1 (skor sesi itu tidak dihitung).")) return;
+        if (b.disabled) return; if (!(await Dlg.confirm("Reset ujian di kategori ini? Progres sesi yang sedang berjalan dihapus dan kamu bisa mulai lagi dari soal 1 (skor sesi itu tidak dihitung).", { title: "Reset sesi", icon: "♻️", okText: "Ya, reset", danger: true }))) return;
         b.disabled = true; var rs0 = await rapi("start", { m: "POST", b: { cat: +b.dataset.cid, mode: b.dataset.mode } });
         var ok0 = rs0.ok && rs0.j && rs0.j.sid && rs0.j.status !== "done"; if (ok0) { var ra0 = await rapi("abandon", { m: "POST", b: { sid: rs0.j.sid } }); ok0 = ra0.ok; }
         toast(ok0 ? "Sesi direset ✓ — mulai lagi dari soal 1" : ((rs0.j && rs0.j.err) || "Gagal mereset. Coba lagi.")); RS.cats = null; route(); return;
       }
-      if (a === "go-mode") { if (b.dataset.warn && !confirm(b.dataset.warn)) return; location.hash = b.dataset.href; }
+      if (a === "go-mode") { if (b.dataset.warn && !(await Dlg.confirm(b.dataset.warn, { title: "Perhatian", icon: "⚠️", okText: "Lanjutkan" }))) return; location.hash = b.dataset.href; }
       else if (a === "nick-edit") { g("rnNk").className = "pn g rn-nk"; g("rnNk").innerHTML = nickInner(true); var ni = g("rnNkI"); if (ni) { ni.focus(); ni.select(); } }
       else if (a === "nick-cancel") g("rnNk").innerHTML = nickInner(false);
       else if (a === "nick-save") {
@@ -796,7 +798,7 @@
         if (!rn.ok) return toast((rn.j && rn.j.err) || "Gagal menyimpan nama");
         RS.nick = rn.j.nick; toast("Nama tersimpan ✓"); route(); // muat ulang halaman: leaderboard & hasil langsung memakai nama baru
       }
-      else if (a === "nick-reset") { if (!confirm("Hapus nama samaran " + nmOf(b.dataset.u) + "?")) return; var rz = await rapi("admin/nick", { m: "POST", b: { u: b.dataset.u, nick: "" } }); toast(rz.ok ? "Nama dihapus" : "Gagal"); route(); }
+      else if (a === "nick-reset") { if (!(await Dlg.confirm("Hapus nama samaran " + nmOf(b.dataset.u) + "?", { title: "Hapus nama samaran", icon: "🏷️", okText: "Hapus", danger: true }))) return; var rz = await rapi("admin/nick", { m: "POST", b: { u: b.dataset.u, nick: "" } }); toast(rz.ok ? "Nama dihapus" : "Gagal"); route(); }
       else if (a === "qz-begin") quizBegin();
       else if (a === "qz-ans") quizAnswer(b.dataset.v2);
       else if (a === "qz-next") quizNext();
@@ -813,7 +815,7 @@
         var body = { id: id || undefined, name: g("cn" + id).value, descr: g("cd" + id).value, per_session: +g("cp" + id).value, q_time: +g("ct" + id).value, show_explain: g("cx" + id).checked, active: g("ca" + id).checked };
         var r = await rapi("admin/cat", { m: "POST", b: body }); if (!r.ok) return toast((r.j && r.j.err) || "Gagal"); toast("Tersimpan ✓"); RS.cats = null; route();
       } else if (a === "cat-mv") { var rm = await rapi("admin/cat/move", { m: "POST", b: { id: id, dir: +v } }); if (!rm.ok) toast((rm.j && rm.j.err) || "Gagal"); RS.cats = null; route();
-      } else if (a === "cat-del") { if (!confirm("Hapus kategori beserta seluruh bank soalnya? Riwayat permainan tetap tersimpan.")) return; var r2 = await rapi("admin/cat/del", { m: "POST", b: { id: id } }); toast(r2.ok ? "Kategori dihapus" : "Gagal"); RS.cats = null; route(); }
+      } else if (a === "cat-del") { if (!(await Dlg.confirm("Hapus kategori beserta seluruh bank soalnya? Riwayat permainan tetap tersimpan.", { title: "Hapus kategori", icon: "🗑️", okText: "Hapus", danger: true }))) return; var r2 = await rapi("admin/cat/del", { m: "POST", b: { id: id } }); toast(r2.ok ? "Kategori dihapus" : "Gagal"); RS.cats = null; route(); }
       else if (a === "q-find") { RS.qf.s = g("rnQs").value.trim(); RS.qf.act = g("rnQa").value; RS.qf.pg = 0; route(); }
       else if (a === "q-pg") { RS.qf.pg = Math.max(0, RS.qf.pg + +v); route(); }
       else if (a === "q-edit") { var row = g("qr" + id), it = RS.qrows[i]; row.innerHTML = qEd(it, "data-id='" + id + "'") + "<div class='rn-row'><button class='btn sm' data-ra='q-save' data-id='" + id + "'>💾 Simpan</button><button class='btn s sm' data-ra='q-cancel'>Batal</button></div>"; row.dataset.act = it.active; }
@@ -827,9 +829,9 @@
         var txt = v === "csv" ? "﻿" + AsterionPdf.toCsv(r4.j.rows) : JSON.stringify(r4.j.rows, null, 1), bl = new Blob([txt], { type: v === "csv" ? "text/csv" : "application/json" }), u = URL.createObjectURL(bl), l = document.createElement("a"); l.href = u; l.download = "bank-soal-" + cid + "." + v; l.click(); setTimeout(function () { URL.revokeObjectURL(u); }, 3000);
       }
       else if (a === "pv-f") { im.f = v; pvDraw(); }
-      else if (a === "pv-del") { if (confirm("Hapus soal ini dari hasil ekstraksi?")) { im.items.splice(i, 1); pvDraw(); } }
+      else if (a === "pv-del") { if (await Dlg.confirm("Hapus soal ini dari hasil ekstraksi?", { title: "Hapus soal", icon: "🗑️", okText: "Hapus", danger: true })) { im.items.splice(i, 1); pvDraw(); } }
       else if (a === "pv-act") { im.items[i].active = im.items[i].active === false; pvDraw(); }
-      else if (a === "pv-clear") { if (confirm("Buang hasil ekstraksi ini?")) { RS.imp = null; g("rnPv").innerHTML = ""; } }
+      else if (a === "pv-clear") { if (await Dlg.confirm("Buang hasil ekstraksi ini?", { title: "Buang hasil", icon: "🗑️", okText: "Buang", danger: true })) { RS.imp = null; g("rnPv").innerHTML = ""; } }
       else if (a === "pv-edit") { var body2 = g("pvb" + i), it2 = im.items[i]; body2.innerHTML = qEd(it2, "data-i='" + i + "'") + "<div class='rn-row'><button class='btn sm' data-ra='pv-ok' data-i='" + i + "'>✔ Selesai edit</button><button class='btn s sm' data-ra='pv-cancel'>Batal</button></div>"; }
       else if (a === "pv-cancel") pvDraw();
       else if (a === "pv-ok") { var o2 = readEd(g("pvb" + i)), it3 = im.items[i]; Object.assign(it3, { q: o2.q, a: o2.a, b: o2.b, c: o2.c, d: o2.d, e: o2.e, expl: o2.expl, diff: o2.diff, num: o2.num, ans: o2.ans || it3.ans || null }); (it3.imgs || []).forEach(function (m) { m.conf = "ok"; }); it3.via = "admin"; recount(it3); pvDraw(); }
