@@ -1317,7 +1317,7 @@ async function todayFill(){
     var up=r.j.filter(function(x){return x.iso>iso&&x.items.length}).sort(function(a,b){return a.iso<b.iso?-1:1}).slice(0,2);
     nx.innerHTML=up.length?"<div class='sec'>JADWAL TERDEKAT</div>"+up.map(function(x){
       var n=Math.round((Date.parse(x.iso)-Date.parse(iso))/864e5),lb=n===1?"Besok":n===2?"Lusa":"";
-      return"<div class='day g'><h3>"+esc(x.d)+(lb?"<span class='badge'>"+lb+"</span>":"")+"</h3>"+x.items.map(slot).join("")+"</div>"}).join("")+
+      return"<div class='day g'><h3>"+esc(x.d)+(lb?"<span class='badge nx'>"+lb+"</span>":"")+"</h3>"+x.items.map(slot).join("")+"</div>"}).join("")+
       "<div class='hint' style='text-align:center'>Dari jadwal “"+esc(tb.n)+"”. Ganti di menu Jadwal.</div>":""
   }catch(e){}}
 function pMateri(P){
