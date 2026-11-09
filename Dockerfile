@@ -1,5 +1,7 @@
 # ASTERION — Worker + D1 dijalankan lewat runtime lokal wrangler (workerd)
-FROM node:24-bookworm-slim
+# Debian 13 (trixie) dipakai karena paket OS di Debian 12 masih membawa
+# temuan keamanan high/critical yang belum ada perbaikannya.
+FROM node:24-trixie-slim
 
 ENV NODE_ENV=production \
     PORT=3000 \
