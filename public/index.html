@@ -372,7 +372,7 @@ function myName(){var u=String(S.u||"").toUpperCase();return S.admin?"Admin":((w
 function toast(m,kind){var t=$("toast"),s=String(m==null?"":m);if(!kind){kind=/gagal|error|tidak valid|tidak boleh|belum diisi|kosong|salah/i.test(s)?"bad":(/✓|✅|🎉|tersimpan|dihapus|terkirim|berhasil|disalin/i.test(s)?"good":"")}t.className=kind||"";t.innerHTML="<span class='ti'>"+(kind==="bad"?"⚠️":kind==="good"?"✅":"💬")+"</span><span>"+esc(s)+"</span>";t.classList.add("on");clearTimeout(toast.h);toast.h=setTimeout(function(){t.classList.remove("on")},2600)}
 /* ---------- dialog kustom: pengganti alert/confirm/prompt bawaan browser ---------- */
 var Dlg=(function(){
-  var el=null,cur=null;
+  var el=null,cur=null,hideT=null;
   function build(){
     el=document.createElement("div");el.id="dlg";el.hidden=true;
     el.innerHTML="<div class='dx' role='dialog' aria-modal='true' aria-labelledby='dlgT'><div class='di' id='dlgI'>💬</div><h3 class='dt' id='dlgT'></h3><p class='dm' id='dlgM'></p><input class='din' id='dlgIn' hidden><div class='db'><button type='button' id='dlgNo'>Batal</button><button type='button' class='ok' id='dlgOk'>OK</button></div></div>";
