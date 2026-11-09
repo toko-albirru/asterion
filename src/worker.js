@@ -472,6 +472,27 @@ async function runView(db, s, extra) { // keadaan sesi untuk klien — TANPA kun
   return { sid: s.id, status: s.status, mode: s.mode || "game", total: s.total, requested: s.requested, adjusted: s.requested > 0 && s.total < s.requested, q_time: s.q_time, cur: s.cur, score: s.score,
     remaining: s.status === "active" ? Math.max(0, s.q_time * 1000 - ((s.paused_at || t) - s.qstart)) : null, paused: !!s.paused_at, qs, ...extra };
 }
+// preferensi pribadi mahasiswa: jumlah soal per sesi (0 = ikut kategori) & tema tampilan ('' = ikut perangkat)
+async function runPref(db, u) {
+  const r = await db.prepare("SELECT per_session, theme FROM run_prefs WHERE u = ?").bind(u).first();
+  return { per_session: r && r.per_session > 0 ? r.per_session : 0, theme: (r && r.theme) || "" };
+}
+// mode simulasi ujian: tanpa kunci/pembahasan sampai dikumpulkan; jawaban & tanda ragu ikut, satu waktu untuk semua soal
+async function runExamView(db, s) {
+  const rows = (await db.prepare("SELECT idx, snap, chosen, flag FROM run_answers WHERE sid = ? ORDER BY idx").bind(s.id).all()).results;
+  const qs = rows.map((r) => { const q = JSON.parse(r.snap); return { idx: r.idx, q: q.q, o: { A: q.a, B: q.b, C: q.c, D: q.d, E: q.e }, img: q.img || "", num: q.num || null, chosen: r.chosen || "", flag: !!r.flag }; });
+  const t = Date.now(), limit = s.q_time * 1000 * s.total, started = s.began || s.qstart || t;
+  return { sid: s.id, status: s.status, mode: "exam", total: s.total, requested: s.requested, adjusted: s.requested > 0 && s.total < s.requested, q_time: s.q_time, limit, cur: s.cur, score: 0,
+    remaining: s.status === "active" ? Math.max(0, limit - (t - started)) : null, answered: qs.filter((x) => x.chosen).length, flagged: qs.filter((x) => x.flag).length, qs };
+}
+// kumpulkan ujian: nilai semua jawaban sekaligus lalu tutup sesi
+async function runExamSubmit(db, s, t) {
+  const rows = (await db.prepare("SELECT idx, snap, chosen FROM run_answers WHERE sid = ?").bind(s.id).all()).results;
+  const upd = rows.map((r) => { const q = JSON.parse(r.snap), ok = !!r.chosen && q.ans === r.chosen; return db.prepare("UPDATE run_answers SET correct = ?, answered = 1, ms = 0 WHERE sid = ? AND idx = ?").bind(ok ? 1 : 0, s.id, r.idx); });
+  for (let i = 0; i < upd.length; i += 40) await db.batch(upd.slice(i, i + 40));
+  await runFinish(db, await runGet(db, s.id), t);
+  return await runGet(db, s.id);
+}
 async function runFinish(db, s, t) {
   const rows = (await db.prepare("SELECT chosen, correct FROM run_answers WHERE sid = ?").bind(s.id).all()).results;
   const correct = rows.filter((r) => r.correct).length, blank = rows.filter((r) => r.chosen == null).length, wrong = rows.length - correct - blank;
