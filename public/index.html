@@ -1704,7 +1704,7 @@ function route(){
   if(!S.data)return;
   var P=location.hash.replace(/^#\/?/,"").split("/").filter(Boolean),tab=P[0]||"home",v;
   if(tab==="materi")v=pMateri(P);else if(tab==="rekaman")v=pRekaman(P);else if(tab==="jadwal")v=pJadwal(P);else if(tab==="tutor")v=pTutor(P);else if(tab==="run"&&window.pRun)v=window.pRun(P);else if(tab==="dokter")v=pDokter(P);else if(tab==="atur")v=pAtur();else if(tab==="akun")v=pAkun();else{tab="home";v=pHome()}
-  renderNav();$("main").innerHTML=v;$("ttl").textContent=(tab!=="home"&&tab!=="atur"&&uiName(tab)?uiName(tab).toUpperCase():TT[tab]);
+  document.body.dataset.r=tab;renderNav();$("main").innerHTML=v;$("ttl").textContent=(tab!=="home"&&tab!=="atur"&&uiName(tab)?uiName(tab).toUpperCase():TT[tab]);
   $("back").hidden=P.length<2;$("back").href="#/"+P.slice(0,-1).join("/");
   [].forEach.call(document.querySelectorAll(".nav a"),function(a){a.classList.toggle("on",a.dataset.t===tab)});
   if(tab!=="jadwal")window.scrollTo(0,0)}
