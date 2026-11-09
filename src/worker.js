@@ -384,7 +384,11 @@ const RUN_DDL = [
   // nama samaran leaderboard (satu per akun; nick_key = bentuk huruf kecil tanpa spasi untuk cek kembar)
   "CREATE TABLE IF NOT EXISTS run_players ( u TEXT PRIMARY KEY, nick TEXT NOT NULL, nick_key TEXT NOT NULL UNIQUE, updated INTEGER NOT NULL )",
   // status online: waktu ping terakhir tiap mahasiswa (ditulis klien tiap ±90 detik saat tab terlihat)
-  "CREATE TABLE IF NOT EXISTS run_presence ( u TEXT PRIMARY KEY, t INTEGER NOT NULL )"
+  "CREATE TABLE IF NOT EXISTS run_presence ( u TEXT PRIMARY KEY, t INTEGER NOT NULL )",
+  // preferensi pribadi tiap mahasiswa: jumlah soal per sesi (0 = ikut kategori) & tema tampilan ('' = ikut perangkat)
+  "CREATE TABLE IF NOT EXISTS run_prefs ( u TEXT PRIMARY KEY, per_session INTEGER NOT NULL DEFAULT 0, theme TEXT NOT NULL DEFAULT '', updated INTEGER NOT NULL )",
+  // soal yang sudah pernah keluar untuk seorang mahasiswa → dipakai agar soal tidak berulang sampai bank kategori habis
+  "CREATE TABLE IF NOT EXISTS run_seen ( u TEXT NOT NULL, cat_id INTEGER NOT NULL, qid INTEGER NOT NULL, t INTEGER NOT NULL, PRIMARY KEY (u, cat_id, qid) )"
 ];
 let runReady = false;
 async function runDb(env) {
