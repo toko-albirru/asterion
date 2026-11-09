@@ -1182,9 +1182,9 @@ async function getTabs(){
   try{var r=await api("tabs");if(r.ok&&r.j&&r.j.tabs&&r.j.tabs.length){S.tabs=r.j.tabs;S.auto=!!r.j.auto;S.def=+r.j.def||0;S.grp=r.j.grp||""}}catch(e){}
   return S.tabs||S.data.sheet.tabs}
 function pJadwal(P){
-  var h="<div id='chips'></div><div id='sch'><div class='empty'>Memuat jadwal…</div></div>";
+  var h="<div id='chips'></div><div class='chips' id='jview'><a href='javascript:void 0' class='chip g"+(CAL.m==="list"?" on":"")+"' data-jv='list'>📋 Daftar</a><a href='javascript:void 0' class='chip g"+(CAL.m==="cal"?" on":"")+"' data-jv='cal'>📅 Kalender</a><a href='javascript:void 0' class='chip g' data-jv='ics'>⬇️ .ics</a></div><div id='sch'><div class='empty'>Memuat jadwal…</div></div>";
   if(S.admin)h+="<div class='pn g'><b>Pengaturan spreadsheet</b><label>ID spreadsheet</label><input id='sId' value=\""+esc(S.data.sheet.id)+"\"><div class='hint' id='tabst'>Memeriksa tab…</div><label>Daftar tab cadangan (satu per baris: Nama|gid, urut dari kiri). Dipakai hanya jika deteksi otomatis gagal.</label><textarea id='sTabs' rows='5'>"+esc(S.data.sheet.tabs.map(function(t){return t.n+"|"+t.g}).join("\n"))+"</textarea><div class='hint'>gid ada di URL spreadsheet setelah <code>#gid=</code> saat tab dibuka. Spreadsheet harus dibagikan “siapa saja yang memiliki link”.</div><button class='btn' data-a='sheet'>Simpan</button></div>";
-  setTimeout(jInit,0);return h}
+  setTimeout(function(){jvSync();jInit()},0);return h}
 async function jInit(){
   var my=S.jt=(S.jt||0)+1,t0=S.tabs||S.data.sheet.tabs;setSel(t0,curTi(t0));
   var tabs=await getTabs();if(my!==S.jt||!$("sch"))return;
