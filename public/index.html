@@ -369,7 +369,56 @@ function beat(){if(!S.t||S.admin||document.hidden)return;api("ping",{m:"POST"}).
 function beatStart(){if(BT||S.admin||!S.t)return;beat();BT=setInterval(beat,9e4)}
 document.addEventListener("visibilitychange",function(){if(!document.hidden)beat()});
 function myName(){var u=String(S.u||"").toUpperCase();return S.admin?"Admin":((window.MHS||{})[u]||S.u)}
-function toast(m){var t=$("toast");t.textContent=m;t.classList.add("on");clearTimeout(toast.h);toast.h=setTimeout(function(){t.classList.remove("on")},2200)}
+function toast(m,kind){var t=$("toast"),s=String(m==null?"":m);if(!kind){kind=/gagal|error|tidak valid|tidak boleh|belum diisi|kosong|salah/i.test(s)?"bad":(/✓|✅|🎉|tersimpan|dihapus|terkirim|berhasil|disalin/i.test(s)?"good":"")}t.className=kind||"";t.innerHTML="<span class='ti'>"+(kind==="bad"?"⚠️":kind==="good"?"✅":"💬")+"</span><span>"+esc(s)+"</span>";t.classList.add("on");clearTimeout(toast.h);toast.h=setTimeout(function(){t.classList.remove("on")},2600)}
+/* ---------- dialog kustom: pengganti alert/confirm/prompt bawaan browser ---------- */
+var Dlg=(function(){
+  var el=null,cur=null;
+  function build(){
+    el=document.createElement("div");el.id="dlg";el.hidden=true;
+    el.innerHTML="<div class='dx' role='dialog' aria-modal='true' aria-labelledby='dlgT'><div class='di' id='dlgI'>💬</div><h3 class='dt' id='dlgT'></h3><p class='dm' id='dlgM'></p><input class='din' id='dlgIn' hidden><div class='db'><button type='button' id='dlgNo'>Batal</button><button type='button' class='ok' id='dlgOk'>OK</button></div></div>";
+    document.body.appendChild(el);
+    el.addEventListener("click",function(e){if(e.target===el)settle(false)});
+    el.querySelector("#dlgNo").addEventListener("click",function(){settle(false)});
+    el.querySelector("#dlgOk").addEventListener("click",function(){settle(true)});
+    return el;
+  }
+  function onKey(e){
+    if(!cur)return;
+    if(e.key==="Escape"){e.preventDefault();settle(false)}
+    else if(e.key==="Enter"){e.preventDefault();settle(true)}
+  }
+  function settle(ok){
+    if(!cur)return;var c=cur;cur=null;
+    document.removeEventListener("keydown",onKey,true);
+    el.classList.remove("on");setTimeout(function(){el.hidden=true},170);
+    if(c.input)c.res(ok?el.querySelector("#dlgIn").value:null);
+    else if(c.cancel)c.res(!!ok);
+    else c.res(undefined);
+  }
+  function open(o){
+    o=o||{};build();
+    if(cur){var p=cur;cur=null;p.res(p.input?null:(p.cancel?false:undefined))}
+    return new Promise(function(res){
+      cur={res:res,input:!!o.input,cancel:!!o.cancel};
+      el.querySelector("#dlgI").textContent=o.icon||"💬";
+      var tt=el.querySelector("#dlgT");tt.textContent=o.title||"";tt.hidden=!o.title;
+      el.querySelector("#dlgM").textContent=o.msg||"";
+      var inp=el.querySelector("#dlgIn");inp.hidden=!o.input;inp.value=o.value==null?"":String(o.value);
+      var no=el.querySelector("#dlgNo"),ok=el.querySelector("#dlgOk");
+      no.hidden=!o.cancel;no.textContent=o.cancelText||"Batal";
+      ok.textContent=o.okText||"OK";ok.classList.toggle("bad",!!o.danger);
+      el.hidden=false;requestAnimationFrame(function(){el.classList.add("on")});
+      document.addEventListener("keydown",onKey,true);
+      setTimeout(function(){(o.input?inp:ok).focus();if(o.input)inp.select()},70);
+    });
+  }
+  return{
+    alert:function(m,o){o=o||{};return open({msg:m,icon:o.icon||"💬",title:o.title||"",okText:o.okText||"Mengerti"})},
+    confirm:function(m,o){o=o||{};return open({msg:m,icon:o.icon||"❓",title:o.title||"",okText:o.okText||"Lanjutkan",cancel:true,cancelText:o.cancelText||"Batal",danger:o.danger})},
+    prompt:function(m,v,o){o=o||{};return open({msg:m,value:v,icon:o.icon||"✎",title:o.title||"",okText:o.okText||"Simpan",cancel:true,input:true})}
+  };
+})();
+window.Dlg=Dlg;
 async function api(p,o){o=o||{};var r=await fetch("/api/"+p,{method:o.m||"GET",headers:{"content-type":"application/json",authorization:"Bearer "+S.t},body:o.b?JSON.stringify(o.b):undefined});
   if(r.status===401&&p!=="login"){logout();throw 0}var j=null;try{j=await r.json()}catch(e){}return{ok:r.ok,s:r.status,j:j}}
 function setUser(){var u=S.t.split(".")[0]||"";S.u=u;S.admin=u==="admin"}
