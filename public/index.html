@@ -1475,7 +1475,7 @@ function fxTick(){
   var e=$("fxEarly");if(e)e.textContent=rem>0?"⏹ Akhiri lebih awal":"✅ Selesai";
   if(rem<=0)fxEnd(0)}
 function fxWarn(m){Dlg.alert(m+"\n\nMode fokus masih berjalan.\nSisa waktu: "+fxFmt(fxLeft())+"\nKamu baru bisa keluar setelah waktu habis.",{title:"Mode fokus aktif",icon:"🎯",okText:"Mengerti"})}
-function fxEnd(early){
+async function fxEnd(early){
   if(!FX.on)return;
   if(early&&!(await Dlg.confirm("Akhiri mode fokus sebelum waktunya? Progres fokusmu akan hilang.",{title:"Akhiri mode fokus",icon:"⏹",okText:"Akhiri",danger:true})))return;
   FX.on=false;clearInterval(FX.iv);FX.iv=0;
