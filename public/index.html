@@ -1206,6 +1206,136 @@ function jRefresh(){
   if(!S.t||!S.data||document.hidden||location.hash.indexOf("#/jadwal")!==0)return;
   getTabs().then(function(tabs){var ti=curTi(tabs);setSel(tabs,ti);S.cur=tabs[ti];if(S.cur)schFill(S.cur,S.jt)})}
 setInterval(jRefresh,20000);window.addEventListener("focus",jRefresh);document.addEventListener("visibilitychange",jRefresh);
+
+/* ---------- KALENDER JADWAL + EKSPOR GOOGLE CALENDAR ---------- */
+var CAL={m:"list",ym:0};
+function p2(n){return n<10?"0"+n:""+n}
+function calHm(t){
+  var g=String(t||"").match(/(\d{1,2})[.:](\d{2})/g)||[],sh=8,sm=0,eh=9,em=40;
+  if(g.length){var a=g[0].split(/[.:]/);sh=+a[0];sm=+a[1];if(g[1]){var b=g[1].split(/[.:]/);eh=+b[0];em=+b[1]}else{eh=sh+1;em=sm}}
+  return[p2(sh)+p2(sm),p2(eh)+p2(em)]}
+function calUtc(iso,hm){var d=new Date(iso+"T"+hm.slice(0,2)+":"+hm.slice(2)+":00+07:00");return isNaN(d)?iso.replace(/-/g,"")+"T"+hm+"00":d.toISOString().replace(/[-:]/g,"").split(".")[0]+"Z"}
+function calLink(iso,it,cat){
+  var hm=calHm(it.j);
+  var u="https://calendar.google.com/calendar/render?action=TEMPLATE&ctz=Asia%2FJakarta&text="+encodeURIComponent((it.k||"Jadwal")+(cat?" · "+cat:""))+"&dates="+calUtc(iso,hm[0])+"/"+calUtc(iso,hm[1]);
+  if(it.r)u+="&location="+encodeURIComponent(it.r);
+  var det=[cat?"Jadwal: "+cat:"",it.s?"Status: "+it.s:"",it.rs?"Reschedule: "+it.rs:"",it.d?"Dosen: "+it.d:""].filter(Boolean).join("\n");
+  if(det)u+="&details="+encodeURIComponent(det);
+  return u}
+function jvSync(){
+  var w=$("jview");if(!w)return;
+  [].forEach.call(w.querySelectorAll("[data-jv]"),function(a){
+    var v=a.getAttribute("data-jv");if(v!=="list"&&v!=="cal")return;
+    a.classList.toggle("on",(v==="cal")===(CAL.m==="cal"))})}
+function calDraw(data,cat){
+  var el=$("sch");if(!el)return;
+  var map={};(data||[]).forEach(function(d){if(d&&d.iso)map[d.iso]=d});
+  if(!CAL.ym){var n0=new Date();CAL.ym=new Date(n0.getFullYear(),n0.getMonth(),1).getTime()}
+  var base=new Date(CAL.ym),y=base.getFullYear(),mo=base.getMonth(),todayIso=jkt();
+  var start=new Date(y,mo,1);start.setDate(1-((start.getDay()+6)%7));
+  var h="<div class='pn g'><div class='calh'><button class='btn s sm' data-jv='prev' aria-label='Bulan sebelumnya'>‹</button><b style='flex:1;text-align:center;text-transform:capitalize'>"+esc(base.toLocaleDateString("id-ID",{month:"long",year:"numeric"}))+"</b><button class='btn s sm' data-jv='next' aria-label='Bulan berikutnya'>›</button></div><div class='calg'>"+["Sen","Sel","Rab","Kam","Jum","Sab","Min"].map(function(d){return "<div class='cw'>"+d+"</div>"}).join("");
+  for(var i=0;i<42;i++){
+    var dt=new Date(start.getTime()+i*864e5),iso=dt.getFullYear()+"-"+p2(dt.getMonth()+1)+"-"+p2(dt.getDate()),ev=map[iso],cnt=ev&&ev.items?ev.items.length:0;
+    h+="<div class='cd"+(dt.getMonth()!==mo?" oth":"")+(iso===todayIso?" td":"")+(cnt?" has":"")+"'><span>"+dt.getDate()+"</span>"+(cnt?"<i>"+cnt+"</i>":"")+"</div>"}
+  h+="</div>";
+  var pre=y+"-"+p2(mo+1),days=(data||[]).filter(function(d){return d.iso&&d.iso.slice(0,7)===pre&&d.items&&d.items.length});
+  h+=days.length?days.map(function(d){return "<div class='cald'><b>"+esc(d.d)+"</b>"+d.items.map(function(it){
+    return "<div class='cali'><div class='calt'>"+esc(it.j||"—")+"</div><div class='calb'><b>"+esc(it.k||"—")+"</b>"+(it.r?"<small>📍 "+esc(it.r)+"</small>":"")+(it.s?"<small>"+esc(it.s)+"</small>":"")+"</div><a class='btn s sm' target='_blank' rel='noopener' title='Tambah ke Google Calendar' href='"+calLink(d.iso,it,cat)+"'>📅</a></div>"}).join("")+"</div>"}).join(""):"<div class='empty' style='margin-top:10px'>Tidak ada jadwal pada bulan ini.</div>";
+  h+="<div class='rn-row' style='margin-top:10px'><button class='btn s' data-jv='ics'>⬇️ Unduh .ics (impor ke Google Calendar)</button><button class='btn s' data-jv='today'>📅 Bulan ini</button></div></div>";
+  el.innerHTML=h;jvSync()}
+function icsEsc(s){return String(s==null?"":s).replace(/\\/g,"\\\\").replace(/;/g,"\\;").replace(/,/g,"\\,").replace(/\r?\n/g,"\\n")}
+function calIcs(data,cat){
+  var L=["BEGIN:VCALENDAR","VERSION:2.0","PRODID:-//ASTERION//Jadwal//ID","CALSCALE:GREGORIAN","METHOD:PUBLISH"];
+  (data||[]).forEach(function(d){if(!d.iso||!d.items)return;d.items.forEach(function(it){
+    var hm=calHm(it.j),det=[cat?"Jadwal: "+cat:"",it.d?"Dosen: "+it.d:"",it.s?"Status: "+it.s:""].filter(Boolean).join("\n");
+    L.push("BEGIN:VEVENT","UID:"+d.iso.replace(/-/g,"")+"-"+Math.random().toString(36).slice(2,9)+"@asterion","DTSTAMP:"+new Date().toISOString().replace(/[-:]/g,"").split(".")[0]+"Z","DTSTART:"+calUtc(d.iso,hm[0]),"DTEND:"+calUtc(d.iso,hm[1]),"SUMMARY:"+icsEsc((it.k||"Jadwal")+(cat?" · "+cat:"")),it.r?"LOCATION:"+icsEsc(it.r):"",det?"DESCRIPTION:"+icsEsc(det):"","END:VEVENT")})});
+  L.push("END:VCALENDAR");return L.filter(Boolean).join("\r\n")}
+function calIcsDl(){
+  if(!S.jData)return toast("Muat jadwal dulu");
+  var b=new Blob([calIcs(S.jData,S.jCat)],{type:"text/calendar;charset=utf-8"}),a=document.createElement("a");
+  a.href=URL.createObjectURL(b);a.download="jadwal-asterion.ics";document.body.appendChild(a);a.click();
+  setTimeout(function(){URL.revokeObjectURL(a.href);a.remove()},500);
+  toast("File .ics diunduh — buka untuk menambahkannya ke Google Calendar.")}
+function jView(){
+  if(CAL.m==="cal"){calDraw(S.jData||[],S.jCat);return}
+  var el=$("sch");if(el&&S.jList){el.dataset.ok=1;el.innerHTML=S.jList}jvSync()}
+$("main").addEventListener("click",function(e){
+  var b=e.target.closest?e.target.closest("[data-jv]"):null;if(!b)return;
+  var v=b.getAttribute("data-jv"),base=new Date(CAL.ym||Date.now());
+  if(v==="list"){CAL.m="list"}
+  else if(v==="cal"){CAL.m="cal"}
+  else if(v==="prev"){CAL.m="cal";CAL.ym=new Date(base.getFullYear(),base.getMonth()-1,1).getTime()}
+  else if(v==="next"){CAL.m="cal";CAL.ym=new Date(base.getFullYear(),base.getMonth()+1,1).getTime()}
+  else if(v==="today"){CAL.m="cal";var n1=new Date();CAL.ym=new Date(n1.getFullYear(),n1.getMonth(),1).getTime()}
+  else if(v==="ics"){return calIcsDl()}
+  else return;
+  jView()});
+
+/* ---------- TEMA TERANG / GELAP ---------- */
+function themeNow(){return document.documentElement.getAttribute("data-theme")==="light"?"light":"dark"}
+function themeSet(t,save){
+  t=t==="light"?"light":"dark";
+  document.documentElement.setAttribute("data-theme",t);
+  var b=$("thm");if(b){b.textContent=t==="light"?"☀️":"🌙";b.title=t==="light"?"Ganti ke mode gelap":"Ganti ke mode terang"}
+  if(save){try{localStorage.setItem("theme",t)}catch(e){}}
+  if(S.t){api("run/prefs",{m:"POST",b:{theme:t}}).catch(function(){})}}
+function themeToggle(){var n=themeNow()==="light"?"dark":"light";themeSet(n,1);toast(n==="light"?"☀️ Mode terang aktif":"🌙 Mode gelap aktif")}
+
+/* ---------- MODE FOKUS MENGAMBANG ---------- */
+var FX={on:false,end:0,iv:0,min:25,left:false};
+function fxFmt(ms){var s=Math.max(0,Math.ceil(ms/1000)),m=Math.floor(s/60);s=s%60;return p2(m)+":"+p2(s)}
+function fxLeft(){return Math.max(0,FX.end-Date.now())}
+function fxFs(){try{var el=document.documentElement;if(el.requestFullscreen)return el.requestFullscreen({navigationUI:"hide"});if(el.webkitRequestFullscreen)return el.webkitRequestFullscreen()}catch(e){}return Promise.reject()}
+function fxPanel(){var p=$("fxP");if(!p)return;p.hidden=!p.hidden;if(!p.hidden&&$("fxMin"))$("fxMin").value=FX.min}
+function fxOpen(){if(FX.on){var o=$("fxOver");if(o)o.hidden=false;fxFs().catch(function(){});return}fxPanel()}
+function fxStart(n){
+  n=+n||0;if(!isFinite(n)||n<1||n>240)return toast("Durasi 1–240 menit ya.");
+  FX.min=n;try{localStorage.setItem("fxMin",n)}catch(e){}
+  FX.on=true;FX.end=Date.now()+n*6e4;FX.left=false;
+  $("fxP").hidden=true;document.body.classList.add("fxon");
+  var o=$("fxOver");if(o)o.hidden=false;var b=$("fxBtn");if(b)b.classList.add("on");
+  fxTick();clearInterval(FX.iv);FX.iv=setInterval(fxTick,250);
+  fxFs().catch(function(){toast("Browser menolak layar penuh — mode fokus tetap berjalan.")})}
+function fxTick(){
+  if(!FX.on)return;
+  var rem=fxLeft(),t=$("fxT");if(t)t.textContent=fxFmt(rem);
+  var e=$("fxEarly");if(e)e.textContent=rem>0?"⏹ Akhiri lebih awal":"✅ Selesai";
+  if(rem<=0)fxEnd(0)}
+function fxWarn(m){alert("⚠️ "+m+"\n\nMode fokus masih berjalan.\nSisa waktu: "+fxFmt(fxLeft())+"\nKamu baru bisa keluar setelah waktu habis.")}
+function fxEnd(early){
+  if(!FX.on)return;
+  if(early&&!confirm("Akhiri mode fokus sebelum waktunya? Progres fokusmu akan hilang."))return;
+  FX.on=false;clearInterval(FX.iv);FX.iv=0;
+  document.body.classList.remove("fxon");
+  var o=$("fxOver");if(o)o.hidden=true;var b=$("fxBtn");if(b)b.classList.remove("on");
+  try{if(document.fullscreenElement&&document.exitFullscreen)document.exitFullscreen()}catch(e){}
+  toast(early?"Mode fokus diakhiri.":"Mode fokus selesai. Kerja bagus! 🎉")}
+document.addEventListener("fullscreenchange",function(){
+  if(!FX.on)return;
+  if(!document.fullscreenElement){fxWarn("Kamu keluar dari layar penuh.");
+    setTimeout(function(){if(FX.on)fxFs().catch(function(){})},1200)}});
+document.addEventListener("visibilitychange",function(){
+  if(!FX.on)return;
+  if(document.hidden)FX.left=true;
+  else if(FX.left){FX.left=false;fxWarn("Kamu meninggalkan halaman ini.");if(!document.fullscreenElement)fxFs().catch(function(){})}});
+window.addEventListener("beforeunload",function(e){if(FX.on){e.preventDefault();e.returnValue="Mode fokus masih berjalan.";return e.returnValue}});
+(function fxInit(){
+  try{FX.min=+localStorage.getItem("fxMin")||25}catch(e){}
+  themeSet(themeNow(),0);
+  var b=$("fxBtn");if(b)b.addEventListener("click",fxOpen);
+  var t=$("thm");if(t)t.addEventListener("click",themeToggle);
+  var p=$("fxP");
+  if(p)p.addEventListener("click",function(e){
+    var x=e.target.closest?e.target.closest("[data-fxm]"):null;if(!x)return;
+    var v=x.getAttribute("data-fxm"),i=$("fxMin");
+    if(v==="start")fxStart(i?i.value:25);
+    else if(v==="close")p.hidden=true;
+    else if(i)i.value=+v});
+  var o=$("fxOver");
+  if(o)o.addEventListener("click",function(e){
+    var x=e.target.closest?e.target.closest("[data-fxo]"):null;
+    if(x&&x.getAttribute("data-fxo")==="early")fxEnd(1)});
+})();
 $("main").addEventListener("change",function(e){if(e.target.id!=="tabSel")return;var tabs=S.tabs||S.data.sheet.tabs,t=tabs[+e.target.value];location.hash="#/jadwal/"+e.target.value});
 
 
