@@ -209,6 +209,7 @@ select.in option{background:#241a3f;color:#fff}
 </style>
 </head>
 <body>
+<script>try{if(localStorage.getItem("theme")==="light")document.documentElement.setAttribute("data-theme","light")}catch(e){}</script>
 <div id="toast"></div>
 
 <div id="gate" class="gate" hidden>
@@ -230,9 +231,25 @@ select.in option{background:#241a3f;color:#fff}
 </div>
 
 <div id="shell" hidden>
-  <div class="top"><a class="ib g" id="back" href="#/" hidden>‹</a><h2 id="ttl"></h2><button class="ib g" id="out" title="Keluar">⎋</button></div>
+  <div class="top"><a class="ib g" id="back" href="#/" hidden>‹</a><h2 id="ttl"></h2><button class="ib g" id="thm" title="Mode terang">🌙</button><button class="ib g" id="out" title="Keluar">⎋</button></div>
   <div class="wrap" id="main"></div>
   <nav class="nav g" id="nav"></nav>
+  <button class="fx" id="fxBtn" aria-label="Mode fokus">🎯 <span>Fokus</span></button>
+  <div class="fxp g" id="fxP" hidden>
+    <b>🎯 Mode fokus</b>
+    <div class="hint" style="margin:0 0 8px">Web masuk layar penuh dan terkunci sampai waktu habis. Kalau keluar sebelum waktunya, muncul peringatan.</div>
+    <label for="fxMin" style="font-size:12px">Durasi (menit)</label>
+    <input id="fxMin" type="number" min="1" max="240" value="25" class="in" style="width:100%;padding:9px;border-radius:10px;border:1px solid var(--line);background:rgba(10,6,28,.5);color:#fff">
+    <div class="fxr"><button data-fxm="15">15</button><button data-fxm="25">25</button><button data-fxm="45">45</button><button data-fxm="60">60</button><button data-fxm="90">90</button></div>
+    <button class="btn w" data-fxm="start">Mulai fokus</button>
+    <div class="hint" style="margin-top:8px">Tips: selesaikan latihan soal di mode ini supaya tidak terganggu.</div>
+  </div>
+  <div class="fxo" id="fxOver" hidden>
+    <h2>MODE FOKUS</h2>
+    <div class="fxT" id="fxT">25:00</div>
+    <div class="hint">Jangan tinggalkan halaman ini. Kalau kamu keluar, peringatan akan muncul sampai waktu habis.</div>
+    <div class="fxb"><button class="btn s" id="fxEarly" data-fxo="early">⏹ Akhiri lebih awal</button></div>
+  </div>
 </div>
 
 <script src="mahasiswa.js"></script>
