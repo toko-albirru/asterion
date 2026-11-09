@@ -81,8 +81,12 @@ function ok(m) { console.log("OK: " + m); }
     errs.length === 0 ? ok("tidak ada page error") : fail("page error: " + errs.join(" | "));
 
     await browser.close();
+  } catch (e) {
+    console.error("FAIL:", e.message);
+    process.exitCode = 1;
   } finally {
     stop();
   }
   console.log(process.exitCode ? "HASIL: GAGAL" : "HASIL: SEMUA LOLOS");
-})().catch(e => { console.error("FAIL:", e.message); process.exitCode = 1; });
+  process.exit(process.exitCode || 0);
+})();
