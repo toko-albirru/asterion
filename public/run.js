@@ -38,7 +38,13 @@
     ".rn-tg{display:flex;align-items:center;gap:8px;margin:8px 0;font-size:13px}.rn-tg input{width:auto}" +
     ".rn-nk{padding:12px 14px;margin:0 0 12px}.rn-nk.ask{border:1px solid rgba(245,192,74,.6);background:linear-gradient(135deg,rgba(245,192,74,.16),rgba(177,140,255,.14))}.rn-nk input.in{margin:8px 0 4px}" +
     ".rn-qo{width:100%;text-align:left;color:#fff;cursor:pointer;font-family:inherit;margin-bottom:8px;padding:12px}.rn-qo:hover:not(:disabled){border-color:var(--gold)}.rn-qo:disabled{cursor:default;color:#fff;opacity:1}.rn-qo.ok{border-color:var(--ok);background:rgba(74,222,128,.22)}.rn-qo.no{border-color:var(--bad);background:rgba(248,113,113,.22)}.rn-qo.sel{border-color:var(--gold);background:rgba(245,192,74,.16)}" +
-    ".rn-qz .q{white-space:pre-line;line-height:1.55;font-size:15px;margin:10px 0 14px;overflow-wrap:anywhere}.rn-qz img{max-width:100%;border-radius:10px;background:#fff;margin-bottom:10px}.rn-qt{font:700 18px Inter,sans-serif;font-variant-numeric:tabular-nums}.rn-qt.low{color:var(--bad)}.rn-qo.key{border-color:var(--ok);background:rgba(74,222,128,.14)}.rn-qf{text-align:center;font-weight:700;margin:6px 0;min-height:22px}";
+    ".rn-qz .q{white-space:pre-line;line-height:1.55;font-size:15px;margin:10px 0 14px;overflow-wrap:anywhere}.rn-qz img{max-width:100%;border-radius:10px;background:#fff;margin-bottom:10px}.rn-qt{font:700 18px Inter,sans-serif;font-variant-numeric:tabular-nums}.rn-qt.low{color:var(--bad)}.rn-qo.key{border-color:var(--ok);background:rgba(74,222,128,.14)}.rn-qf{text-align:center;font-weight:700;margin:6px 0;min-height:22px}" +
+    ".rn-exo{flex:1 0 100%;margin-top:6px;padding:6px 8px;border-radius:8px;background:rgba(255,255,255,.08);font-size:12px;line-height:1.45;white-space:pre-line;color:var(--mut);text-align:left;font-weight:400}" +
+    ".rn-op,.rn-qo{flex-wrap:wrap}.rn-pf input.in{margin:6px 0;padding:9px;border-radius:10px;border:1px solid var(--line);background:rgba(10,6,28,.5);color:#fff;font:400 15px Inter,sans-serif}" +
+    ".ex-hd{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:8px}.ex-hd .sp{flex:1}" +
+    ".ex-nums{display:flex;flex-wrap:wrap;gap:5px;margin:8px 0}.ex-nums button{width:34px;height:34px;border-radius:10px;border:1px solid var(--line);background:rgba(255,255,255,.08);color:#fff;font-size:12px;cursor:pointer;font-family:inherit}" +
+    ".ex-nums .ans{background:rgba(74,222,128,.35);border-color:var(--ok)}.ex-nums .flg{box-shadow:inset 0 0 0 2px var(--warn);color:var(--warn);font-weight:700}.ex-nums .cur{outline:2px solid var(--gold)}" +
+    ".rn-qo.pick{border-color:var(--gold);background:rgba(245,192,74,.18)}.rn-flag{border-color:var(--warn);color:var(--warn)}";
   (function () { var s = document.createElement("style"); s.textContent = CSS; document.head.appendChild(s); })();
 
   function errBox(r) {
@@ -46,7 +52,7 @@
     return "<div class='pn g empty'>" + esc((r && r.j && r.j.err) || "Gagal memuat. Coba lagi.") + "</div>";
   }
   function destroyGame() { if (RS.game) { try { RS.game.destroy(); } catch (e) {} RS.game = null; document.body.style.overflow = ""; } }
-  window.addEventListener("hashchange", function () { if (RS.game && !/^#\/run\/(play|tutorial)/.test(location.hash)) destroyGame(); if (RS.quiz && !/^#\/run\/quiz/.test(location.hash)) quizStop(); });
+  window.addEventListener("hashchange", function () { if (RS.game && !/^#\/run\/(play|tutorial)/.test(location.hash)) destroyGame(); if (RS.quiz && !/^#\/run\/quiz/.test(location.hash)) quizStop(); if (RS.exam && !/^#\/run\/exam/.test(location.hash)) examStop(); });
   function loadGameLib() { return window.AsterionGame ? Promise.resolve() : window.AsterionPdf && 0 ? 0 : new Promise(function (res, rej) { var s = document.createElement("script"); s.src = "run-game.js"; s.onload = res; s.onerror = function () { rej(new Error("run-game.js tidak ditemukan")); }; document.head.appendChild(s); }); }
   function loadPdfLib() { return window.AsterionPdf ? Promise.resolve() : new Promise(function (res, rej) { var s = document.createElement("script"); s.src = "run-pdf.js"; s.onload = res; s.onerror = function () { rej(new Error("run-pdf.js tidak ditemukan")); }; document.head.appendChild(s); }); }
 
@@ -60,7 +66,8 @@
     if (sub === "play") return startFlow(+P[2], k);
     if (sub === "tutorial") return tutorial(k);
     if (sub === "quiz") return quizFlow(+P[2], k);
-    destroyGame(); quizStop();
+    if (sub === "exam") return examFlow(+P[2], k);
+    destroyGame(); quizStop(); examStop();
     try {
       if (sub === "") return await home(k);
       if (sub === "lb") return await lbPage(P[2] || "", P[3] || "all", k);
