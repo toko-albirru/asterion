@@ -11,6 +11,10 @@
     "test": "node scripts/test-format-baru.js"
   },
   "devDependencies": {
-    "wrangler": "^4.0.0"
+    "wrangler": "^4.159.0"
+  },
+  "overrides": {
+    "sharp": "^0.35.5",
+    "undici": "^7.30.1"
   }
 }
