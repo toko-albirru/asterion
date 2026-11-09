@@ -469,14 +469,16 @@
         String(x.img || "").split(",").filter(Boolean).map(function (id) { return "<img alt='Gambar soal' loading='lazy' src='/api/run/img/" + encodeURIComponent(id) + "'>"; }).join("") + "<div class='q'>" + esc(x.q) + "</div>";
       LET.forEach(function (Lt, i) {
         if (!x.o[Lt]) return; var isKey = Lt === x.ans, isMine = Lt === x.chosen, cls = isKey ? "key" : isMine ? "bad" : "";
-        h += "<div class='rn-op " + cls + "'><b style='background:" + CSSC[i] + "'>" + Lt + "</b><span>" + esc(x.o[Lt]) + "</span>" + (isKey ? "<i class='rn-s-ok'>✔ KUNCI</i>" : "") + (isMine && !isKey ? "<i class='rn-s-bad'>✘ jawabanmu</i>" : isMine ? "<i>jawabanmu</i>" : "") + "</div>";
+        h += "<div class='rn-op " + cls + "'><b style='background:" + CSSC[i] + "'>" + Lt + "</b><span>" + esc(x.o[Lt]) + "</span>" + (isKey ? "<i class='rn-s-ok'>✔ KUNCI</i>" : "") + (isMine && !isKey ? "<i class='rn-s-bad'>✘ jawabanmu</i>" : isMine ? "<i>jawabanmu</i>" : "") + optEx(x.ex, Lt) + "</div>";
       });
       h += "<div class='hint' style='margin:8px 2px'>Jawaban pemain: <b>" + (x.chosen || "—") + "</b> · Kunci: <b class='rn-s-ok'>" + x.ans + "</b> · Status: <b>" + st[0] + "</b> · Skor: <b>" + st[2] + "</b></div>";
       h += rv.ex ? (x.expl ? "<div class='rn-ex'><b>Pembahasan</b><br>" + esc(x.expl) + "</div>" : "<div class='rn-ex no'>Pembahasan belum tersedia.</div>") : "<div class='rn-ex no'>Pembahasan dinonaktifkan untuk kategori ini.</div>";
-      h += "</div><div class='rn-row'><button class='btn s' data-ra='rv-p' " + (pos <= 0 ? "disabled style='opacity:.4'" : "") + ">‹ Sebelumnya</button><div class='hint' style='flex:.4;text-align:center;align-self:center;margin:0'>" + (rv.i + 1) + "/" + rv.items.length + "</div><button class='btn s' data-ra='rv-n' " + (pos >= L.length - 1 ? "disabled style='opacity:.4'" : "") + ">Berikutnya ›</button></div>";
+      h += "</div><div class='rn-row'><button class='btn s' data-ra='rv-p' " + (pos <= 0 ? "disabled style='opacity:.4'" : "") + ">‹ Sebelumnya</button><div class='hint' style='flex:.4;text-align:center;align-self:center;margin:0'>" + (rv.i + 1) + "/" + rv.items.length + "</div><button class='btn s' data-ra='rv-n' " + (pos >= L.length - 1 ? "disabled style='opacity:.4'" : "") + ">Berikutnya ›</button></div>" +
+        "<div class='rn-row' style='margin-top:8px'><select id='rvJump' class='in' style='flex:1;min-width:150px;padding:9px;border-radius:10px;border:1px solid var(--line);background:rgba(10,6,28,.5);color:#fff;font:400 14px Inter,sans-serif'>" + L.map(function (i) { var it = rv.items[i]; return "<option value='" + i + "'" + (i === rv.i ? " selected" : "") + ">Ke nomor " + (i + 1) + (it.correct ? " ✔" : it.chosen ? " ✘" : " ○") + (it.flag ? " 🚩" : "") + "</option>"; }).join("") + "</select></div>";
     }
     h += "<div class='rn-row' style='margin-top:12px'><a class='btn s' href='#/run/result/" + esc(rv.sid) + "'>↩ Ringkasan hasil</a><a class='btn s' href='#/run'>🏠 Dashboard ASTERION RUN</a></div>";
     setRR(h); window.scrollTo(0, 0);
+    var jp = g("rvJump"); if (jp) jp.addEventListener("change", function () { rv.i = +jp.value; rvDraw(); });
   }
 
   async function histPage(k) {
