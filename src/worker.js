@@ -807,7 +807,7 @@ async function runApi(request, env, a, path, url, body, M) {
       const o = v.o, active = b01(body.active);
       if (o.img) { const miss = await runImgMissing(db, o.img.split(",")); if (miss.length) return runErr("Gambar tidak ditemukan di server (" + miss.length + "). Unggah ulang gambarnya."); }
       try {
-        const u = await db.prepare("UPDATE run_questions SET num = ?, q = ?, a = ?, b = ?, c = ?, d = ?, e = ?, ans = ?, expl = ?, diff = ?, img = ?, active = ?, verified = 1, hash = ?, updated = ? WHERE id = ?").bind(o.num, o.q, o.a, o.b, o.c, o.d, o.e, o.ans, o.expl, o.diff, o.img, active, await runHash(o), t, +body.id || 0).run();
+        const u = await db.prepare("UPDATE run_questions SET num = ?, q = ?, a = ?, b = ?, c = ?, d = ?, e = ?, ans = ?, expl = ?, expl_opt = ?, diff = ?, img = ?, active = ?, verified = 1, hash = ?, updated = ? WHERE id = ?").bind(o.num, o.q, o.a, o.b, o.c, o.d, o.e, o.ans, o.expl, o.ex, o.diff, o.img, active, await runHash(o), t, +body.id || 0).run();
         if (!u.meta.changes) return runErr("Soal tidak ditemukan.", 404);
       } catch { return runErr("Soal yang sama sudah ada di kategori ini.", 409); }
       await runAudit(db, a.u, "soal.ubah", "#" + body.id);
@@ -843,7 +843,7 @@ async function runApi(request, env, a, path, url, body, M) {
       const src = clip(body.src, 200);
       for (let i = 0; i < rows.length; i += 40) {
         const part = rows.slice(i, i + 40), st = [];
-        for (const r of part) st.push(db.prepare("INSERT OR IGNORE INTO run_questions (cat_id, num, q, a, b, c, d, e, ans, expl, diff, img, active, verified, src, hash, imported, updated) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?, ?, ?)").bind(+body.cat, r.o.num, r.o.q, r.o.a, r.o.b, r.o.c, r.o.d, r.o.e, r.o.ans, r.o.expl, r.o.diff, r.o.img, r.active, src, await runHash(r.o), t, t));
+        for (const r of part) st.push(db.prepare("INSERT OR IGNORE INTO run_questions (cat_id, num, q, a, b, c, d, e, ans, expl, expl_opt, diff, img, active, verified, src, hash, imported, updated) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?, ?, ?)").bind(+body.cat, r.o.num, r.o.q, r.o.a, r.o.b, r.o.c, r.o.d, r.o.e, r.o.ans, r.o.expl, r.o.ex, r.o.diff, r.o.img, r.active, src, await runHash(r.o), t, t));
         const res = await db.batch(st), fill = [];
         for (let k = 0; k < res.length; k++) {
           if (res[k].meta.changes) added++; else { dup++; if (part[k].o.img) fill.push(db.prepare("UPDATE run_questions SET img = ?, updated = ? WHERE cat_id = ? AND hash = ? AND (img IS NULL OR img = '')").bind(part[k].o.img, t, +body.cat, await runHash(part[k].o))); }
