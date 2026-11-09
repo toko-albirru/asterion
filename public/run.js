@@ -43,12 +43,12 @@
     ".rn-op,.rn-qo{flex-wrap:wrap}.rn-pf input.in{margin:6px 0;padding:9px;border-radius:10px;border:1px solid var(--line);background:rgba(10,6,28,.5);color:#fff;font:400 15px Inter,sans-serif}" +
     ".ex-hd{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:8px}.ex-hd .sp{flex:1}" +
     ".ex-nums{display:flex;flex-wrap:wrap;gap:5px;margin:8px 0}.ex-nums button{width:34px;height:34px;border-radius:10px;border:1px solid var(--line);background:rgba(255,255,255,.08);color:#fff;font-size:12px;cursor:pointer;font-family:inherit}" +
-    ".ex-nums .ans{background:rgba(74,222,128,.35);border-color:var(--ok)}.ex-nums .flg{box-shadow:inset 0 0 0 2px var(--warn);color:var(--warn);font-weight:700}.ex-nums .cur{outline:2px solid var(--gold)}" +
-    ".rn-qo.pick{border-color:var(--gold);background:rgba(245,192,74,.18)}.rn-flag{border-color:var(--warn);color:var(--warn)}";
+    ".ex-nums .ans{background:rgba(74,222,128,.35);border-color:var(--ok)}.ex-nums .flg{background:rgba(236,72,153,.55);border-color:#f472b6;color:#fff;font-weight:700;box-shadow:inset 0 0 0 2px #f472b6}.ex-nums .flg.ans{background:linear-gradient(135deg,rgba(74,222,128,.45),rgba(236,72,153,.6))}.ex-nums .cur{outline:2px solid var(--gold)}" +
+    ".rn-qo.pick{border-color:var(--gold);background:rgba(245,192,74,.18)}.rn-flag{border-color:#f472b6;color:#fff;background:rgba(236,72,153,.35)}.rn-flag:hover{border-color:#fb7fb8}";
   (function () { var s = document.createElement("style"); s.textContent = CSS; document.head.appendChild(s); })();
 
   function errBox(r) {
-    if (r && r.s === 503) return "<div class='pn g'><b>⚙️ Database belum dipasang</b><div class='hint'>ASTERION RUN memakai Cloudflare D1 (binding <code>DB</code>). Admin: ikuti <b>PANDUAN.md</b> (buat database, jalankan migrasi, pasang binding, deploy ulang). Fitur lain ASTERION tetap berjalan normal.</div></div>";
+    if (r && r.s === 503) return "<div class='pn g'><b>⚙️ Database belum dipasang</b><div class='hint'>GAME KUIS memakai Cloudflare D1 (binding <code>DB</code>). Admin: ikuti <b>PANDUAN.md</b> (buat database, jalankan migrasi, pasang binding, deploy ulang). Fitur lain ASTERION tetap berjalan normal.</div></div>";
     return "<div class='pn g empty'>" + esc((r && r.j && r.j.err) || "Gagal memuat. Coba lagi.") + "</div>";
   }
   function destroyGame() { if (RS.game) { try { RS.game.destroy(); } catch (e) {} RS.game = null; document.body.style.overflow = ""; } }
@@ -83,7 +83,7 @@
   async function home(k) {
     var r = await rapi("cats"); if (!alive(k)) return; if (!r.ok) return setRR(errBox(r));
     RS.cats = r.j.cats; RS.set = r.j.settings;
-    var h = "<div class='rn-hero g'><h1>ASTERION RUN</h1><div class='yr' style='color:var(--gold);letter-spacing:.35em;font-size:11px'>3D · EDUKASI · KEDOKTERAN</div><p>Berlari di lintasan lima jalur dan jawab soal dengan melewati gerbang <b>A–E</b> — atau pilih <b>Mode Soal</b> kalau mau langsung mengerjakan soal tanpa game. Skor: benar +1, salah/kosong 0. Waktu <b>per soal</b>. Setelah selesai, kamu mendapat pembahasan semua soal.</p>" +
+    var h = "<div class='rn-hero g'><h1>GAME KUIS</h1><div class='yr' style='color:var(--gold);letter-spacing:.35em;font-size:11px'>3D · EDUKASI · KEDOKTERAN</div><p>Berlari di lintasan lima jalur dan jawab soal dengan melewati gerbang <b>A–E</b> — atau pilih <b>Mode Soal</b> kalau mau langsung mengerjakan soal tanpa game. Skor: benar +1, salah/kosong 0. Waktu <b>per soal</b>. Setelah selesai, kamu mendapat pembahasan semua soal.</p>" +
       "<div class='rn-row'><a class='btn s' href='#/run/lb/global'>🌍 Leaderboard global</a><a class='btn s' href='#/run/hist'>🕘 Riwayat</a><a class='btn s' href='#/run/tutorial'>🎮 Tutorial</a>" + (S.admin ? "<a class='btn' href='#/run/admin'>⚙️ Panel Admin</a>" : "") + "</div></div>";
     RS.nick = r.j.nick; RS.prefs = r.j.prefs;
     h += nickBar() + prefsBar() + "<div class='sec'>PILIH KATEGORI</div>";
@@ -337,7 +337,7 @@
       "<div class='rn-st g'><b>" + pct(s.acc) + "</b><small>Akurasi</small></div><div class='rn-st g'><b>" + fdur(s.dur) + "</b><small>Durasi</small></div><div class='rn-st g'><b>" + (s.rank ? "#" + s.rank : "—") + "</b><small>Peringkat kategori</small></div></div>" +
       "<a class='card g' href='#/run/review/" + esc(s.id) + "'><span class='i'>📖</span><span class='t'>Lihat pembahasan " + s.total + " soal<small>Semua soal: benar, salah, dan tidak dijawab</small></span><span class='a'>›</span></a>" +
       "<a class='card g' href='#/run/lb/" + s.cat_id + "'><span class='i'>🏆</span><span class='t'>Leaderboard kategori</span><span class='a'>›</span></a>" +
-      "<a class='card g' href='#/run/play/" + s.cat_id + "'><span class='i'>🔁</span><span class='t'>Main lagi</span><span class='a'>›</span></a><a class='card g' href='#/run'><span class='i'>🏠</span><span class='t'>Kembali ke ASTERION RUN</span><span class='a'>›</span></a>";
+      "<a class='card g' href='#/run/play/" + s.cat_id + "'><span class='i'>🔁</span><span class='t'>Main lagi</span><span class='a'>›</span></a><a class='card g' href='#/run'><span class='i'>🏠</span><span class='t'>Kembali ke GAME KUIS</span><span class='a'>›</span></a>";
     setRR(h);
   }
   /* ======================= MODE SIMULASI UJIAN =======================
@@ -399,7 +399,7 @@
     var E = RS.exam; if (!E || RS.route !== E.k || !g("rr")) return examStop();
     var q = E.qs[E.cur]; if (!q) return;
     var chosen = E.ans[E.cur], fl = !!E.flag[E.cur], answered = Object.keys(E.ans).length, flagged = Object.keys(E.flag).length;
-    var h = "<div class='rn-qz'><div class='rn-hd'><b>Soal " + (E.cur + 1) + "/" + E.total + "</b><span class='tag'>✍️ " + answered + " dijawab</span>" + (flagged ? "<span class='tag' style='color:var(--warn)'>🚩 " + flagged + "</span>" : "") + "<span class='sp'></span><span class='rn-qt' id='exT'></span></div>" +
+    var h = "<div class='rn-qz'><div class='rn-hd'><b>Soal " + (E.cur + 1) + "/" + E.total + "</b><span class='tag'>✍️ " + answered + " dijawab</span>" + (flagged ? "<span class='tag' style='color:#f472b6'>🚩 " + flagged + "</span>" : "") + "<span class='sp'></span><span class='rn-qt' id='exT'></span></div>" +
       "<div class='rn-prog'><i style='width:" + (E.total ? answered / E.total * 100 : 0) + "%'></i></div>" +
       "<div class='pn g' style='padding:14px'>" + imgs(q) + "<div class='q'>" + esc(q.q) + "</div>";
     LET.forEach(function (L, i) { if (!q.o[L]) return; h += "<button class='rn-op rn-qo" + (chosen === L ? " pick" : "") + "' data-ex-pick='" + L + "'><b style='background:" + CSSC[i] + "'>" + L + "</b><span>" + esc(q.o[L]) + "</span></button>"; });
@@ -476,7 +476,7 @@
       h += "</div><div class='rn-row'><button class='btn s' data-ra='rv-p' " + (pos <= 0 ? "disabled style='opacity:.4'" : "") + ">‹ Sebelumnya</button><div class='hint' style='flex:.4;text-align:center;align-self:center;margin:0'>" + (rv.i + 1) + "/" + rv.items.length + "</div><button class='btn s' data-ra='rv-n' " + (pos >= L.length - 1 ? "disabled style='opacity:.4'" : "") + ">Berikutnya ›</button></div>" +
         "<div class='rn-row' style='margin-top:8px'><select id='rvJump' class='in' style='flex:1;min-width:150px;padding:9px;border-radius:10px;border:1px solid var(--line);background:rgba(10,6,28,.5);color:#fff;font:400 14px Inter,sans-serif'>" + L.map(function (i) { var it = rv.items[i]; return "<option value='" + i + "'" + (i === rv.i ? " selected" : "") + ">Ke nomor " + (i + 1) + (it.correct ? " ✔" : it.chosen ? " ✘" : " ○") + (it.flag ? " 🚩" : "") + "</option>"; }).join("") + "</select></div>";
     }
-    h += "<div class='rn-row' style='margin-top:12px'><a class='btn s' href='#/run/result/" + esc(rv.sid) + "'>↩ Ringkasan hasil</a><a class='btn s' href='#/run'>🏠 Dashboard ASTERION RUN</a></div>";
+    h += "<div class='rn-row' style='margin-top:12px'><a class='btn s' href='#/run/result/" + esc(rv.sid) + "'>↩ Ringkasan hasil</a><a class='btn s' href='#/run'>🏠 Dashboard GAME KUIS</a></div>";
     setRR(h); window.scrollTo(0, 0);
     var jp = g("rvJump"); if (jp) jp.addEventListener("change", function () { rv.i = +jp.value; rvDraw(); });
   }
@@ -532,7 +532,7 @@
   }
   async function adminHome(k) {
     var r = await rapi("admin/stats"); if (!alive(k)) return; if (!r.ok) return setRR(errBox(r)); var d = r.j;
-    var h = "<div class='sec'>PANEL ASTERION RUN</div>" + anav("") + "<div class='rn-grid'>" + [["Kategori", d.cats], ["Soal aktif", d.qActive], ["Soal nonaktif", d.qInactive], ["Mahasiswa bermain", d.players], ["Total permainan", d.games], ["Rata² akurasi", pct(d.acc)]].map(function (x) { return "<div class='rn-st g'><b>" + x[1] + "</b><small>" + x[0] + "</small></div>"; }).join("") + "</div>";
+    var h = "<div class='sec'>PANEL GAME KUIS</div>" + anav("") + "<div class='rn-grid'>" + [["Kategori", d.cats], ["Soal aktif", d.qActive], ["Soal nonaktif", d.qInactive], ["Mahasiswa bermain", d.players], ["Total permainan", d.games], ["Rata² akurasi", pct(d.acc)]].map(function (x) { return "<div class='rn-st g'><b>" + x[1] + "</b><small>" + x[0] + "</small></div>"; }).join("") + "</div>";
     h += "<div class='sec'>PER KATEGORI</div><div class='pn g rn-sc'><table class='rn-tb'><tr><th>Kategori</th><th>Soal</th><th>Main</th><th>Pemain</th><th>Akurasi</th></tr>" + d.byCat.map(function (c) { return "<tr><td><a href='#/run/admin/q/" + c.id + "' style='color:var(--gold)'>" + esc(c.name) + "</a>" + (c.active ? "" : " " + tag("off", "warn")) + "</td><td>" + c.aq + "/" + c.tq + "</td><td>" + c.games + "</td><td>" + c.players + "</td><td>" + (c.games ? pct(c.acc) : "—") + "</td></tr>"; }).join("") + "</table></div>";
     h += "<div class='sec'>AKTIVITAS TERBARU</div><div class='pn g rn-sc'>" + (d.recent.length ? "<table class='rn-tb'>" + d.recent.map(function (x) { return "<tr><td>" + fdate(x.fin) + "</td><td>" + esc(nmOf(x.u)) + "<small style='display:block;color:var(--mut)'>" + esc(x.u) + (x.nick ? " · “" + esc(x.nick) + "”" : "") + "</small></td><td>" + (x.mode === "quiz" ? "📝 " : "🎮 ") + esc(x.cat_name) + "</td><td><a href='#/run/review/" + esc(x.id) + "' style='color:var(--gold)'>" + x.score + "/" + x.total + "</a></td></tr>"; }).join("") + "</table>" : "<div class='empty'>Belum ada aktivitas.</div>") + "</div>";
     setRR(h);
