@@ -396,7 +396,11 @@ async function runDb(env) {
   if (!runReady) {
     await env.DB.batch(RUN_DDL.map((s) => env.DB.prepare(s)));
     const cols = (await env.DB.prepare("PRAGMA table_info(run_sessions)").all()).results || [];
-    if (!cols.some((c) => c.name === "mode")) await env.DB.prepare("ALTER TABLE run_sessions ADD COLUMN mode TEXT NOT NULL DEFAULT 'game'").run(); // game | quiz
+    if (!cols.some((c) => c.name === "mode")) await env.DB.prepare("ALTER TABLE run_sessions ADD COLUMN mode TEXT NOT NULL DEFAULT 'game'").run(); // game | quiz | exam
+    const acols = (await env.DB.prepare("PRAGMA table_info(run_answers)").all()).results || [];
+    if (!acols.some((c) => c.name === "flag")) await env.DB.prepare("ALTER TABLE run_answers ADD COLUMN flag INTEGER NOT NULL DEFAULT 0").run(); // tanda ragu (mode ujian)
+    const qcols = (await env.DB.prepare("PRAGMA table_info(run_questions)").all()).results || [];
+    if (!qcols.some((c) => c.name === "expl_opt")) await env.DB.prepare("ALTER TABLE run_questions ADD COLUMN expl_opt TEXT NOT NULL DEFAULT ''").run(); // pembahasan per pilihan (JSON A–E)
     runReady = true;
   }
   return env.DB;
