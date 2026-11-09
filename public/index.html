@@ -1300,7 +1300,7 @@ async function uiAct(b,a){
 /* ---------- pages ---------- */
 function pHome(){
   setTimeout(todayFill,0);
-  return "<div class='hero'><img class='mark' alt='' src='logo.webp'></div><div class='ttl'><h1>ASTERION</h1><div class='yr'>MMXXV</div></div>"+
+  return "<div class='hband'><div class='hero'><img class='mark' alt='' src='logo.webp'></div><div class='ttl'><h1>ASTERION</h1><div class='yr'>MMXXV</div></div></div>"+
   "<p class='hint' style='text-align:center;font-size:14px'>Halo, <b>"+esc(myName())+"</b> 👋<br>Seluruh rekaman, rangkuman, soal, dan materi kuliah ada disini, semangat belajarnya 🤩✨</p>"+
   "<div class='sec'>HARI INI</div><div id='today' class='pn g empty'>Memuat jadwal…</div><div id='next'></div>"+
   "<div class='sec'>MENU</div>"+cards(uiList("menu").filter(function(x){return !x.h}).map(function(x){return["#/"+x.id,x.i,x.n,x.s]}))+
