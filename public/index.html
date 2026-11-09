@@ -440,7 +440,7 @@ async function api(p,o){o=o||{};var r=await fetch("/api/"+p,{method:o.m||"GET",h
   if(r.status===401&&p!=="login"){logout();throw 0}var j=null;try{j=await r.json()}catch(e){}return{ok:r.ok,s:r.status,j:j}}
 function setUser(){var u=S.t.split(".")[0]||"";S.u=u;S.admin=u==="admin"}
 function logout(){clearInterval(BT);BT=0;localStorage.removeItem("tk");S.t="";S.data=null;location.hash="#/";show("gate");$("lp").value=""}
-function show(w){["gate","shell"].forEach(function(i){$(i).hidden=i!==w});if(w==="gate"){$("fLogin").hidden=false;$("fPw").hidden=true}}
+function show(w){["gate","shell"].forEach(function(i){$(i).hidden=i!==w});document.body.dataset.r=w==="gate"?"login":(location.hash.replace(/^#\/?/,"").split("/")[0]||"home");if(w==="gate"){$("fLogin").hidden=false;$("fPw").hidden=true}}
 $("out").onclick=logout;
 
 async function doLogin(){
