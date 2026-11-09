@@ -241,7 +241,10 @@
     for (var i = 0; i < L.length; i++) {
       var ln = L[i], t = ln.t, m, ocr = !!ln.ocr;
       if (mode === "front") {
-        if (cur && Q.length && (reHead.test(t) || (reHeadBare.test(t) && looksKeyTable(L, i + 1))) && (cur.cnt >= 2 || cur.inExp)) { mode = "back"; bq = null; continue; }
+        // kepala bagian kunci/pembahasan di AKHIR dokumen selalu pindah mode;
+        // kepala "PEMBAHASAN:" yang menyusul KUNCI: tetap milik soal berjalan (pembahasan per soal)
+        var hardHead = /^\s*(kunci\s*jawaban|kunci\s*(?:dan|&)\s*pembahasan|jawaban\s*(?:dan|&)\s*pembahasan|answer\s*key|daftar\s*jawaban)(\s+soal)?\s*:?\s*$/i.test(t);
+        if (cur && Q.length && (hardHead || ((reHead.test(t) || (reHeadBare.test(t) && looksKeyTable(L, i + 1))) && !cur.inExp)) && (cur.cnt >= 2 || cur.inExp)) { mode = "back"; bq = null; continue; }
         if ((m = reKey.exec(t) || reKey2.exec(t)) && cur && cur.cnt >= 2) { cur.textKey = m[1].toUpperCase(); cur.inExp = true; if (m[2]) cur.expl = cat(cur.expl, m[2]); own(cur, i); continue; }
         if ((m = reExp.exec(t)) && cur && cur.cnt >= 1) { cur.inExp = true; if (m[2]) cur.expl = cat(cur.expl, m[2]); own(cur, i); continue; }
         var qs = qStart(t);
