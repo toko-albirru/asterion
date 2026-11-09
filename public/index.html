@@ -1366,10 +1366,11 @@ async function schFill(tab,my){
   try{var r=await api("schedule?g="+tab.g),el=$("sch");if(!el||my!==S.jt)return;
     if(!r.ok){if(!el.dataset.ok)el.innerHTML="<div class='pn g empty'>"+esc((r.j&&r.j.err)||"Gagal memuat jadwal.")+"</div>";return}
     var iso=jkt(),y=window.scrollY;
-    el.dataset.ok=1;S.jData=r.j;S.jCat=tab.n;
-    el.innerHTML=r.j.length?r.j.map(function(d){return"<div class='day g"+(d.iso===iso?" today":"")+"'><h3>"+esc(d.d)+(d.iso===iso?"<span class='badge'>HARI INI</span>":"")+"</h3>"+
+    var rows=(r.j||[]).slice().sort(function(a,b){return String(a.iso||"").localeCompare(String(b.iso||""))});
+    el.dataset.ok=1;S.jData=rows;S.jCat=tab.n;
+    el.innerHTML=rows.length?rows.map(function(d){return"<div class='day g"+(d.iso===iso?" today":"")+"'><h3>"+esc(d.d)+(d.iso===iso?"<span class='badge'>HARI INI</span>":"")+"</h3>"+
       (d.items.length?d.items.map(slot).join(""):"<div class='empty'>Tidak ada kegiatan</div>")+d.notes.map(function(n){return"<div class='note'>📌 "+esc(n)+"</div>"}).join("")+"</div>"}).join(""):"<div class='pn g empty'>Jadwal kosong.</div>";
-    S.jList=el.innerHTML;if(CAL.m==="cal")calDraw(r.j,tab.n);
+    S.jList=el.innerHTML;if(CAL.m==="cal")calDraw(rows,tab.n);
     window.scrollTo(0,y)
   }catch(e){}}
 function jRefresh(){
