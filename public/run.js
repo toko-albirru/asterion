@@ -485,6 +485,7 @@
     var r = await rapi("history"); if (!alive(k)) return; if (!r.ok) return setRR(errBox(r));
     var h = "<div class='sec'>RIWAYAT PERMAINAN</div>";
     if (!r.j.rows.length) h += "<div class='pn g empty'>Belum ada permainan selesai.</div>";
+    if (r.j.rows.length) h += "<div class='rn-hist'>";
     r.j.rows.forEach(function (x) { h += "<a class='card g' href='#/run/result/" + esc(x.id) + "'><span class='i'>" + (x.mode === "quiz" ? "📝" : "🎮") + "</span><span class='t'>" + esc(x.cat_name) + "<small>" + fdate(x.fin) + " · ✔" + x.correct + " ✘" + x.wrong + " ○" + x.blank + " · " + fdur(x.dur) + (x.rank ? " · peringkat #" + x.rank : "") + "</small></span><span class='v' style='text-align:right;font-weight:700'>" + x.score + "/" + x.total + "<small style='display:block;color:var(--mut);font-weight:400'>" + pct(x.acc) + "</small></span></a>"; });
     setRR(h);
   }
