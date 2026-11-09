@@ -332,6 +332,117 @@
       "<a class='card g' href='#/run/play/" + s.cat_id + "'><span class='i'>🔁</span><span class='t'>Main lagi</span><span class='a'>›</span></a><a class='card g' href='#/run'><span class='i'>🏠</span><span class='t'>Kembali ke ASTERION RUN</span><span class='a'>›</span></a>";
     setRR(h);
   }
+  /* ======================= MODE SIMULASI UJIAN =======================
+     Saat memilih jawaban, kunci & pembahasan TIDAK muncul. Jawaban boleh diubah, dinilai hanya setelah "Kumpulkan".
+     Navigasi bebas: sebelumnya/berikutnya, lompat ke nomor mana pun, dan tandai soal (flag) untuk ditinjau. */
+  var imgs = function (q) { return String(q.img || "").split(",").filter(Boolean).map(function (id) { return "<img alt='Gambar soal' src='/api/run/img/" + encodeURIComponent(id) + "'>"; }).join(""); };
+  var optEx = function (ex, L) { return ex && ex[L] ? "<div class='rn-exo'>" + esc(ex[L]) + "</div>" : ""; };
+  function examStop() { var E = RS.exam; if (!E) return; clearInterval(E.tm); document.removeEventListener("keydown", E.kd); RS.exam = null; }
+  async function examFlow(cid, k) {
+    examStop(); quizStop(); destroyGame(); setRR("<div class='empty'>Menyiapkan simulasi ujian…</div>");
+    try {
+      await ensureSettings();
+      var r = await rapi("start", { m: "POST", b: { cat: cid, mode: "exam" } }); if (RS.route !== k) return;
+      if (!r.ok) { toast((r.j && r.j.err) || "Gagal memulai"); location.replace("#/run"); return; }
+      var p = r.j;
+      if (p.adjusted) toast("Soal aktif hanya " + p.total + " (target " + p.requested + "): sesi disesuaikan.");
+      if (p.cycle) toast("Bank soal kategori sudah habis dipakai — putaran baru dimulai.");
+      var c = (RS.cats || []).filter(function (x) { return x.id === cid; })[0];
+      var E = RS.exam = { k: k, cid: cid, sid: p.sid, name: c ? c.name : "", total: p.total, limit: p.limit || p.q_time * 1000 * p.total, qTime: p.q_time * 1000, dl: 0, cur: p.cur || 0, qs: p.qs || [], ans: {}, flag: {}, busy: false, sent: false, tm: 0, kd: null };
+      (p.qs || []).forEach(function (q) { if (q.chosen) E.ans[q.idx] = q.chosen; if (q.flag) E.flag[q.idx] = 1; });
+      E.kd = function (e) {
+        var X = RS.exam; if (!X || X !== E || X.sent || e.ctrlKey || e.metaKey || e.altKey) return;
+        var t = e.target && e.target.tagName; if (t === "INPUT" || t === "TEXTAREA" || t === "SELECT") return;
+        if (e.key === "ArrowLeft") { e.preventDefault(); return examGo(E.cur - 1); }
+        if (e.key === "ArrowRight") { e.preventDefault(); return examGo(E.cur + 1); }
+        if (e.key === "f" || e.key === "F") { e.preventDefault(); return examFlag(); }
+        var L = String(e.key || "").toUpperCase(); if (LET.indexOf(L) >= 0) { e.preventDefault(); examPick(L); }
+      };
+      document.addEventListener("keydown", E.kd);
+      if (p.status === "ready") { setRR(examIntro(E)); examBind(); return; }
+      E.dl = performance.now() + (p.remaining == null ? E.limit : p.remaining);
+      examDraw(); examTick();
+    } catch (e) { if (e !== 0) { toast(e.message || "Gagal memulai"); location.replace("#/run"); } }
+  }
+  function examIntro(E) {
+    return "<div class='rn-hero g'><h1 style='font-size:clamp(22px,6vw,30px)'>🎓 Simulasi Ujian</h1><p>" + (E.name ? "<b>" + esc(E.name) + "</b><br>" : "") +
+      "<b>" + E.total + " soal</b> · waktu total <b>" + fdur(E.limit) + "</b> (" + Math.round(E.qTime / 1000) + " dtk × " + E.total + " soal).<br>" +
+      "Jawaban <b>tidak langsung dinilai</b>: kunci dan pembahasan tidak muncul sampai kamu menekan <b>Kumpulkan</b>. Kamu tetap bisa kembali ke nomor sebelumnya, berikutnya, atau lompat ke nomor mana pun, dan menandai soal (🚩) untuk ditinjau.</p>" +
+      "<div class='rn-row'><button class='btn' id='exStart'>▶ Mulai ujian</button><a class='btn s' href='#/run'>Kembali</a></div></div>";
+  }
+  function examBind() { var b = g("exStart"); if (b) b.addEventListener("click", examBegin); }
+  async function examBegin() {
+    var E = RS.exam; if (!E) return; var b = g("exStart"); if (b) { b.disabled = true; b.textContent = "Memulai…"; }
+    var r = await rapi("begin", { m: "POST", b: { sid: E.sid } }); if (!RS.exam || RS.exam !== E) return;
+    if (!r.ok) { toast((r.j && r.j.err) || "Gagal memulai"); examBind(); return; }
+    E.dl = performance.now() + (r.j.remaining == null ? E.limit : r.j.remaining);
+    examDraw(); examTick();
+  }
+  function examTick() {
+    var E = RS.exam; if (!E) return; clearInterval(E.tm);
+    E.tm = setInterval(function () {
+      if (RS.exam !== E || RS.route !== E.k || !g("rr")) return examStop();
+      var rem = E.dl - performance.now(), el = g("exT");
+      if (el) { el.textContent = "⏱ " + fdur(Math.max(0, rem)); el.className = "rn-qt" + (rem < 60000 ? " low" : ""); }
+      if (rem <= 0 && !E.busy && !E.sent) { toast("Waktu habis — jawaban dikumpulkan otomatis."); examSubmit(true); }
+    }, 250);
+  }
+  function examDraw() {
+    var E = RS.exam; if (!E || RS.route !== E.k || !g("rr")) return examStop();
+    var q = E.qs[E.cur]; if (!q) return;
+    var chosen = E.ans[E.cur], fl = !!E.flag[E.cur], answered = Object.keys(E.ans).length, flagged = Object.keys(E.flag).length;
+    var h = "<div class='rn-qz'><div class='rn-hd'><b>Soal " + (E.cur + 1) + "/" + E.total + "</b><span class='tag'>✍️ " + answered + " dijawab</span>" + (flagged ? "<span class='tag' style='color:var(--warn)'>🚩 " + flagged + "</span>" : "") + "<span class='sp'></span><span class='rn-qt' id='exT'></span></div>" +
+      "<div class='rn-prog'><i style='width:" + (E.total ? answered / E.total * 100 : 0) + "%'></i></div>" +
+      "<div class='pn g' style='padding:14px'>" + imgs(q) + "<div class='q'>" + esc(q.q) + "</div>";
+    LET.forEach(function (L, i) { if (!q.o[L]) return; h += "<button class='rn-op rn-qo" + (chosen === L ? " pick" : "") + "' data-ex-pick='" + L + "'><b style='background:" + CSSC[i] + "'>" + L + "</b><span>" + esc(q.o[L]) + "</span></button>"; });
+    h += "</div>" +
+      "<div class='ex-nums'>" + E.qs.map(function (x, i) { return "<button class='" + (E.ans[i] ? "ans " : "") + (E.flag[i] ? "flg " : "") + (i === E.cur ? "cur" : "") + "' data-ex-go='" + i + "'>" + (i + 1) + "</button>"; }).join("") + "</div>" +
+      "<div class='rn-row'><button class='btn s' data-ex-nav='-1'" + (E.cur <= 0 ? " disabled" : "") + ">‹ Sebelumnya</button>" +
+      "<button class='btn s' data-ex-nav='1'" + (E.cur >= E.total - 1 ? " disabled" : "") + ">Berikutnya ›</button></div>" +
+      "<div class='rn-row'><select class='in' id='exJump' style='flex:1;min-width:140px;padding:9px;border-radius:10px;border:1px solid var(--line);background:rgba(10,6,28,.5);color:#fff;font:400 14px Inter,sans-serif'>" + E.qs.map(function (x, i) { return "<option value='" + i + "'" + (i === E.cur ? " selected" : "") + ">Ke nomor " + (i + 1) + (E.ans[i] ? " ✓" : "") + (E.flag[i] ? " 🚩" : "") + "</option>"; }).join("") + "</select>" +
+      "<button class='btn s " + (fl ? "rn-flag" : "") + "' data-ex-flag>" + (fl ? "🚩 Ditandai" : "🚩 Tandai soal") + "</button></div>" +
+      "<div class='rn-row'><button class='btn' data-ex-submit style='flex:1'>📤 Kumpulkan ujian</button><a class='btn s' href='#/run'>✕ Keluar</a></div>" +
+      "<div class='hint' style='text-align:center;margin-top:8px'>Jawaban tersimpan otomatis. Kunci & pembahasan hanya muncul setelah ujian dikumpulkan.</div></div>";
+    setRR(h); window.scrollTo(0, 0); examBindNav();
+    var rem = E.dl - performance.now(), el = g("exT"); if (el) { el.textContent = "⏱ " + fdur(Math.max(0, rem)); el.className = "rn-qt" + (rem < 60000 ? " low" : ""); }
+  }
+  function examBindNav() {
+    var rr = g("rr"); if (!rr) return;
+    [].forEach.call(rr.querySelectorAll("[data-ex-pick]"), function (b) { b.addEventListener("click", function () { examPick(b.dataset.exPick); }); });
+    [].forEach.call(rr.querySelectorAll("[data-ex-go]"), function (b) { b.addEventListener("click", function () { examGo(+b.dataset.exGo); }); });
+    [].forEach.call(rr.querySelectorAll("[data-ex-nav]"), function (b) { b.addEventListener("click", function () { examGo(RS.exam.cur + (+b.dataset.exNav)); }); });
+    var f = rr.querySelector("[data-ex-flag]"); if (f) f.addEventListener("click", examFlag);
+    var s = rr.querySelector("[data-ex-submit]"); if (s) s.addEventListener("click", function () { examSubmit(false); });
+    var j = g("exJump"); if (j) j.addEventListener("change", function () { examGo(+j.value); });
+  }
+  async function examPick(L) {
+    var E = RS.exam; if (!E || E.busy || E.sent) return;
+    var idx = E.cur; E.ans[idx] = L; examDraw();
+    E.busy = true;
+    var r; try { r = await rapi("exam/save", { m: "POST", b: { sid: E.sid, idx: idx, ans: L } }); } catch (e) { if (e === 0) return; r = null; }
+    E.busy = false;
+    if (!RS.exam || RS.exam !== E) return;
+    if (!r || !r.ok) toast((r && r.j && r.j.err) || "Gagal menyimpan jawaban");
+  }
+  async function examFlag() {
+    var E = RS.exam; if (!E || E.sent) return;
+    var idx = E.cur, on = E.flag[idx] ? 0 : 1; if (on) E.flag[idx] = 1; else delete E.flag[idx];
+    examDraw();
+    var r; try { r = await rapi("exam/save", { m: "POST", b: { sid: E.sid, idx: idx, flag: on } }); } catch (e) { return; }
+    if (!RS.exam || RS.exam !== E) return;
+    if (!r.ok) toast((r.j && r.j.err) || "Gagal menyimpan tanda");
+  }
+  function examGo(i) { var E = RS.exam; if (!E) return; i = Math.max(0, Math.min(E.total - 1, i)); if (i === E.cur) return; E.cur = i; examDraw(); }
+  async function examSubmit(auto) {
+    var E = RS.exam; if (!E || E.sent) return;
+    var blank = E.total - Object.keys(E.ans).length;
+    if (!auto && !confirm("Kumpulkan ujian sekarang?" + (blank ? "\n\nMasih ada " + blank + " soal belum dijawab." : "") + "\nJawaban tidak bisa diubah setelah dikumpulkan.")) return;
+    E.sent = true; E.busy = true; clearInterval(E.tm);
+    var r; try { r = await rapi("exam/submit", { m: "POST", b: { sid: E.sid } }); } catch (e) { if (e === 0) return; r = null; }
+    if (!r || !r.ok) { E.sent = false; E.busy = false; toast((r && r.j && r.j.err) || "Gagal mengumpulkan"); examTick(); return; }
+    var sid = E.sid; examStop(); location.replace("#/run/result/" + sid);
+  }
+
   async function reviewPage(sid, k) {
     var r = await rapi("result?sid=" + encodeURIComponent(sid)); if (!alive(k)) return; if (!r.ok) return setRR(errBox(r));
     RS.rv = { sid: sid, s: r.j.s, items: r.j.items, ex: r.j.explain, f: "all", i: 0 }; rvDraw();
