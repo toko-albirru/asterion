@@ -713,7 +713,7 @@
     }
     for (var i = 0; i < items.length; i += 50) {
       box.innerHTML = "<div class='hint'>Menyimpan… " + Math.min(i + 50, items.length) + "/" + items.length + "</div><div class='rn-prog'><i style='width:" + Math.round((i / items.length) * 100) + "%'></i></div>";
-      var chunk = items.slice(i, i + 50).map(function (x) { return { num: x.num, q: x.q, a: x.a, b: x.b, c: x.c, d: x.d, e: x.e, ans: x.ans, expl: x.expl, diff: x.diff, img: x.imgs && x.imgs.length ? x.imgs.map(function (m) { return m.id; }).filter(Boolean).join(",") : (x.img || ""), active: x.active !== false }; });
+      var chunk = items.slice(i, i + 50).map(function (x) { return { num: x.num, q: x.q, a: x.a, b: x.b, c: x.c, d: x.d, e: x.e, ans: x.ans, expl: x.expl, ex: x.ex || null, diff: x.diff, img: x.imgs && x.imgs.length ? x.imgs.map(function (m) { return m.id; }).filter(Boolean).join(",") : (x.img || ""), active: x.active !== false }; });
       var r = await rapi("admin/import", { m: "POST", b: { cat: im.cat, src: im.src, items: chunk } });
       if (!r.ok) { box.innerHTML = "<div class='err'>Gagal menyimpan: " + esc((r.j && r.j.err) || r.s) + ". Soal yang sudah tersimpan dilewati otomatis bila diulang.</div>"; return; }
       added += r.j.added; dup += r.j.dup; filled += r.j.filled || 0; (r.j.errors || []).forEach(function (e) { errs.push("soal ke-" + (i + e.i + 1) + ": " + e.err); });
