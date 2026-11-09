@@ -390,7 +390,7 @@ var Dlg=(function(){
   function settle(ok){
     if(!cur)return;var c=cur;cur=null;
     document.removeEventListener("keydown",onKey,true);
-    el.classList.remove("on");setTimeout(function(){el.hidden=true},170);
+    el.classList.remove("on");clearTimeout(hideT);hideT=setTimeout(function(){el.hidden=true},170);
     if(c.input)c.res(ok?el.querySelector("#dlgIn").value:null);
     else if(c.cancel)c.res(!!ok);
     else c.res(undefined);
