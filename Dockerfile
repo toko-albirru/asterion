@@ -1,27 +1,26 @@
-# ASTERION — Worker + D1 dijalankan lewat runtime lokal wrangler (workerd)
-# Debian 13 (trixie) dipakai karena paket OS di Debian 12 masih membawa
-# temuan keamanan high/critical yang belum ada perbaikannya.
-FROM node:24-trixie-slim
+# ASTERION — Worker dijalankan di Node 24 (Alpine) lewat adapter server.js.
+# Binding Cloudflare (D1/KV/R2) digantikan shim SQLite di server.js sehingga
+# image tidak memerlukan workerd maupun pustaka glibc Debian.
+FROM node:24-alpine
 
 ENV NODE_ENV=production \
     PORT=3000 \
-    CI=1 \
-    WRANGLER_SEND_METRICS=false \
-    WRANGLER_SEND_METRICS_TIMEOUT=0
+    DATA_DIR=/app/data
 
 WORKDIR /app
 
-# patch paket OS pada rilis yang didukung sebelum menjatuhkan hak akses
-RUN apt-get update \
- && apt-get -y upgrade \
- && rm -rf /var/lib/apt/lists/*
+# perbaiki paket OS Alpine sebelum menjatuhkan hak akses
+RUN apk upgrade --no-cache
 
+# tidak ada dependensi runtime (worker murni Web API), jadi tanpa npm install
 COPY package.json ./
-RUN npm install --no-audit --no-fund
+COPY server.js wrangler.jsonc ./
+COPY src ./src
+COPY public ./public
+COPY migrations ./migrations
 
-COPY . .
+RUN mkdir -p /app/data && chown -R node:node /app
+USER node
 
 EXPOSE 3000
-
-# migrasi D1 lokal (aman diulang, IF NOT EXISTS) lalu jalankan worker di 0.0.0.0
-CMD ["sh", "-c", "npx wrangler d1 migrations apply asterion-run --local --yes >/dev/null 2>&1 || echo 'migrasi D1 lokal dilewati'; exec npx wrangler dev --ip 0.0.0.0 --port ${PORT:-3000} --show-interactive-dev-session=false"]
+CMD ["node", "server.js"]
