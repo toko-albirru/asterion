@@ -1285,7 +1285,7 @@ function calDraw(data,cat){
   h+="</div>";
   var pre=y+"-"+p2(mo+1),days=(data||[]).filter(function(d){return d.iso&&d.iso.slice(0,7)===pre&&d.items&&d.items.length});
   h+=days.length?days.map(function(d){return "<div class='cald'><b>"+esc(d.d)+"</b>"+d.items.map(function(it){
-    return "<div class='cali'><div class='calt'>"+esc(it.j||"—")+"</div><div class='calb'><b>"+esc(it.k||"—")+"</b>"+(it.r?"<small>📍 "+esc(it.r)+"</small>":"")+(it.s?"<small>"+esc(it.s)+"</small>":"")+"</div><a class='btn s sm' target='_blank' rel='noopener' title='Tambah ke Google Calendar' href='"+calLink(d.iso,it,cat)+"'>📅</a></div>"}).join("")+"</div>"}).join(""):"<div class='empty' style='margin-top:10px'>Tidak ada jadwal pada bulan ini.</div>";
+    return "<div class='cali "+jcls(it.k)+"'><div class='calt'>"+esc(it.j||"—")+"</div><div class='calb'><b>"+esc(it.k||"—")+"</b>"+(it.r?"<small>📍 "+esc(it.r)+"</small>":"")+(it.s?"<small>"+esc(it.s)+"</small>":"")+"</div><a class='btn s sm' target='_blank' rel='noopener' title='Tambah ke Google Calendar' href='"+calLink(d.iso,it,cat)+"'>📅</a></div>"}).join("")+"</div>"}).join(""):"<div class='empty' style='margin-top:10px'>Tidak ada jadwal pada bulan ini.</div>";
   h+="<div class='rn-row' style='margin-top:10px'><button class='btn s' data-jv='ics'>⬇️ Unduh .ics (impor ke Google Calendar)</button><button class='btn s' data-jv='today'>📅 Bulan ini</button></div></div>";
   el.innerHTML=h;jvSync()}
 function icsEsc(s){return String(s==null?"":s).replace(/\\/g,"\\\\").replace(/;/g,"\\;").replace(/,/g,"\\,").replace(/\r?\n/g,"\\n")}
@@ -1293,7 +1293,7 @@ function calIcs(data,cat){
   var L=["BEGIN:VCALENDAR","VERSION:2.0","PRODID:-//ASTERION//Jadwal//ID","CALSCALE:GREGORIAN","METHOD:PUBLISH"];
   (data||[]).forEach(function(d){if(!d.iso||!d.items)return;d.items.forEach(function(it){
     var hm=calHm(it.j),det=[cat?"Jadwal: "+cat:"",it.d?"Dosen: "+it.d:"",it.s?"Status: "+it.s:""].filter(Boolean).join("\n");
-    L.push("BEGIN:VEVENT","UID:"+d.iso.replace(/-/g,"")+"-"+Math.random().toString(36).slice(2,9)+"@asterion","DTSTAMP:"+new Date().toISOString().replace(/[-:]/g,"").split(".")[0]+"Z","DTSTART:"+calUtc(d.iso,hm[0]),"DTEND:"+calUtc(d.iso,hm[1]),"SUMMARY:"+icsEsc((it.k||"Jadwal")+(cat?" · "+cat:"")),it.r?"LOCATION:"+icsEsc(it.r):"",det?"DESCRIPTION:"+icsEsc(det):"","END:VEVENT")})});
+    L.push("BEGIN:VEVENT","UID:"+d.iso.replace(/-/g,"")+"-"+Math.random().toString(36).slice(2,9)+"@asterion","DTSTAMP:"+new Date().toISOString().replace(/[-:]/g,"").split(".")[0]+"Z","DTSTART:"+calUtc(d.iso,hm[0]),"DTEND:"+calUtc(d.iso,hm[1]),(jhex(jcls(it.k))?"COLOR:"+jhex(jcls(it.k)):""),(jhex(jcls(it.k))?"X-APPLE-CALENDAR-COLOR:"+jhex(jcls(it.k)):""),"SUMMARY:"+icsEsc((jcls(it.k)?jlabel(jcls(it.k))+": ":"")+(it.k||"Jadwal")+(cat?" · "+cat:"")),it.r?"LOCATION:"+icsEsc(it.r):"",det?"DESCRIPTION:"+icsEsc(det):"","END:VEVENT")})});
   L.push("END:VCALENDAR");return L.filter(Boolean).join("\r\n")}
 function calIcsDl(){
   if(!S.jData)return toast("Muat jadwal dulu");
