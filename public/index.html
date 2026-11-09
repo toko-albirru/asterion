@@ -1263,8 +1263,8 @@ function pAtur(){
   var h="<div class='hint'>Atur urutan dengan ↑ ↓, ganti nama/ikon dengan ✎, sembunyikan dengan 👁 (item tersembunyi tampak redup). Perubahan langsung tersimpan.</div>";
   ["nav","menu","mp","cm","cr"].forEach(function(g){h+="<div class='sec'>"+UI_LBL[g]+"</div>"+uiList(g).map(function(x,i,a){return uiRow(g,x,i,a.length)}).join("")});
   return h+"<div class='pn g'><b>Kembalikan ke bawaan</b><div class='hint'>Mengembalikan semua nama, ikon, dan urutan di halaman ini.</div><button class='btn s' data-a='ui-reset'>Reset</button></div>"}
-function uiAct(b,a){
-  if(a==="ui-reset"){if(!confirm("Kembalikan semua pengaturan menu ke bawaan?"))return false;delete S.data.ui;return true}
+async function uiAct(b,a){
+  if(a==="ui-reset"){if(!(await Dlg.confirm("Kembalikan semua nama, ikon, dan urutan di halaman ini ke pengaturan bawaan?",{title:"Reset pengaturan menu",icon:"♻️",okText:"Ya, reset",danger:true})))return false;delete S.data.ui;return true}
   var g=b.dataset.g,i=+b.dataset.i,l=uiList(g);if(!l[i])return false;
   if(a==="ui-up"){if(i<1)return false;l.splice(i-1,0,l.splice(i,1)[0])}
   else if(a==="ui-dn"){if(i>l.length-2)return false;l.splice(i+1,0,l.splice(i,1)[0])}
@@ -1272,11 +1272,11 @@ function uiAct(b,a){
     if(!l[i].h&&l.filter(function(x){return !x.h}).length<=(g==="nav"?2:1)){toast(g==="nav"?"Minimal 2 item navbar harus tampil":"Minimal 1 menu harus tampil");return false}
     l[i].h=!l[i].h}
   else if(a==="ui-ren"){
-    var nn=prompt(g==="mp"?"Judul bagian (teks emas di atas daftar):":"Nama baru:",l[i].n);if(nn===null)return false;nn=nn.trim();if(!nn){toast("Nama tidak boleh kosong");return false}
+    var nn=await Dlg.prompt(g==="mp"?"Judul bagian (teks emas di atas daftar):":"Nama baru:",l[i].n,{title:"Ganti nama",icon:"✎",okText:"Lanjut"});if(nn===null)return false;nn=nn.trim();if(!nn){toast("Nama tidak boleh kosong");return false}
     l[i].n=nn.slice(0,40);
-    var ic=prompt("Ikon (emoji):",l[i].i);if(ic!==null&&ic.trim())l[i].i=ic.trim().slice(0,8);
-    if(l[i].c!==undefined){var cc=prompt("Nama kartu:",l[i].c);if(cc!==null&&cc.trim())l[i].c=cc.trim().slice(0,60)}
-    if(l[i].s!==undefined){var ss=prompt("Deskripsi singkat (boleh kosong):",l[i].s);if(ss!==null)l[i].s=ss.trim().slice(0,120)}}
+    var ic=await Dlg.prompt("Ikon (emoji):",l[i].i,{title:"Ikon",icon:"😀",okText:"Lanjut"});if(ic!==null&&ic.trim())l[i].i=ic.trim().slice(0,8);
+    if(l[i].c!==undefined){var cc=await Dlg.prompt("Nama kartu:",l[i].c,{title:"Nama kartu",icon:"🗂️",okText:"Lanjut"});if(cc!==null&&cc.trim())l[i].c=cc.trim().slice(0,60)}
+    if(l[i].s!==undefined){var ss=await Dlg.prompt("Deskripsi singkat (boleh kosong):",l[i].s,{title:"Deskripsi",icon:"📝",okText:"Lanjut"});if(ss!==null)l[i].s=ss.trim().slice(0,120)}}
   else return false;
   uiSet(g,l);return true}
 
@@ -1474,10 +1474,10 @@ function fxTick(){
   var rem=fxLeft(),t=$("fxT");if(t)t.textContent=fxFmt(rem);
   var e=$("fxEarly");if(e)e.textContent=rem>0?"⏹ Akhiri lebih awal":"✅ Selesai";
   if(rem<=0)fxEnd(0)}
-function fxWarn(m){alert("⚠️ "+m+"\n\nMode fokus masih berjalan.\nSisa waktu: "+fxFmt(fxLeft())+"\nKamu baru bisa keluar setelah waktu habis.")}
+function fxWarn(m){Dlg.alert(m+"\n\nMode fokus masih berjalan.\nSisa waktu: "+fxFmt(fxLeft())+"\nKamu baru bisa keluar setelah waktu habis.",{title:"Mode fokus aktif",icon:"🎯",okText:"Mengerti"})}
 function fxEnd(early){
   if(!FX.on)return;
-  if(early&&!confirm("Akhiri mode fokus sebelum waktunya? Progres fokusmu akan hilang."))return;
+  if(early&&!(await Dlg.confirm("Akhiri mode fokus sebelum waktunya? Progres fokusmu akan hilang.",{title:"Akhiri mode fokus",icon:"⏹",okText:"Akhiri",danger:true})))return;
   FX.on=false;clearInterval(FX.iv);FX.iv=0;
   document.body.classList.remove("fxon");
   var o=$("fxOver");if(o)o.hidden=true;var b=$("fxBtn");if(b)b.classList.remove("on");
@@ -1564,9 +1564,9 @@ $("main").addEventListener("click",async function(e){
   else if(a==="edit")dkForm((S.dk||[]).filter(function(x){return x.id===b.dataset.id})[0]);
   else if(a==="cancel")$("dkf").innerHTML="";
   else if(a==="del"){var dd2=(S.dk||[]).filter(function(x){return x.id===b.dataset.id})[0];if(!dd2)return;
-    if(S.admin){if(!confirm("Hapus "+dd2.n+" dari daftar dokter? Tidak bisa dibatalkan."))return;b.disabled=true;
+    if(S.admin){if(!(await Dlg.confirm("Hapus "+dd2.n+" dari daftar dokter? Tidak bisa dibatalkan.",{title:"Hapus dokter",icon:"🗑️",okText:"Hapus",danger:true})))return;b.disabled=true;
       var rd=await api("dokter/kelola",{m:"POST",b:{aksi:"hapus",id:dd2.id}});if(rd.ok){toast("Dihapus ✓");dkInit()}else{b.disabled=false;toast((rd.j&&rd.j.err)||"Gagal menghapus")}}
-    else{var why=prompt("Usul hapus: "+dd2.n+"\nAlasan (opsional):","");if(why===null)return;b.disabled=true;
+    else{var why=await Dlg.prompt("Usul hapus: "+dd2.n+"\nAlasan (opsional):","",{title:"Usul hapus",icon:"📨",okText:"Kirim"});if(why===null)return;b.disabled=true;
       var ru=await api("dokter/ajukan",{m:"POST",b:{tipe:"hapus",id:dd2.id,n:dd2.n,h1:dd2.h1,h2:dd2.h2,cat:why.trim()}});b.disabled=false;toast(ru.ok?"Usul hapus terkirim, akan dicek admin ✓":((ru.j&&ru.j.err)||"Gagal mengirim"))}}
   else if(a==="send"){
     var n=$("fn").value.trim(),h1=ph($("f1").value),h2=ph($("f2").value),id=$("dkf").dataset.id;
@@ -1698,9 +1698,9 @@ $("main").addEventListener("click",async function(e){
   else if(a==="add"){var n=$("aN").value.trim(),u=$("aU").value.trim(),hh=$("aH")?$("aH").value.trim():"";
     if(!n||(!u&&!hh)){toast("Isi judul dan URL/HTML");return}
     var o={n:n};if(u){o.u=/^https?:\/\//i.test(u)?u:"https://"+u}else if(hh.length>6e4){var rr=await api("html",{m:"POST",b:{h:hh}});if(!rr.ok){toast("Gagal menyimpan HTML");return}o.hid=rr.j.id}else o.h=hh;arr.unshift(o)}
-  else if(a==="ren"){var nn=prompt("Nama baru:",arr[i].n);if(!nn||!nn.trim())return;arr[i].n=nn.trim().slice(0,200)}
+  else if(a==="ren"){var nn=await Dlg.prompt("Nama baru:",arr[i].n,{title:"Ganti nama",icon:"✎",okText:"Simpan"});if(nn===null||!nn.trim())return;arr[i].n=nn.trim().slice(0,200)}
   else if(a==="addtop"){var nm=$("tN").value.trim();if(!nm){toast("Isi nama dulu");return}arr.unshift(b.dataset.k==="materi"?{n:nm,lab:[],all:[]}:{n:nm,kl:[],blok:[],lab:[]})}
-  else if(a.indexOf("ui-")===0){if(!uiAct(b,a))return}
+  else if(a.indexOf("ui-")===0){if(!(await uiAct(b,a)))return}
   else if(a==="reset"){var r=await api("reset",{m:"POST",b:{u:$("rU").value}});toast(r.ok?"Password direset ✓":"Username tidak valid");return}
   else if(a==="sheet"){var sid=$("sId").value.trim();if(!sid){toast("Isi ID spreadsheet");return}var tl=$("sTabs").value.split("\n").map(function(l){var p=l.split("|");return{n:(p[0]||"").trim(),g:(p[1]||"").trim()}}).filter(function(t){return t.n&&/^\d+$/.test(t.g)});
     S.data.sheet={id:sid,tabs:tl.length?tl:S.data.sheet.tabs};S.tabs=null}
