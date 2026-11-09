@@ -208,7 +208,9 @@
   }
 
   /* ---------- parser struktur soal ---------- */
-  function newQ(n, t, line, i) { return { num: n, q: t, o: {}, ol: {}, ql: line ? [line] : [], cnt: 0, last: "", inExp: false, expl: "", textKey: "", i0: i, i1: i }; }
+  function newQ(n, t, line, i) { return { num: n, q: t, o: {}, ol: {}, ql: line ? [line] : [], cnt: 0, last: "", inExp: false, expl: "", ex: {}, exL: "", textKey: "", i0: i, i1: i }; }
+  // pembahasan per pilihan: baris "A. …" / "A) …" di dalam blok pembahasan
+  var reOptExp = /^\s*\(?([A-Ea-e])\)?\s*[.):\-–]\s+(\S.*)$/;
   function nextMissing(o) { for (var k = 0; k < 5; k++) if (!(LET[k] in o)) return LET[k]; return ""; }
   function lookA(L, i) { for (var k = i + 1; k < Math.min(L.length, i + 13); k++) { var m = optStart(L[k].t, !!L[k].ocr, "A"); if (m && m.L === "A") return true; } return false; }
   function looksKeyTable(L, i) { return i < L.length && /^\s*\d{1,4}\s*[.):\-–=]?\s*\(?[A-Ea-e]\)?(?![A-Za-z0-9])/.test(L[i].t); }
@@ -259,7 +261,12 @@
         }
         if (!cur) continue; // teks sebelum soal pertama (judul/petunjuk)
         own(cur, i);
-        if (cur.inExp) cur.expl = cat(cur.expl, t);
+        if (cur.inExp) { // pembahasan per pilihan (A–E) dipisah dari pembahasan umum
+          var xm = reOptExp.exec(t);
+          if (xm) { cur.exL = xm[1].toUpperCase(); cur.ex[cur.exL] = cat(cur.ex[cur.exL] || "", xm[2]); }
+          else if (cur.exL) cur.ex[cur.exL] = cat(cur.ex[cur.exL] || "", t);
+          else cur.expl = cat(cur.expl, t);
+        }
         else if (cur.last) { cur.o[cur.last] = cat(cur.o[cur.last], t); cur.ol[cur.last].push(ln); }
         else { cur.q = cat(cur.q, t); cur.ql.push(ln); }
       } else { // bagian kunci/pembahasan di akhir dokumen
