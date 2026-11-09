@@ -653,7 +653,7 @@
     P({ stage: "Menyusun soal, kunci & gambar…", pct: 0.97 });
     var Q = parse(all), un = assignFigs(Q, all, figsAll, 2);
     var items = Q.map(function (q) {
-      var d = decide(q), o = { num: q.num, q: q.q.trim(), expl: (q.expl || "").trim(), diff: 2, ans: d.ans, via: d.via, active: true, img: "", imgs: q.imgs || [], ocr: !!(q.ql[0] && q.ql[0].ocr),
+      var d = decide(q), o = { num: q.num, q: q.q.trim(), expl: (q.expl || "").trim(), ex: Object.keys(q.ex || {}).length ? q.ex : null, diff: 2, ans: d.ans, via: d.via, active: true, img: "", imgs: q.imgs || [], ocr: !!(q.ql[0] && q.ql[0].ocr),
         page: (q.ql[0] || (q.ol.A || [])[0] || {}).p || 0 };
       LET.forEach(function (L) { o[L.toLowerCase()] = (q.o[L] || "").trim(); });
       var ql = quality(o); o.status = worst(d.status, ql.status); o.notes = d.notes.concat(ql.notes);
