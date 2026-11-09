@@ -396,7 +396,7 @@ var Dlg=(function(){
     else c.res(undefined);
   }
   function open(o){
-    o=o||{};build();
+    o=o||{};if(!el)build();clearTimeout(hideT);el.hidden=false;
     if(cur){var p=cur;cur=null;p.res(p.input?null:(p.cancel?false:undefined))}
     return new Promise(function(res){
       cur={res:res,input:!!o.input,cancel:!!o.cancel};
