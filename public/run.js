@@ -314,7 +314,7 @@
   }
   async function quizReset() { // ulang dari awal: sesi sekarang dibatalkan (skor tidak dihitung), soal diacak ulang
     var Q = RS.quiz; if (!Q || Q.paused || Q.nexting) return;
-    if (!confirm("Reset ujian? Semua jawaban di sesi ini dihapus dan kamu mulai lagi dari soal 1 (skor sesi ini tidak dihitung).")) return;
+    if (!(await Dlg.confirm("Reset ujian? Semua jawaban di sesi ini dihapus dan kamu mulai lagi dari soal 1 (skor sesi ini tidak dihitung).", { title: "Reset ujian", icon: "♻️", okText: "Ya, reset", danger: true }))) return;
     var sid = Q.sid, cid = Q.cid, k = Q.k; Q.paused = true; // kunci layar selama proses reset
     var r; try { r = await rapi("abandon", { m: "POST", b: { sid: sid } }); } catch (e) { if (e === 0) return; r = null; }
     if (!RS.quiz || RS.quiz !== Q) return;
@@ -323,7 +323,7 @@
   }
   async function quizExit() {
     var Q = RS.quiz; if (!Q) return;
-    if (!confirm("Keluar dari sesi? Kamu bisa melanjutkannya nanti dari menu kategori." + (RS.set && RS.set.pause ? "" : " Perhatian: waktu soal yang sedang berjalan tetap berjalan."))) return;
+    if (!(await Dlg.confirm("Keluar dari sesi? Kamu bisa melanjutkannya nanti dari menu kategori." + (RS.set && RS.set.pause ? "" : "\n\nPerhatian: waktu soal yang sedang berjalan tetap berjalan."), { title: "Keluar sesi", icon: "🚪", okText: "Keluar", danger: true }))) return;
     if (RS.set && RS.set.pause && !Q.paused && !Q.busy) { try { await rapi("pause", { m: "POST", b: { sid: Q.sid } }); } catch (e) {} }
     quizStop(); location.hash = "#/run";
   }
@@ -444,7 +444,7 @@
   async function examSubmit(auto) {
     var E = RS.exam; if (!E || E.sent) return;
     var blank = E.total - Object.keys(E.ans).length;
-    if (!auto && !confirm("Kumpulkan ujian sekarang?" + (blank ? "\n\nMasih ada " + blank + " soal belum dijawab." : "") + "\nJawaban tidak bisa diubah setelah dikumpulkan.")) return;
+    if (!auto && !(await Dlg.confirm("Kumpulkan ujian sekarang?" + (blank ? "\n\nMasih ada " + blank + " soal belum dijawab." : "") + "\nJawaban tidak bisa diubah setelah dikumpulkan.", { title: "Kumpulkan ujian", icon: "📤", okText: "Kumpulkan", danger: true }))) return;
     E.sent = true; E.busy = true; clearInterval(E.tm);
     var r; try { r = await rapi("exam/submit", { m: "POST", b: { sid: E.sid } }); } catch (e) { if (e === 0) return; r = null; }
     if (!r || !r.ok) { E.sent = false; E.busy = false; toast((r && r.j && r.j.err) || "Gagal mengumpulkan"); examTick(); return; }
@@ -701,7 +701,7 @@
   }
   async function pvSave() {
     var im = RS.imp, items = im.items.filter(function (x) { return x.active !== false; }), warn = items.filter(function (x) { return x.status === "warn"; }).length;
-    if (warn && !confirm(warn + " soal berstatus KUNING (perlu pemeriksaan). Dengan menyimpan, kamu menyatakan sudah memeriksanya. Lanjutkan?")) return;
+    if (warn && !(await Dlg.confirm(warn + " soal berstatus KUNING (perlu pemeriksaan). Dengan menyimpan, kamu menyatakan sudah memeriksanya. Lanjutkan?", { title: "Simpan soal?", icon: "⚠️", okText: "Lanjutkan" }))) return;
     var box = g("rnSv"), added = 0, dup = 0, filled = 0, errs = [], pend = [], seen = {};
     items.forEach(function (x) { (x.imgs || []).forEach(function (m) { if (!m.id && m.data) pend.push(m); }); });
     for (var u = 0; u < pend.length; u++) { // gambar disimpan permanen di server lebih dulu (ID dari isi → aman diulang)
@@ -782,12 +782,12 @@
     var a = b.dataset.ra, id = +b.dataset.id, i = +b.dataset.i, v = b.dataset.v2, rv = RS.rv, im = RS.imp;
     try {
       if (a === "cat-reset") { // ulang dari awal: batalkan sesi yang sedang berjalan di kategori ini (mode game maupun mode soal)
-        if (b.disabled) return; if (!confirm("Reset ujian di kategori ini? Progres sesi yang sedang berjalan dihapus dan kamu bisa mulai lagi dari soal 1 (skor sesi itu tidak dihitung).")) return;
+        if (b.disabled) return; if (!(await Dlg.confirm("Reset ujian di kategori ini? Progres sesi yang sedang berjalan dihapus dan kamu bisa mulai lagi dari soal 1 (skor sesi itu tidak dihitung).", { title: "Reset sesi", icon: "♻️", okText: "Ya, reset", danger: true }))) return;
         b.disabled = true; var rs0 = await rapi("start", { m: "POST", b: { cat: +b.dataset.cid, mode: b.dataset.mode } });
         var ok0 = rs0.ok && rs0.j && rs0.j.sid && rs0.j.status !== "done"; if (ok0) { var ra0 = await rapi("abandon", { m: "POST", b: { sid: rs0.j.sid } }); ok0 = ra0.ok; }
         toast(ok0 ? "Sesi direset ✓ — mulai lagi dari soal 1" : ((rs0.j && rs0.j.err) || "Gagal mereset. Coba lagi.")); RS.cats = null; route(); return;
       }
-      if (a === "go-mode") { if (b.dataset.warn && !confirm(b.dataset.warn)) return; location.hash = b.dataset.href; }
+      if (a === "go-mode") { if (b.dataset.warn && !(await Dlg.confirm(b.dataset.warn, { title: "Perhatian", icon: "⚠️", okText: "Lanjutkan" }))) return; location.hash = b.dataset.href; }
       else if (a === "nick-edit") { g("rnNk").className = "pn g rn-nk"; g("rnNk").innerHTML = nickInner(true); var ni = g("rnNkI"); if (ni) { ni.focus(); ni.select(); } }
       else if (a === "nick-cancel") g("rnNk").innerHTML = nickInner(false);
       else if (a === "nick-save") {
@@ -796,7 +796,7 @@
         if (!rn.ok) return toast((rn.j && rn.j.err) || "Gagal menyimpan nama");
         RS.nick = rn.j.nick; toast("Nama tersimpan ✓"); route(); // muat ulang halaman: leaderboard & hasil langsung memakai nama baru
       }
-      else if (a === "nick-reset") { if (!confirm("Hapus nama samaran " + nmOf(b.dataset.u) + "?")) return; var rz = await rapi("admin/nick", { m: "POST", b: { u: b.dataset.u, nick: "" } }); toast(rz.ok ? "Nama dihapus" : "Gagal"); route(); }
+      else if (a === "nick-reset") { if (!(await Dlg.confirm("Hapus nama samaran " + nmOf(b.dataset.u) + "?", { title: "Hapus nama samaran", icon: "🏷️", okText: "Hapus", danger: true }))) return; var rz = await rapi("admin/nick", { m: "POST", b: { u: b.dataset.u, nick: "" } }); toast(rz.ok ? "Nama dihapus" : "Gagal"); route(); }
       else if (a === "qz-begin") quizBegin();
       else if (a === "qz-ans") quizAnswer(b.dataset.v2);
       else if (a === "qz-next") quizNext();
@@ -813,7 +813,7 @@
         var body = { id: id || undefined, name: g("cn" + id).value, descr: g("cd" + id).value, per_session: +g("cp" + id).value, q_time: +g("ct" + id).value, show_explain: g("cx" + id).checked, active: g("ca" + id).checked };
         var r = await rapi("admin/cat", { m: "POST", b: body }); if (!r.ok) return toast((r.j && r.j.err) || "Gagal"); toast("Tersimpan ✓"); RS.cats = null; route();
       } else if (a === "cat-mv") { var rm = await rapi("admin/cat/move", { m: "POST", b: { id: id, dir: +v } }); if (!rm.ok) toast((rm.j && rm.j.err) || "Gagal"); RS.cats = null; route();
-      } else if (a === "cat-del") { if (!confirm("Hapus kategori beserta seluruh bank soalnya? Riwayat permainan tetap tersimpan.")) return; var r2 = await rapi("admin/cat/del", { m: "POST", b: { id: id } }); toast(r2.ok ? "Kategori dihapus" : "Gagal"); RS.cats = null; route(); }
+      } else if (a === "cat-del") { if (!(await Dlg.confirm("Hapus kategori beserta seluruh bank soalnya? Riwayat permainan tetap tersimpan.", { title: "Hapus kategori", icon: "🗑️", okText: "Hapus", danger: true }))) return; var r2 = await rapi("admin/cat/del", { m: "POST", b: { id: id } }); toast(r2.ok ? "Kategori dihapus" : "Gagal"); RS.cats = null; route(); }
       else if (a === "q-find") { RS.qf.s = g("rnQs").value.trim(); RS.qf.act = g("rnQa").value; RS.qf.pg = 0; route(); }
       else if (a === "q-pg") { RS.qf.pg = Math.max(0, RS.qf.pg + +v); route(); }
       else if (a === "q-edit") { var row = g("qr" + id), it = RS.qrows[i]; row.innerHTML = qEd(it, "data-id='" + id + "'") + "<div class='rn-row'><button class='btn sm' data-ra='q-save' data-id='" + id + "'>💾 Simpan</button><button class='btn s sm' data-ra='q-cancel'>Batal</button></div>"; row.dataset.act = it.active; }
@@ -827,9 +827,9 @@
         var txt = v === "csv" ? "﻿" + AsterionPdf.toCsv(r4.j.rows) : JSON.stringify(r4.j.rows, null, 1), bl = new Blob([txt], { type: v === "csv" ? "text/csv" : "application/json" }), u = URL.createObjectURL(bl), l = document.createElement("a"); l.href = u; l.download = "bank-soal-" + cid + "." + v; l.click(); setTimeout(function () { URL.revokeObjectURL(u); }, 3000);
       }
       else if (a === "pv-f") { im.f = v; pvDraw(); }
-      else if (a === "pv-del") { if (confirm("Hapus soal ini dari hasil ekstraksi?")) { im.items.splice(i, 1); pvDraw(); } }
+      else if (a === "pv-del") { if (await Dlg.confirm("Hapus soal ini dari hasil ekstraksi?", { title: "Hapus soal", icon: "🗑️", okText: "Hapus", danger: true })) { im.items.splice(i, 1); pvDraw(); } }
       else if (a === "pv-act") { im.items[i].active = im.items[i].active === false; pvDraw(); }
-      else if (a === "pv-clear") { if (confirm("Buang hasil ekstraksi ini?")) { RS.imp = null; g("rnPv").innerHTML = ""; } }
+      else if (a === "pv-clear") { if (await Dlg.confirm("Buang hasil ekstraksi ini?", { title: "Buang hasil", icon: "🗑️", okText: "Buang", danger: true })) { RS.imp = null; g("rnPv").innerHTML = ""; } }
       else if (a === "pv-edit") { var body2 = g("pvb" + i), it2 = im.items[i]; body2.innerHTML = qEd(it2, "data-i='" + i + "'") + "<div class='rn-row'><button class='btn sm' data-ra='pv-ok' data-i='" + i + "'>✔ Selesai edit</button><button class='btn s sm' data-ra='pv-cancel'>Batal</button></div>"; }
       else if (a === "pv-cancel") pvDraw();
       else if (a === "pv-ok") { var o2 = readEd(g("pvb" + i)), it3 = im.items[i]; Object.assign(it3, { q: o2.q, a: o2.a, b: o2.b, c: o2.c, d: o2.d, e: o2.e, expl: o2.expl, diff: o2.diff, num: o2.num, ans: o2.ans || it3.ans || null }); (it3.imgs || []).forEach(function (m) { m.conf = "ok"; }); it3.via = "admin"; recount(it3); pvDraw(); }
