@@ -241,6 +241,71 @@ select.in option{background:#241a3f;color:#fff}
 .cali[class*="j-"]{box-shadow:inset 3px 0 0 var(--jc);padding-left:9px;border-radius:0 8px 8px 0}
 .jtag{display:inline-block;font:700 9px Inter,sans-serif;letter-spacing:.06em;text-transform:uppercase;padding:2px 7px;border-radius:999px;color:#fff;background:var(--jc);margin-right:6px;vertical-align:middle}
 :root[data-theme="light"] .jtag{color:#fff}
+/* ---------- KONTRAS TEMA TERANG: permukaan gelap dibuat bertulisan terang ---------- */
+:root[data-theme="light"] .ib{color:#241a3f}
+:root[data-theme="light"] .kg button{background:rgba(48,28,88,.08);color:#241a3f;border-color:rgba(48,28,88,.22)}
+:root[data-theme="light"] .kg button.on{background:linear-gradient(135deg,rgba(245,192,74,.55),rgba(245,192,74,.25));border-color:rgba(154,106,18,.75);color:#3a2a66}
+:root[data-theme="light"] .ctl button{background:rgba(48,28,88,.08);color:#241a3f;border-color:rgba(48,28,88,.22)}
+:root[data-theme="light"] .ctl .x{background:rgba(179,38,30,.14);color:#b3261e;border-color:rgba(179,38,30,.32)}
+:root[data-theme="light"] .vl{color:#241a3f}
+:root[data-theme="light"] .vl .n{background:rgba(36,26,63,.88);color:#ffd77a}
+:root[data-theme="light"] .vl small{color:#4b3f66}
+:root[data-theme="light"] .dz{color:#4b3f66;border-color:rgba(154,106,18,.55)}
+:root[data-theme="light"] .dz small{color:#4b3f66}
+:root[data-theme="light"] .dz.on{background:rgba(154,106,18,.14);color:#241a3f}
+:root[data-theme="light"] .stt.on{color:#0d6b39;background:rgba(18,122,62,.16)}
+:root[data-theme="light"] .stt.ok{color:#0d5c2e;background:rgba(18,122,62,.14)}
+:root[data-theme="light"] .stt.bk{color:#7a4d05;background:rgba(150,98,10,.16)}
+:root[data-theme="light"] select.in option{background:#fff;color:#241a3f}
+:root[data-theme="light"] .badge{color:#3a2a66}
+:root[data-theme="light"] .rn-bar{background:rgba(255,255,255,.94);color:#241a3f;box-shadow:0 6px 20px rgba(60,40,110,.14)}
+:root[data-theme="light"] .rn-prog{background:rgba(48,28,88,.12)}
+:root[data-theme="light"] .rn-tb th,:root[data-theme="light"] .rn-tb td{border-bottom-color:rgba(48,28,88,.14)}
+:root[data-theme="light"] .rn-big .sc{background:linear-gradient(180deg,#3a2a66,var(--gold));-webkit-background-clip:text;background-clip:text;color:transparent}
+:root[data-theme="light"] .rn-ed textarea,:root[data-theme="light"] .rn-ed input[type=text],:root[data-theme="light"] .rn-ed select,:root[data-theme="light"] .rn-pf input.in{background:#fff;color:#241a3f;border-color:rgba(48,28,88,.22)}
+:root[data-theme="light"] .rn-nums .ok,:root[data-theme="light"] .ex-nums .ans{color:#0d5c2e;font-weight:700}
+:root[data-theme="light"] .rn-nums .no{color:#8c1d18;font-weight:700}
+:root[data-theme="light"] .rn-nums .bl{color:#3b4452;font-weight:700}
+:root[data-theme="light"] .rn-flag{background:rgba(236,72,153,.18);border-color:#db2777;color:#7a1140}
+:root[data-theme="light"] .ex-nums .flg{background:rgba(236,72,153,.3);border-color:#db2777;color:#7a1140}
+:root[data-theme="light"] .ex-nums .flg.ans{background:linear-gradient(135deg,rgba(74,222,128,.4),rgba(236,72,153,.32));color:#123d24}
+:root[data-theme="light"] .rn-lb .r{color:#8a5d0c}
+:root[data-theme="light"] .rn-me{color:#7a4d05}
+:root[data-theme="light"] .rn-it .o{color:#241a3f}
+/* permukaan yang selalu gelap (pembaca PDF, panel catatan, overlay) → teks selalu terang */
+.pv-m .bar{color:#fff}
+.pv-m .bar .tl span{color:#d7cdf2}
+.pv-m .bar .fsx .fc{color:#d7cdf2}
+.pnote{color:#ffd27a}
+.pst{color:#d7cdf2}
+.pp .nb{color:#efe9ff}
+.pp .nb.no{color:#b9aee0}
+.pp .ct,.pp .nh2{color:#b9aee0}
+/* ---------- DIALOG & TOAST KUSTOM ---------- */
+#dlg{position:fixed;inset:0;z-index:200;display:flex;align-items:center;justify-content:center;padding:20px;background:rgba(12,8,26,.62);-webkit-backdrop-filter:blur(10px);backdrop-filter:blur(10px);opacity:0;pointer-events:none;transition:opacity .18s}
+#dlg.on{opacity:1;pointer-events:auto}
+#dlg .dx{width:min(420px,100%);border-radius:22px;padding:20px 20px 16px;background:linear-gradient(160deg,rgba(40,29,70,.99),rgba(23,17,42,.99));border:1px solid rgba(245,192,74,.34);box-shadow:0 24px 60px rgba(4,2,14,.6);transform:translateY(12px) scale(.97);transition:transform .2s cubic-bezier(.2,.9,.3,1.15)}
+#dlg.on .dx{transform:none}
+#dlg .di{width:44px;height:44px;border-radius:14px;display:grid;place-items:center;font-size:21px;margin-bottom:12px;background:rgba(245,192,74,.16);border:1px solid rgba(245,192,74,.4)}
+#dlg .dt{margin:0 0 6px;font:700 16px Inter,sans-serif;color:#fff;letter-spacing:.01em}
+#dlg .dm{margin:0;font-size:13.5px;line-height:1.6;color:#d9cdf5;white-space:pre-line}
+#dlg input.din{width:100%;margin-top:12px;padding:11px 12px;border-radius:12px;border:1px solid rgba(255,255,255,.2);background:rgba(10,6,28,.6);color:#fff;font:400 14px Inter,sans-serif;outline:none}
+#dlg input.din:focus{border-color:var(--gold)}
+#dlg .db{display:flex;gap:8px;margin-top:16px}
+#dlg .db button{flex:1;padding:11px 14px;border-radius:12px;border:1px solid rgba(255,255,255,.18);background:rgba(255,255,255,.08);color:#fff;font:600 13.5px Inter,sans-serif;cursor:pointer;transition:transform .12s,filter .2s}
+#dlg .db button:active{transform:scale(.97)}
+#dlg .db .ok{background:linear-gradient(135deg,#f5c04a,#e08a2e);color:#241a3f;border-color:transparent}
+#dlg .db .ok.bad{background:linear-gradient(135deg,#f87171,#dc2626);color:#fff}
+#dlg .db button:focus-visible{outline:2px solid var(--gold);outline-offset:2px}
+:root[data-theme="light"] #dlg{background:rgba(36,26,63,.44)}
+:root[data-theme="light"] #dlg .dx{background:linear-gradient(160deg,#fff,#f6f0ff);border-color:rgba(48,28,88,.18);box-shadow:0 24px 60px rgba(60,40,110,.3)}
+:root[data-theme="light"] #dlg .dt{color:#241a3f}
+:root[data-theme="light"] #dlg .dm{color:#4b3f66}
+:root[data-theme="light"] #dlg .di{background:rgba(154,106,18,.12);border-color:rgba(154,106,18,.35)}
+:root[data-theme="light"] #dlg input.din{background:#fff;color:#241a3f;border-color:rgba(48,28,88,.22)}
+:root[data-theme="light"] #dlg .db button{background:rgba(48,28,88,.07);color:#241a3f;border-color:rgba(48,28,88,.2)}
+:root[data-theme="light"] #dlg .db .ok{background:linear-gradient(135deg,#f5c04a,#e08a2e);color:#241a3f}
+:root[data-theme="light"] #dlg .db .ok.bad{background:linear-gradient(135deg,#ef4444,#b3261e);color:#fff}
 </style>
 </head>
 <body>
