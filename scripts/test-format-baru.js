@@ -1,9 +1,11 @@
 /* Uji parser format soal baru (pembahasan per pilihan A–E).
    Menjalankan public/run-pdf.js di sandbox minimal lalu memeriksa hasil _parse. */
-const fs = require("fs");
-const path = require("path");
-const vm = require("vm");
+import fs from "node:fs";
+import path from "node:path";
+import vm from "node:vm";
+import { fileURLToPath } from "node:url";
 
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const file = path.join(__dirname, "..", "public", "run-pdf.js");
 const code = fs.readFileSync(file, "utf8");
 
