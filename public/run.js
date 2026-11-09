@@ -85,8 +85,8 @@
     RS.cats = r.j.cats; RS.set = r.j.settings;
     var h = "<div class='rn-hero g'><h1>ASTERION RUN</h1><div class='yr' style='color:var(--gold);letter-spacing:.35em;font-size:11px'>3D · EDUKASI · KEDOKTERAN</div><p>Berlari di lintasan lima jalur dan jawab soal dengan melewati gerbang <b>A–E</b> — atau pilih <b>Mode Soal</b> kalau mau langsung mengerjakan soal tanpa game. Skor: benar +1, salah/kosong 0. Waktu <b>per soal</b>. Setelah selesai, kamu mendapat pembahasan semua soal.</p>" +
       "<div class='rn-row'><a class='btn s' href='#/run/lb/global'>🌍 Leaderboard global</a><a class='btn s' href='#/run/hist'>🕘 Riwayat</a><a class='btn s' href='#/run/tutorial'>🎮 Tutorial</a>" + (S.admin ? "<a class='btn' href='#/run/admin'>⚙️ Panel Admin</a>" : "") + "</div></div>";
-    RS.nick = r.j.nick;
-    h += nickBar() + "<div class='sec'>PILIH KATEGORI</div>";
+    RS.nick = r.j.nick; RS.prefs = r.j.prefs;
+    h += nickBar() + prefsBar() + "<div class='sec'>PILIH KATEGORI</div>";
     if (!RS.cats.length) h += "<div class='pn g empty'>Belum ada kategori." + (S.admin ? " Buat di Panel Admin." : "") + "</div>";
     RS.cats.forEach(function (c) {
       var can = c.aq > 0 && (c.active || S.admin);
@@ -99,13 +99,32 @@
     setRR(h);
   }
 
-  // dua mode per kategori: 🎮 game 3D atau 📝 mode soal (tanpa game). Sesi yang tersimpan hanya bisa dilanjutkan pada mode yang sama.
+  // tiga mode per kategori: 🎮 game 3D, 📝 mode soal (pembahasan langsung), 🎓 simulasi ujian (jawaban muncul di akhir).
+  // Sesi yang tersimpan hanya bisa dilanjutkan pada mode yang sama.
   function modeBtns(c) {
     var rs = c.resume, rm = rs ? rs.mode || "game" : "", prog = rs ? " (" + rs.cur + "/" + rs.total + ")" : "";
-    var warn = function (m) { return rs && rm !== m ? " data-warn='Ada sesi " + (rm === "quiz" ? "Mode Soal" : "game") + " yang belum selesai " + prog.trim() + " di kategori ini. Mulai sesi baru dengan mode lain? Sesi lama akan dibatalkan.'" : ""; };
+    var NM = { game: "game", quiz: "Mode Soal", exam: "Simulasi Ujian" };
+    var warn = function (m) { return rs && rm !== m ? " data-warn='Ada sesi " + (NM[rm] || rm) + " yang belum selesai" + prog + " di kategori ini. Mulai sesi baru dengan mode lain? Sesi lama akan dibatalkan.'" : ""; };
     return "<button class='btn' data-ra='go-mode' data-href='#/run/play/" + c.id + "'" + warn("game") + ">" + (rm === "game" ? "▶ Lanjutkan game" + prog : "🎮 Main game") + "</button>" +
       "<button class='btn s' data-ra='go-mode' data-href='#/run/quiz/" + c.id + "'" + warn("quiz") + ">" + (rm === "quiz" ? "▶ Lanjutkan soal" + prog : "📝 Mode Soal") + "</button>" +
+      "<button class='btn s' data-ra='go-mode' data-href='#/run/exam/" + c.id + "'" + warn("exam") + ">" + (rm === "exam" ? "▶ Lanjutkan ujian" + prog : "🎓 Simulasi Ujian") + "</button>" +
       (rs ? "<button class='btn s' data-ra='cat-reset' data-cid='" + c.id + "' data-mode='" + rm + "' title='Ulang dari soal 1'>🔄 Reset" + prog + "</button>" : "");
+  }
+
+  /* ======================= PENGATURAN PRIBADI (jumlah soal) ======================= */
+  function prefsBar() {
+    var pf = RS.prefs || { per_session: 0 };
+    return "<div class='pn g rn-pf' id='rnPf'><div class='rn-hd'><b>⚙️ Jumlah soal sekali main</b><span class='sp'></span><span class='hint' style='margin:0'>khusus akunmu</span></div>" +
+      "<div class='hint' style='margin:6px 0'>Atur sendiri berapa soal yang ingin dikerjakan setiap sesi (game, mode soal, maupun ujian). Isi <b>0</b> untuk mengikuti pengaturan kategori. Soal tidak diulang sampai bank soal kategori habis.</div>" +
+      "<div class='rn-row'><input id='rnPfN' class='in' type='number' min='0' max='500' inputmode='numeric' value='" + (pf.per_session || 0) + "' style='flex:1;min-width:90px'>" +
+      "<button class='btn sm' id='rnPfS' style='flex:none;min-width:110px'>Simpan</button></div></div>";
+  }
+  async function savePrefs() {
+    var el = g("rnPfN"); if (!el) return; var n = parseInt(el.value, 10);
+    if (!isFinite(n) || n < 0 || n > 500) { toast("Jumlah soal harus 0–500."); return; }
+    var r = await rapi("prefs", { m: "POST", b: { per_session: n } });
+    if (!r.ok) { toast((r.j && r.j.err) || "Gagal menyimpan"); return; }
+    RS.prefs = r.j; toast(n > 0 ? "Jumlah soal per sesi: " + n : "Mengikuti pengaturan kategori");
   }
 
   /* ======================= NAMA SAMARAN LEADERBOARD ======================= */
