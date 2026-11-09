@@ -1199,8 +1199,18 @@ function pRekaman(P){
   var t=d.rekaman[+P[1]];if(!t)return "<div class='empty'>Tidak ditemukan.</div>";
   if(!P[2])return "<div class='sec'>"+esc(t.n)+"</div>"+catCards("cr",P[1],t," playlist");
   return P[3]!==undefined?viewer((arrAt(P)||[])[+P[3]]||{n:"?"},P.slice(4)):listPage(P.slice(0,3),"▶️",false)}
+function jcls(k){var s=String(k||"").toLowerCase();
+  if(/ujian\s*blok/.test(s))return"j-blok";
+  if(/skill\s*lab/.test(s))return"j-skill";
+  if(/tutor/.test(s))return"j-tutor";
+  if(/kuliah/.test(s))return"j-kuliah";
+  if(/praktikum|pre-?test|asistensi|responsi|remidi/.test(s))return"j-prat";
+  return""}
+function jhex(c){return c==="j-tutor"?"#22C55E":c==="j-skill"?"#F59E0B":c==="j-kuliah"?"#3B82F6":c==="j-prat"?"#A855F7":c==="j-blok"?"#94A3B8":""}
+function jlabel(c){return c==="j-tutor"?"Tutor":c==="j-skill"?"Skill Lab":c==="j-kuliah"?"Kuliah":c==="j-prat"?"Praktikum":c==="j-blok"?"Ujian Blok":""}
 function slot(x){
-  var h="<div class='sl'><div class='tm'>"+esc(x.j)+"</div><div class='bd'><b>"+esc(x.k||"—")+"</b><div class='mt'>";
+  var jc=jcls(x.k);
+  var h="<div class='sl "+jc+"'><div class='tm'>"+esc(x.j)+"</div><div class='bd'><b>"+(jc?"<span class='jtag'>"+jlabel(jc)+"</span>":"")+esc(x.k||"—")+"</b><div class='mt'>";
   if(x.r)h+="<span class='tag'>📍 "+esc(x.r)+"</span>";
   if(x.s)h+="<span class='tag "+(/resched/i.test(x.s)?"warn":/on schedule/i.test(x.s)?"ok":"")+"'>"+esc(x.s)+"</span>";
   if(x.rs)h+="<span class='tag warn'>➜ "+esc(x.rs)+"</span>";
