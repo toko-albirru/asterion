@@ -637,25 +637,42 @@ async function runApi(request, env, a, path, url, body, M) {
     const cat = await db.prepare("SELECT * FROM run_cats WHERE id = ?").bind(+body.cat || 0).first();
     if (!cat) return runErr("Kategori tidak ditemukan.", 404);
     if (!cat.active && !a.admin) return runErr("Kategori ini sedang dinonaktifkan.", 403);
-    const mode = body.mode === "quiz" ? "quiz" : "game"; // quiz = mode soal saja (tanpa game 3D)
+    const mode = body.mode === "exam" ? "exam" : body.mode === "quiz" ? "quiz" : "game"; // quiz = mode soal, exam = simulasi ujian
     // lanjutkan sesi yang belum selesai pada kategori yang sama; sesi kategori lain dihentikan
     await db.prepare("UPDATE run_sessions SET status = 'abandoned' WHERE u = ? AND status IN ('ready', 'active') AND cat_id <> ?").bind(a.u, cat.id).run();
     let old = await db.prepare("SELECT * FROM run_sessions WHERE u = ? AND cat_id = ? AND status IN ('ready', 'active') ORDER BY started DESC LIMIT 1").bind(a.u, cat.id).first();
     if (old && (old.mode || "game") !== mode) { await db.prepare("UPDATE run_sessions SET status = 'abandoned' WHERE id = ?").bind(old.id).run(); old = null; } // ganti mode = sesi baru
-    if (old) { old = await runSync(db, old); if (old.status === "ready" || old.status === "active") return J(await runView(db, old, { resumed: true })); }
-    const pool = (await db.prepare("SELECT id, num, q, a, b, c, d, e, ans, expl, img FROM run_questions WHERE cat_id = ? AND active = 1 AND verified = 1").bind(cat.id).all()).results;
+    if (old) { old = await runSync(db, old); if (old.status === "ready" || old.status === "active") return J({ ...(mode === "exam" ? await runExamView(db, old) : await runView(db, old)), resumed: true }); }
+    const pool = (await db.prepare("SELECT id, num, q, a, b, c, d, e, ans, expl, expl_opt, img FROM run_questions WHERE cat_id = ? AND active = 1 AND verified = 1").bind(cat.id).all()).results;
     if (!pool.length) return runErr("Kategori ini belum memiliki soal aktif. Hubungi admin.", 409, { empty: true });
-    const total = cat.per_session > 0 ? Math.min(cat.per_session, pool.length) : pool.length, pick = shuffle(pool).slice(0, total);
+    // jumlah soal: preferensi pribadi mahasiswa menang atas pengaturan kategori (0 = ikut kategori)
+    const pref = await runPref(db, a.u), ask = pref.per_session > 0 ? pref.per_session : cat.per_session;
+    // soal yang sudah pernah keluar untuk mahasiswa ini dilewati sampai bank kategori habis, lalu mulai putaran baru
+    const seen = new Set((await db.prepare("SELECT qid FROM run_seen WHERE u = ? AND cat_id = ?").bind(a.u, cat.id).all()).results.map((r) => r.qid));
+    let fresh = shuffle(pool.filter((q) => !seen.has(q.id))), used = shuffle(pool.filter((q) => seen.has(q.id))), cycle = false;
+    if (!fresh.length) { await db.prepare("DELETE FROM run_seen WHERE u = ? AND cat_id = ?").bind(a.u, cat.id).run(); fresh = shuffle(pool.slice()); used = []; cycle = true; } // bank habis → putaran baru
+    const total = ask > 0 ? Math.min(ask, pool.length) : pool.length, pick = fresh.concat(used).slice(0, total);
     const sid = b64(crypto.getRandomValues(new Uint8Array(12)));
-    await db.prepare("INSERT INTO run_sessions (id, u, cat_id, cat_name, status, total, requested, q_time, show_explain, started, mode) VALUES (?, ?, ?, ?, 'ready', ?, ?, ?, ?, ?, ?)").bind(sid, a.u, cat.id, cat.name, total, cat.per_session, cat.q_time, cat.show_explain, t, mode).run();
-    const ins = pick.map((q, i) => db.prepare("INSERT INTO run_answers (sid, idx, qid, snap) VALUES (?, ?, ?, ?)").bind(sid, i, q.id, JSON.stringify({ q: q.q, a: q.a, b: q.b, c: q.c, d: q.d, e: q.e, ans: q.ans, expl: q.expl, img: q.img, num: q.num })));
+    await db.prepare("INSERT INTO run_sessions (id, u, cat_id, cat_name, status, total, requested, q_time, show_explain, started, mode) VALUES (?, ?, ?, ?, 'ready', ?, ?, ?, ?, ?, ?)").bind(sid, a.u, cat.id, cat.name, pick.length, ask, cat.q_time, cat.show_explain, t, mode).run();
+    const ins = pick.map((q, i) => db.prepare("INSERT INTO run_answers (sid, idx, qid, snap) VALUES (?, ?, ?, ?)").bind(sid, i, q.id, JSON.stringify({ q: q.q, a: q.a, b: q.b, c: q.c, d: q.d, e: q.e, ans: q.ans, expl: q.expl, ex: q.expl_opt ? JSON.parse(q.expl_opt) : null, img: q.img, num: q.num })));
     for (let i = 0; i < ins.length; i += 40) await db.batch(ins.slice(i, i + 40));
-    return J(await runView(db, await runGet(db, sid)));
+    // tandai soal sudah dipakai agar tidak berulang di permainan berikutnya
+    const marks = pick.map((q) => db.prepare("INSERT OR IGNORE INTO run_seen (u, cat_id, qid, t) VALUES (?, ?, ?, ?)").bind(a.u, cat.id, q.id, t));
+    for (let i = 0; i < marks.length; i += 40) await db.batch(marks.slice(i, i + 40));
+    const freshN = pick.filter((q) => !seen.has(q.id)).length, v = mode === "exam" ? await runExamView(db, await runGet(db, sid)) : await runView(db, await runGet(db, sid));
+    return J({ ...v, cycle, fresh: freshN });
   }
   if (["begin", "answer", "pause", "resume", "abandon"].includes(path) && M === "POST" || (path === "session" && M === "GET")) {
     let s = await runGet(db, body.sid || qp("sid"));
     if (!s || s.u !== a.u) return runErr("Sesi tidak ditemukan.", 404);
-    if (path === "session") { s = await runSync(db, s); return J(s.status === "done" ? { sid: s.id, status: "done" } : await runView(db, s)); }
+    if (path === "session") {
+      if ((s.mode || "game") === "exam") { // mode ujian: satu waktu untuk semua soal, jawaban boleh diubah
+        const limit = s.q_time * 1000 * s.total;
+        if (s.status === "active" && Date.now() - (s.began || s.qstart || Date.now()) > limit + RUN_GRACE) { s = await runExamSubmit(db, s, Date.now()); return J({ sid: s.id, status: "done" }); }
+        return J(await runExamView(db, s));
+      }
+      s = await runSync(db, s); return J(s.status === "done" ? { sid: s.id, status: "done" } : await runView(db, s));
+    }
     if (path === "abandon") { if (s.status === "ready" || s.status === "active") await db.prepare("UPDATE run_sessions SET status = 'abandoned' WHERE id = ?").bind(s.id).run(); return J({ ok: 1 }); }
     if (path === "begin") {
       if (s.status === "ready") { await db.prepare("UPDATE run_sessions SET status = 'active', qstart = ?, began = ? WHERE id = ? AND status = 'ready'").bind(t, t, s.id).run(); return J({ status: "active", remaining: s.q_time * 1000 }); }
