@@ -576,12 +576,13 @@ async function runApi(request, env, a, path, url, body, M) {
     const cats = (await db.prepare("SELECT c.*, (SELECT COUNT(*) FROM run_questions q WHERE q.cat_id = c.id AND q.active = 1 AND q.verified = 1) AS aq, (SELECT COUNT(DISTINCT u) FROM run_sessions s WHERE s.cat_id = c.id AND s.status = 'done' AND s.u <> 'admin') AS players FROM run_cats c " + (a.admin ? "" : "WHERE c.active = 1 ") + "ORDER BY c.sort, c.id").all()).results;
     const mine = (await db.prepare("SELECT cat_id, cur, total, mode FROM run_sessions WHERE u = ? AND status IN ('ready', 'active')").bind(a.u).all()).results;
     const best = (await db.prepare("SELECT cat_id, score, total, acc, dur FROM (SELECT cat_id, score, total, acc, dur, ROW_NUMBER() OVER (PARTITION BY cat_id ORDER BY score DESC, acc DESC, dur ASC) rn FROM run_sessions WHERE u = ? AND status = 'done') WHERE rn = 1").bind(a.u).all()).results;
+    const prefPer = (await runPref(db, a.u)).per_session;
     const out = [];
     for (const c of cats) {
       const b = best.find((x) => x.cat_id === c.id), rs = mine.find((x) => x.cat_id === c.id);
       let me = null;
       if (b) { const i = a.admin ? -1 : (await runBoard(db, c.id, 0)).findIndex((x) => x.u === a.u); me = { score: b.score, total: b.total, acc: b.acc, dur: b.dur, rank: i + 1 }; }
-      out.push({ id: c.id, name: c.name, descr: c.descr, active: c.active, per_session: c.per_session, q_time: c.q_time, show_explain: c.show_explain, aq: c.aq, play: c.per_session > 0 ? Math.min(c.per_session, c.aq) : c.aq, players: c.players, me, resume: rs ? { cur: rs.cur, total: rs.total, mode: rs.mode || "game" } : null });
+      out.push({ id: c.id, name: c.name, descr: c.descr, active: c.active, per_session: c.per_session, q_time: c.q_time, show_explain: c.show_explain, aq: c.aq, play: (prefPer > 0 ? Math.min(prefPer, c.aq) : (c.per_session > 0 ? Math.min(c.per_session, c.aq) : c.aq)), players: c.players, me, resume: rs ? { cur: rs.cur, total: rs.total, mode: rs.mode || "game" } : null });
     }
     const myNick = a.admin ? undefined : ((await db.prepare("SELECT nick FROM run_players WHERE u = ?").bind(a.u).first()) || {}).nick || null;
     return J({ cats: out, settings: set, nick: myNick, prefs: await runPref(db, a.u) });

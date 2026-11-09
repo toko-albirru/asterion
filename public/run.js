@@ -117,7 +117,7 @@
     return "<div class='pn g rn-pf' id='rnPf'><div class='rn-hd'><b>⚙️ Jumlah soal sekali main</b><span class='sp'></span><span class='hint' style='margin:0'>khusus akunmu</span></div>" +
       "<div class='hint' style='margin:6px 0'>Atur sendiri berapa soal yang ingin dikerjakan setiap sesi (game, mode soal, maupun ujian). Isi <b>0</b> untuk mengikuti pengaturan kategori. Soal tidak diulang sampai bank soal kategori habis.</div>" +
       "<div class='rn-row'><input id='rnPfN' class='in' type='number' min='0' max='500' inputmode='numeric' value='" + (pf.per_session || 0) + "' style='flex:1;min-width:90px'>" +
-      "<button class='btn sm' id='rnPfS' style='flex:none;min-width:110px'>Simpan</button></div></div>";
+      "<button class='btn sm' id='rnPfS' data-ra='pf-save' style='flex:none;min-width:110px'>💾 Simpan</button></div></div>";
   }
   async function savePrefs() {
     var el = g("rnPfN"); if (!el) return; var n = parseInt(el.value, 10);
@@ -808,6 +808,7 @@
       else if (a === "qz-reset") quizReset();
       else if (a === "rv-n" || a === "rv-p") { var L = rvList(), p = L.indexOf(rv.i) + (a === "rv-n" ? 1 : -1); if (p >= 0 && p < L.length) { rv.i = L[p]; rvDraw(); } }
       else if (a === "rv-go") { rv.i = +v; rvDraw(); } else if (a === "rv-f") { rv.f = v; rv.i = -1; rvDraw(); }
+      else if (a === "pf-save") { await savePrefs(); route(); return; }
       else if (a === "cat-save") {
         var body = { id: id || undefined, name: g("cn" + id).value, descr: g("cd" + id).value, per_session: +g("cp" + id).value, q_time: +g("ct" + id).value, show_explain: g("cx" + id).checked, active: g("ca" + id).checked };
         var r = await rapi("admin/cat", { m: "POST", b: body }); if (!r.ok) return toast((r.j && r.j.err) || "Gagal"); toast("Tersimpan ✓"); RS.cats = null; route();
