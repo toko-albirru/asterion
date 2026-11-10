@@ -4,7 +4,7 @@
 (function () {
   "use strict";
   var LET = ["A", "B", "C", "D", "E"], COL = [0xb18cff, 0x4cc9f0, 0x4ade80, 0xfbbf24, 0xff6b9a], CSSC = ["#b18cff", "#4cc9f0", "#4ade80", "#fbbf24", "#ff6b9a"];
-  var PLANK_L = 22, TUN_L = 1.6, LW = 2.4, LANES = 5, SPEED = 20, GATE_DIST = 95, GATE_MIN = 24, FB_MS = 2400;
+  var PLANK_L = 22, TUN_L = 0.5, LW = 2.4, LANES = 5, SPEED = 20, GATE_DIST = 95, GATE_MIN = 24, FB_MS = 2400;
   var laneX = function (i) { return (i - 2) * LW; };
   var THREE_URL = "https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js", p3;
   function loadThree() {
@@ -242,7 +242,7 @@
       var hc = document.createElement("canvas"); hc.width = 64; hc.height = 32; var hg = hc.getContext("2d"); hg.fillStyle = "#1b1740"; hg.fillRect(0, 0, 64, 32); hg.fillStyle = "#ff4f9a";
       for (var hx = -32; hx < 80; hx += 32) { hg.beginPath(); hg.moveTo(hx, 32); hg.lineTo(hx + 16, 32); hg.lineTo(hx + 32, 0); hg.lineTo(hx + 16, 0); hg.closePath(); hg.fill(); }
       var ht = new T.CanvasTexture(hc); ht.wrapS = ht.wrapT = T.RepeatWrapping; ht.repeat.set(4, 1); G.hazard = mkMat(0xffffff, { map: ht });
-      G.plankTop = mkLam(0x34d399, { emissive: 0x0b3d2c }); G.postG = new T.BoxGeometry(0.22, 1, 0.22); G.purple = mkLam(0x5b3fb0, { emissive: 0x2a1b66 }); G.gold = mkMat(0xf5c04a); G.laser = mkMat(0xe2a92f, { transparent: true, opacity: 0.55, depthWrite: false }); G.laserGlow = mkMat(0xf0b840, { transparent: true, opacity: 0.14, depthWrite: false }); G.red = mkMat(0xff6b9a, { transparent: true, opacity: 0.95 });
+      G.pur = mkMat(0xb18cff); G.plankTop = G.pur; G.postG = new T.BoxGeometry(0.22, 1, 0.22); G.purple = mkLam(0x5b3fb0, { emissive: 0x2a1b66 }); G.gold = mkMat(0xf5c04a); G.laser = mkMat(0xe2a92f, { transparent: true, opacity: 0.55, depthWrite: false }); G.laserGlow = mkMat(0xf0b840, { transparent: true, opacity: 0.14, depthWrite: false }); G.red = mkMat(0xff6b9a, { transparent: true, opacity: 0.95 });
       G.foamG = new T.RingGeometry(0.95, 2.1, 24); G.foam = mkMat(0xffffff, { transparent: true, opacity: 0.6, depthWrite: false, side: T.DoubleSide }); G.dark = mkLam(0x2a1c52); G.white = mkLam(0xf4f0ff); G.wall = mkLam(0x2b2442);
       G.gateTex = CSSC.map(function (cs) {
         var c = document.createElement("canvas"); c.width = 64; c.height = 256; var g = c.getContext("2d"), gr = g.createLinearGradient(0, 0, 0, 256);
@@ -361,6 +361,7 @@
       scene.background.setHex(light ? 0xcfdcf5 : 0x120c24); scene.fog.color.setHex(light ? 0xcfdcf5 : 0x120c24);
       amb.color.setHex(light ? 0xffffff : 0xcbb8ff); amb.intensity = light ? 0.8 : 0.85; dirL.intensity = light ? 0.6 : 0.8;
       G.dark.color.setHex(light ? 0x6a5aac : 0x2a1c52); G.foam.color.setHex(light ? 0xffffff : 0x4dffe6); G.wall.color.setHex(light ? 0x56468f : 0x2b2442); G.white.color.setHex(light ? 0x9275d0 : 0xf4f0ff);
+      G.pCoat.color.setHex(light ? 0x22b35e : 0xffffff); G.pScrub.color.setHex(light ? 0x15803d : 0xffffff); G.pScrubD.color.setHex(light ? 0x14532d : 0xffffff);
       laneGlow.material.color.setHex(light ? 0x7a5ae0 : 0xffffff); starsP.visible = !light;
       moon.material.transparent = true; cloudG.visible = light; paintMoon();
       paintFloor(); floorT.needsUpdate = true; paintLt(); paintSea();
@@ -368,7 +369,7 @@
     var limbs = {};
     function buildPlayer() {
       player = new T.Group(); var body = new T.Group(); player.add(body); limbs.body = body;
-      var skin = mkLam(0xf1c9a5), coat = mkLam(0x22b35e), scrub = mkLam(0x15803d), scrubD = mkLam(0x14532d), shoe = mkLam(0xf4f0ff), hair = mkLam(0x2b1d16), steth = mkLam(0x2b2f3a), metal = mkLam(0xb8bfcc);
+      var skin = mkLam(0xf1c9a5), coat = G.pCoat = mkLam(0x22b35e), scrub = G.pScrub = mkLam(0x15803d), scrubD = G.pScrubD = mkLam(0x14532d), shoe = mkLam(0xf4f0ff), hair = mkLam(0x2b1d16), steth = mkLam(0x2b2f3a), metal = mkLam(0xb8bfcc);
       function cyl(rt, rb, h, m, seg) { return new T.Mesh(new T.CylinderGeometry(rt, rb, h, seg || 16), m); }
       // scrub di dalam + jas dokter
       var inner = cyl(0.3, 0.27, 0.9, scrub, 18); inner.scale.z = 0.62; inner.position.y = 1.0; body.add(inner);
@@ -439,11 +440,14 @@
         [-1, 1].forEach(function (s) { var e = box(0.06, 0.06, L + 0.04, G.neon2); e.position.set(s * pw / 2, H + 0.04, 0); g.add(e); });
         var pf = box(pw + 0.02, 0.22, 0.06, G.hazard); pf.position.set(0, H * 0.5, L / 2 + 0.02); g.add(pf);
       } else if (type === "tunnel") {
-        var TL = TUN_L, ry = 1.3, tw = w * 0.96, TH = 6; gl.scale.y = TL / 1.5;
-        var wall = box(tw, TH, TL, G.obsDark); wall.position.y = ry + TH / 2; g.add(wall);
-        var hz = box(tw + 0.02, 0.22, TL + 0.02, G.hazard); hz.position.y = ry + 0.11; g.add(hz);
-        var ne = box(tw + 0.04, 0.06, TL + 0.04, G.neon); ne.position.y = ry - 0.01; g.add(ne);
-        [-1, 1].forEach(function (s) { var sd = box(0.06, TH, TL + 0.04, G.neon2); sd.position.set(s * tw / 2, ry + TH / 2, 0); g.add(sd); });
+        var TH = 6, tb = box(w, 0.3, 0.3, G.hazard); tb.position.y = 1.55; g.add(tb);
+        [1.72, 1.38].forEach(function (y) { var e = box(w, 0.04, 0.34, G.neon); e.position.y = y; g.add(e); });
+        [-1, 1].forEach(function (s) {
+          var p = box(0.2, TH, 0.2, G.obsDark); p.position.set(s * w / 2, TH / 2, 0); g.add(p);
+          var st2 = box(0.05, TH - 0.3, 0.22, G.neon2); st2.position.set(s * w / 2, TH / 2, 0); g.add(st2);
+        });
+        var tp2 = box(w, TH - 1.75, 0.08, mkMat(0x5b3fb0, { transparent: true, opacity: 0.5, depthWrite: false })); tp2.position.y = 1.75 + (TH - 1.75) / 2; g.add(tp2);
+        var tcap = box(w + 0.2, 0.16, 0.3, G.pur); tcap.position.y = TH; g.add(tcap);
       } else { // block
         var bw = w * 0.9, bk = box(bw, 1.4, 1.1, G.obsDark); bk.position.y = 0.7; g.add(bk);
         var hb = box(bw + 0.02, 0.24, 1.12, G.hazard); hb.position.y = 0.45; g.add(hb);
