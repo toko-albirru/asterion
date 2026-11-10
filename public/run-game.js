@@ -4,7 +4,7 @@
 (function () {
   "use strict";
   var LET = ["A", "B", "C", "D", "E"], COL = [0xb18cff, 0x4cc9f0, 0x4ade80, 0xfbbf24, 0xff6b9a], CSSC = ["#b18cff", "#4cc9f0", "#4ade80", "#fbbf24", "#ff6b9a"];
-  var PLANK_L = 22, TUN_L = 12, LW = 2.4, LANES = 5, SPEED = 20, GATE_DIST = 95, GATE_MIN = 24, FB_MS = 2400;
+  var PLANK_L = 22, TUN_L = 1.6, LW = 2.4, LANES = 5, SPEED = 20, GATE_DIST = 95, GATE_MIN = 24, FB_MS = 2400;
   var laneX = function (i) { return (i - 2) * LW; };
   var THREE_URL = "https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js", p3;
   function loadThree() {
@@ -439,14 +439,11 @@
         [-1, 1].forEach(function (s) { var e = box(0.06, 0.06, L + 0.04, G.neon2); e.position.set(s * pw / 2, H + 0.04, 0); g.add(e); });
         var pf = box(pw + 0.02, 0.22, 0.06, G.hazard); pf.position.set(0, H * 0.5, L / 2 + 0.02); g.add(pf);
       } else if (type === "tunnel") {
-        var TL = TUN_L, ry = 1.3, tw = w * 0.96; gl.scale.y = TL / 1.5;
-        var rf = box(tw, 0.3, TL, G.obsDark); rf.position.y = ry + 0.15; g.add(rf);
-        var rt = box(tw * 0.5, 0.02, TL, G.neon2); rt.position.y = ry + 0.31; g.add(rt);
-        [-1, 1].forEach(function (s) {
-          var e = box(0.06, 0.06, TL + 0.04, G.neon); e.position.set(s * tw / 2, ry, 0); g.add(e);
-          [-1, 1].forEach(function (zz) { var pp = box(0.14, ry + 0.3, 0.14, G.obsDark); pp.position.set(s * tw / 2, (ry + 0.3) / 2, zz * TL / 2); g.add(pp); });
-        });
-        var lt = box(tw, 0.18, 0.08, G.hazard); lt.position.set(0, ry + 0.15, TL / 2 + 0.05); g.add(lt);
+        var TL = TUN_L, ry = 1.3, tw = w * 0.96, TH = 6; gl.scale.y = TL / 1.5;
+        var wall = box(tw, TH, TL, G.obsDark); wall.position.y = ry + TH / 2; g.add(wall);
+        var hz = box(tw + 0.02, 0.22, TL + 0.02, G.hazard); hz.position.y = ry + 0.11; g.add(hz);
+        var ne = box(tw + 0.04, 0.06, TL + 0.04, G.neon); ne.position.y = ry - 0.01; g.add(ne);
+        [-1, 1].forEach(function (s) { var sd = box(0.06, TH, TL + 0.04, G.neon2); sd.position.set(s * tw / 2, ry + TH / 2, 0); g.add(sd); });
       } else { // block
         var bw = w * 0.9, bk = box(bw, 1.4, 1.1, G.obsDark); bk.position.y = 0.7; g.add(bk);
         var hb = box(bw + 0.02, 0.24, 1.12, G.hazard); hb.position.y = 0.45; g.add(hb);
@@ -678,7 +675,7 @@
         o.g.position.z += v * dt;
         if (o.dying) { o.g.scale.multiplyScalar(0.82); if (o.g.scale.x < 0.05) o.rm = true; }
         if (o.len) {
-          var cov = Math.abs(o.g.position.z) <= o.len / 2 && o.lane === st.lane && !o.dying && !o.hit;
+          var cov = Math.abs(o.g.position.z) <= o.len / 2 + (o.type === "tunnel" ? 0.5 : 0) && o.lane === st.lane && !o.dying && !o.hit;
           if (o.type === "plank") { if (cov && !o.on) { if (st.y >= o.h - 0.35) o.on = true; else hitO(o); } else if (!cov) o.on = false; }
           else if (cov && st.slideT <= 0) hitO(o);
         } else if (!o.hit && !o.dying && o.g.position.z > -0.55 && o.g.position.z < 0.55 && o.lane === st.lane) {
