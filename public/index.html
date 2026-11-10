@@ -113,9 +113,9 @@ h1{margin:0;display:inline-block;padding:0 .12em;font-family:Cinzel,Georgia,seri
 .ak .dot{display:inline-block;width:9px;height:9px;border-radius:50%;background:#3ddc84;box-shadow:0 0 0 3px rgba(61,220,132,.25);margin-right:7px;vertical-align:middle;animation:onl 1.6s ease-in-out infinite}@keyframes onl{50%{box-shadow:0 0 0 6px rgba(61,220,132,0)}}.stt.on{background:rgba(61,220,132,.25);color:#3ddc84}
 .stt.ok{background:rgba(80,200,120,.18);color:#7fe3a1}.stt.bk{background:rgba(245,192,74,.18);color:var(--gold)}.stt.bl{background:rgba(255,255,255,.08);color:var(--mut)}
 .day{border-radius:22px;padding:14px 14px 4px;margin-bottom:14px}
-.day.today{box-shadow:0 0 0 2px rgba(245,192,74,.7),0 10px 30px rgba(8,4,24,.4)}
+.day.today{border:2px solid #f5c04a;box-shadow:0 0 14px rgba(245,192,74,.35),0 10px 30px rgba(8,4,24,.4)}:root[data-theme="light"] .day.today{border-color:#d9a21c;box-shadow:0 0 12px rgba(217,162,28,.3),0 6px 22px rgba(60,40,110,.12)}
 .day h3{margin:0 0 10px;font:600 14px Inter,sans-serif;display:flex;align-items:center;gap:8px}
-.badge{font-size:10px;font-weight:700;color:#241a3f;background:var(--gold);padding:2px 8px;border-radius:999px}
+.badge{font-size:10px;font-weight:700;color:#fff;background:linear-gradient(135deg,#8b5cf6,#6d4ae0);padding:2px 8px;border-radius:999px}
 .sl{display:flex;gap:12px;padding:11px 0;border-top:1px solid rgba(255,255,255,.12)}
 .sl .tm{width:84px;flex:none;font-size:12px;color:var(--gold);font-weight:600;padding-top:2px}
 .sl .bd{flex:1;min-width:0;font-size:14px;line-height:1.4}.sl b{font-weight:600}
@@ -228,8 +228,8 @@ select.in option{background:#241a3f;color:#fff}
 @media (prefers-reduced-motion:reduce){:root[data-theme="light"] .hero::before{animation:none}}
 :root[data-theme="light"] .hband .ttl h1{background:linear-gradient(180deg,#3a2a66,#9a6a12);-webkit-background-clip:text;background-clip:text;color:transparent;filter:none}
 :root[data-theme="light"] .hband .yr{color:#9a6a12}
-.badge.nx{background:linear-gradient(135deg,#fde68a,#fbbf24 55%,#f59e0b);color:#4a2f86;box-shadow:0 2px 10px rgba(245,158,11,.45)}
-:root[data-theme="light"] .badge.nx{color:#4a2f86}
+.badge.nx{background:linear-gradient(135deg,#8b5cf6,#6d4ae0);color:#fff;box-shadow:0 2px 10px rgba(109,74,224,.4)}
+:root[data-theme="light"] .badge.nx{color:#fff}
 :root[data-theme="light"] body{color:#241a3f}
 :root[data-theme="light"] .chip{color:#241a3f;background:rgba(255,255,255,.82);border:1px solid rgba(48,28,88,.16)}
 :root[data-theme="light"] .chip.on{color:#4a2f86;background:linear-gradient(135deg,rgba(245,192,74,.42),rgba(160,120,255,.22));border-color:rgba(154,106,18,.5)}
@@ -289,7 +289,7 @@ select.in option{background:#241a3f;color:#fff}
 :root[data-theme="light"] .stt.ok{color:#0d5c2e;background:rgba(18,122,62,.14)}
 :root[data-theme="light"] .stt.bk{color:#7a4d05;background:rgba(150,98,10,.16)}
 :root[data-theme="light"] select.in option{background:#fff;color:#241a3f}
-:root[data-theme="light"] .badge{color:#3a2a66}
+:root[data-theme="light"] .badge{color:#fff}
 :root[data-theme="light"] .rn-bar{background:rgba(255,255,255,.94);color:#241a3f;box-shadow:0 6px 20px rgba(60,40,110,.14)}
 :root[data-theme="light"] .rn-prog{background:rgba(48,28,88,.12)}
 :root[data-theme="light"] .rn-tb th,:root[data-theme="light"] .rn-tb td{border-bottom-color:rgba(48,28,88,.14)}
@@ -1379,7 +1379,7 @@ async function getTabs(){
   try{var r=await api("tabs");if(r.ok&&r.j&&r.j.tabs&&r.j.tabs.length){S.tabs=r.j.tabs;S.auto=!!r.j.auto;S.def=+r.j.def||0;S.grp=r.j.grp||""}}catch(e){}
   return S.tabs||S.data.sheet.tabs}
 function pJadwal(P){
-  var h="<div id='chips'></div><div class='chips' id='jview'><a href='javascript:void 0' class='chip g"+(CAL.m==="list"?" on":"")+"' data-jv='list'>📋 Daftar</a><a href='javascript:void 0' class='chip g"+(CAL.m==="cal"?" on":"")+"' data-jv='cal'>📅 Kalender</a><a href='javascript:void 0' class='chip g' data-jv='ics'>⬇️ .ics</a></div><div id='sch'><div class='empty'>Memuat jadwal…</div></div>";
+  var h="<div id='chips'></div><div class='chips' id='jview'><a href='javascript:void 0' class='chip g"+(CAL.m==="list"?" on":"")+"' data-jv='list'>📋 Daftar</a><a href='javascript:void 0' class='chip g"+(CAL.m==="cal"?" on":"")+"' data-jv='cal'>📅 Kalender</a><a href='javascript:void 0' class='chip g' data-jv='ics'>⬇️ Export jadwal</a></div><div id='sch'><div class='empty'>Memuat jadwal…</div></div>";
   if(S.admin)h+="<div class='pn g'><b>Pengaturan spreadsheet</b><label>ID spreadsheet</label><input id='sId' value=\""+esc(S.data.sheet.id)+"\"><div class='hint' id='tabst'>Memeriksa tab…</div><label>Daftar tab cadangan (satu per baris: Nama|gid, urut dari kiri). Dipakai hanya jika deteksi otomatis gagal.</label><textarea id='sTabs' rows='5'>"+esc(S.data.sheet.tabs.map(function(t){return t.n+"|"+t.g}).join("\n"))+"</textarea><div class='hint'>gid ada di URL spreadsheet setelah <code>#gid=</code> saat tab dibuka. Spreadsheet harus dibagikan “siapa saja yang memiliki link”.</div><button class='btn' data-a='sheet'>Simpan</button></div>";
   setTimeout(function(){jvSync();jInit()},0);return h}
 async function jInit(){
@@ -1445,7 +1445,7 @@ function calDraw(data,cat){
   var pre=y+"-"+p2(mo+1),days=(data||[]).filter(function(d){return d.iso&&d.iso.slice(0,7)===pre&&d.items&&d.items.length}).sort(function(a,b){return String(a.iso).localeCompare(String(b.iso))});
   h+=days.length?"<div class='sec' style='margin-top:14px'>SEMUA JADWAL BULAN INI</div>"+days.map(function(d){return "<div class='cald'><b>"+esc(d.d)+"</b>"+d.items.map(function(it){
     return "<div class='cali "+jcls(it.k)+"'><div class='calt'>"+esc(it.j||"—")+"</div><div class='calb'><b>"+esc(it.k||"—")+"</b>"+(it.r?"<small>📍 "+esc(it.r)+"</small>":"")+(it.s?"<small>"+esc(it.s)+"</small>":"")+"</div><a class='btn s sm' target='_blank' rel='noopener' title='Tambah ke Google Calendar' href='"+calLink(d.iso,it,cat)+"'>📅</a></div>"}).join("")+"</div>"}).join(""):"<div class='empty' style='margin-top:10px'>Tidak ada jadwal pada bulan ini.</div>";
-  h+="<div class='rn-row' style='margin-top:10px'><button class='btn s' data-jv='ics'>⬇️ Unduh .ics (impor ke Google Calendar)</button><button class='btn s' data-jv='today'>📅 Bulan ini</button></div></div>";
+  h+="<div class='rn-row' style='margin-top:10px'><button class='btn s' data-jv='ics'>⬇️ Ekspor jadwal</button><button class='btn s' data-jv='today'>📅 Bulan ini</button></div></div>";
   el.innerHTML=h;jvSync()}
 function icsEsc(s){return String(s==null?"":s).replace(/\\/g,"\\\\").replace(/;/g,"\\;").replace(/,/g,"\\,").replace(/\r?\n/g,"\\n")}
 function calIcs(data,cat){
@@ -1459,7 +1459,7 @@ function calIcsDl(){
   var b=new Blob([calIcs(S.jData,S.jCat)],{type:"text/calendar;charset=utf-8"}),a=document.createElement("a");
   a.href=URL.createObjectURL(b);a.download="jadwal-asterion.ics";document.body.appendChild(a);a.click();
   setTimeout(function(){URL.revokeObjectURL(a.href);a.remove()},500);
-  toast("File .ics diunduh — buka untuk menambahkannya ke Google Calendar.")}
+  toast("Jadwal berhasil diekspor — buka filenya untuk menambahkannya ke Google Calendar.")}
 function jView(){
   if(CAL.m==="cal"){calDraw(S.jData||[],S.jCat);return}
   var el=$("sch");if(el&&S.jList){el.dataset.ok=1;el.innerHTML=S.jList}jvSync()}
