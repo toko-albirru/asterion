@@ -4,7 +4,7 @@
 (function () {
   "use strict";
   var LET = ["A", "B", "C", "D", "E"], COL = [0xb18cff, 0x4cc9f0, 0x4ade80, 0xfbbf24, 0xff6b9a], CSSC = ["#b18cff", "#4cc9f0", "#4ade80", "#fbbf24", "#ff6b9a"];
-  var LW = 2.4, LANES = 5, SPEED = 20, GATE_DIST = 95, GATE_MIN = 24, FB_MS = 2400;
+  var PLANK_L = 22, TUN_L = 12, LW = 2.4, LANES = 5, SPEED = 20, GATE_DIST = 95, GATE_MIN = 24, FB_MS = 2400;
   var laneX = function (i) { return (i - 2) * LW; };
   var THREE_URL = "https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js", p3;
   function loadThree() {
@@ -242,8 +242,14 @@
       var hc = document.createElement("canvas"); hc.width = 64; hc.height = 32; var hg = hc.getContext("2d"); hg.fillStyle = "#1b1740"; hg.fillRect(0, 0, 64, 32); hg.fillStyle = "#ff4f9a";
       for (var hx = -32; hx < 80; hx += 32) { hg.beginPath(); hg.moveTo(hx, 32); hg.lineTo(hx + 16, 32); hg.lineTo(hx + 32, 0); hg.lineTo(hx + 16, 0); hg.closePath(); hg.fill(); }
       var ht = new T.CanvasTexture(hc); ht.wrapS = ht.wrapT = T.RepeatWrapping; ht.repeat.set(4, 1); G.hazard = mkMat(0xffffff, { map: ht });
-      G.postG = new T.BoxGeometry(0.22, 1, 0.22); G.purple = mkLam(0x5b3fb0, { emissive: 0x2a1b66 }); G.gold = mkMat(0xf5c04a); G.laser = mkMat(0xe2a92f, { transparent: true, opacity: 0.55, depthWrite: false }); G.laserGlow = mkMat(0xf0b840, { transparent: true, opacity: 0.14, depthWrite: false }); G.red = mkMat(0xff6b9a, { transparent: true, opacity: 0.95 });
+      G.plankTop = mkLam(0x34d399, { emissive: 0x0b3d2c }); G.postG = new T.BoxGeometry(0.22, 1, 0.22); G.purple = mkLam(0x5b3fb0, { emissive: 0x2a1b66 }); G.gold = mkMat(0xf5c04a); G.laser = mkMat(0xe2a92f, { transparent: true, opacity: 0.55, depthWrite: false }); G.laserGlow = mkMat(0xf0b840, { transparent: true, opacity: 0.14, depthWrite: false }); G.red = mkMat(0xff6b9a, { transparent: true, opacity: 0.95 });
       G.foamG = new T.RingGeometry(0.95, 2.1, 24); G.foam = mkMat(0xffffff, { transparent: true, opacity: 0.6, depthWrite: false, side: T.DoubleSide }); G.dark = mkLam(0x2a1c52); G.white = mkLam(0xf4f0ff); G.wall = mkLam(0x2b2442);
+      G.gateTex = CSSC.map(function (cs) {
+        var c = document.createElement("canvas"); c.width = 64; c.height = 256; var g = c.getContext("2d"), gr = g.createLinearGradient(0, 0, 0, 256);
+        gr.addColorStop(0, cs + "10"); gr.addColorStop(1, cs + "99"); g.fillStyle = gr; g.fillRect(0, 0, 64, 256);
+        g.fillStyle = "rgba(255,255,255,.07)"; for (var y = 0; y < 256; y += 10) g.fillRect(0, y, 64, 2);
+        return new T.MeshBasicMaterial({ map: new T.CanvasTexture(c), transparent: true, side: T.DoubleSide, depthWrite: false });
+      });
       G.ltc = []; G.lt = LET.map(function (L, i) {
         var c = document.createElement("canvas"); c.width = c.height = 128; G.ltc.push(c); return new T.CanvasTexture(c);
       }); paintLt();
@@ -252,8 +258,9 @@
       var light = LT();
       G.ltc.forEach(function (c, i) {
         var g = c.getContext("2d"); g.clearRect(0, 0, 128, 128);
-        g.fillStyle = light ? "rgba(255,255,255,.95)" : "rgba(10,6,24,.85)"; g.beginPath(); g.arc(64, 64, 58, 0, 7); g.fill(); g.lineWidth = 8; g.strokeStyle = CSSC[i]; g.stroke();
-        g.fillStyle = light ? "#241a3f" : "#fff"; g.font = "900 78px Cinzel,Georgia,serif"; g.textAlign = "center"; g.textBaseline = "middle"; g.fillText(L_(i), 64, 70);
+        g.beginPath(); g.moveTo(42, 12); g.arcTo(116, 12, 116, 116, 30); g.arcTo(116, 116, 12, 116, 30); g.arcTo(12, 116, 12, 12, 30); g.arcTo(12, 12, 116, 12, 30); g.closePath();
+        g.shadowColor = CSSC[i]; g.shadowBlur = 16; g.fillStyle = CSSC[i]; g.fill(); g.shadowBlur = 0; g.lineWidth = 4; g.strokeStyle = "rgba(255,255,255,.85)"; g.stroke();
+        g.fillStyle = "#fff"; g.font = "900 72px Cinzel,Georgia,serif"; g.textAlign = "center"; g.textBaseline = "middle"; g.fillText(L_(i), 64, 70);
         G.lt[i].needsUpdate = true;
       });
     }
@@ -317,7 +324,6 @@
       var fl = new T.Mesh(new T.PlaneGeometry(LANES * LW, LEN), mkMat(0xffffff, { map: floorT })); fl.rotation.x = -Math.PI / 2; fl.position.set(0, 0, -LEN / 2 + 25); scene.add(fl);
       seaCv = document.createElement("canvas"); seaCv.width = seaCv.height = 256; seaT = new T.CanvasTexture(seaCv); seaT.wrapS = seaT.wrapT = T.RepeatWrapping; seaT.repeat.set(4, 8); seaT.anisotropy = 4; paintSea();
       gndM = mkMat(0xffffff, { map: seaT }); var gnd = new T.Mesh(new T.PlaneGeometry(160, LEN), gndM); gnd.rotation.x = -Math.PI / 2; gnd.position.set(0, -0.06, -LEN / 2 + 25); scene.add(gnd);
-      [-1, 1].forEach(function (s) { var rail = box(0.08, 0.2, LEN, G.laser); var rg2 = box(0.3, 0.32, LEN, G.laserGlow); rg2.position.set(s * (LANES * LW / 2 + 0.05), 0.14, -LEN / 2 + 25); scene.add(rg2); rail.position.set(s * (LANES * LW / 2 + 0.05), 0.11, -LEN / 2 + 25); scene.add(rail); var rl = box(0.03, 0.02, LEN, mkMat(0xffe9a6, { transparent: true, opacity: 0.7, depthWrite: false })); rl.position.set(s * (LANES * LW / 2 + 0.05), 0.23, -LEN / 2 + 25); scene.add(rl); });
       laneGlow = new T.Mesh(new T.PlaneGeometry(LW - 0.15, 36), mkMat(0xffffff, { transparent: true, opacity: 0.13, depthWrite: false })); laneGlow.rotation.x = -Math.PI / 2; laneGlow.position.set(0, 0.03, -14); scene.add(laneGlow);
       // pylon sisi jalan
       var N = low ? 9 : 16, sp = 14;
@@ -332,10 +338,6 @@
           g.position.set(s * (LANES * LW / 2 + 2.2), 0, 8 - i * sp); scene.add(g); world.pyl.push(g);
         }
       });
-      // lengkung emas di atas lintasan
-      for (var a = 0; a < (low ? 3 : 6); a++) {
-        var arc = new T.Mesh(new T.TorusGeometry(LANES * LW / 2 + 0.6, 0.035, 8, 48, Math.PI), G.laser); arc.position.set(0, 0, -a * 38 + 5); arc.userData.sp = 38 * (low ? 3 : 6); scene.add(arc); world.arch.push(arc);
-      }
       // bintang & bulan
       var pos = []; for (var s2 = 0; s2 < (low ? 150 : 420); s2++) { var th = Math.random() * 6.283, ph = Math.random() * 1.2 + 0.1, r = 220 + Math.random() * 60; pos.push(Math.cos(th) * Math.cos(ph) * r, Math.sin(ph) * r * 0.9 + 6, -Math.abs(Math.sin(th) * Math.cos(ph) * r) - 30); }
       var sg = new T.BufferGeometry(); sg.setAttribute("position", new T.Float32BufferAttribute(pos, 3));
@@ -366,7 +368,7 @@
     var limbs = {};
     function buildPlayer() {
       player = new T.Group(); var body = new T.Group(); player.add(body); limbs.body = body;
-      var skin = mkLam(0xf1c9a5), coat = G.white, scrub = mkLam(0x1fa6a0), scrubD = mkLam(0x188a86), shoe = mkLam(0xf4f0ff), hair = mkLam(0x2b1d16), steth = mkLam(0x2b2f3a), metal = mkLam(0xb8bfcc);
+      var skin = mkLam(0xf1c9a5), coat = mkLam(0x22b35e), scrub = mkLam(0x15803d), scrubD = mkLam(0x14532d), shoe = mkLam(0xf4f0ff), hair = mkLam(0x2b1d16), steth = mkLam(0x2b2f3a), metal = mkLam(0xb8bfcc);
       function cyl(rt, rb, h, m, seg) { return new T.Mesh(new T.CylinderGeometry(rt, rb, h, seg || 16), m); }
       // scrub di dalam + jas dokter
       var inner = cyl(0.3, 0.27, 0.9, scrub, 18); inner.scale.z = 0.62; inner.position.y = 1.0; body.add(inner);
@@ -430,26 +432,42 @@
           var p = box(0.2, 2.9, 0.2, G.obsDark); p.position.set(s * w / 2, 1.45, 0); g.add(p);
           var st = box(0.05, 2.6, 0.22, G.neon2); st.position.set(s * w / 2, 1.4, 0); g.add(st);
         });
+      } else if (type === "plank") {
+        var L = PLANK_L, H = 0.9, pw = w * 0.96; gl.scale.y = L / 1.5;
+        var pb = box(pw, H, L, G.obsDark); pb.position.y = H / 2; g.add(pb);
+        var pt = box(pw, 0.06, L + 0.02, G.plankTop); pt.position.y = H + 0.01; g.add(pt);
+        [-1, 1].forEach(function (s) { var e = box(0.06, 0.06, L + 0.04, G.neon2); e.position.set(s * pw / 2, H + 0.04, 0); g.add(e); });
+        var pf = box(pw + 0.02, 0.22, 0.06, G.hazard); pf.position.set(0, H * 0.5, L / 2 + 0.02); g.add(pf);
+      } else if (type === "tunnel") {
+        var TL = TUN_L, ry = 1.3, tw = w * 0.96; gl.scale.y = TL / 1.5;
+        var rf = box(tw, 0.3, TL, G.obsDark); rf.position.y = ry + 0.15; g.add(rf);
+        var rt = box(tw * 0.5, 0.02, TL, G.neon2); rt.position.y = ry + 0.31; g.add(rt);
+        [-1, 1].forEach(function (s) {
+          var e = box(0.06, 0.06, TL + 0.04, G.neon); e.position.set(s * tw / 2, ry, 0); g.add(e);
+          [-1, 1].forEach(function (zz) { var pp = box(0.14, ry + 0.3, 0.14, G.obsDark); pp.position.set(s * tw / 2, (ry + 0.3) / 2, zz * TL / 2); g.add(pp); });
+        });
+        var lt = box(tw, 0.18, 0.08, G.hazard); lt.position.set(0, ry + 0.15, TL / 2 + 0.05); g.add(lt);
       } else { // block
         var bw = w * 0.9, bk = box(bw, 1.4, 1.1, G.obsDark); bk.position.y = 0.7; g.add(bk);
         var hb = box(bw + 0.02, 0.24, 1.12, G.hazard); hb.position.y = 0.45; g.add(hb);
         var tp = box(bw, 0.07, 1.14, G.neon); tp.position.y = 1.4; g.add(tp);
         var ed = new T.LineSegments(new T.EdgesGeometry(new T.BoxGeometry(bw, 1.4, 1.1)), new T.LineBasicMaterial({ color: 0x35e6ff })); ed.position.y = 0.7; g.add(ed);
       }
-      g.position.set(x, 0, z); scene.add(g); var o = { g: g, type: type, lane: lane, hit: false, dying: false }; world.obs.push(o); return o;
+      g.position.set(x, 0, z); scene.add(g); var o = { g: g, type: type, lane: lane, hit: false, dying: false, on: false, h: 0.9, len: type === "plank" ? PLANK_L : type === "tunnel" ? TUN_L : 0 }; world.obs.push(o); return o;
     }
+    function hitO(o) { o.hit = true; if (st.invul <= 0) { st.invul = 1.7; st.stumbleT = 1.3; sfx.bump(); shake(); burst(st.x, 0.8, 0, 0xff6b9a, 10); } }
     function mkCoin(lane, z, y) {
       var m = new T.Group(), d = new T.Mesh(G.coinD, G.coinM); d.rotation.x = Math.PI / 2; m.add(d);
       m.add(new T.Mesh(G.coinR, G.coinRim));
       [-1, 1].forEach(function (sd) { var f = new T.Mesh(G.coinF, G.coinDecal); f.position.z = sd * 0.042; if (sd < 0) f.rotation.y = Math.PI; m.add(f); });
       m.position.set(laneX(lane), y || 1.0, z); scene.add(m); var c = { m: m, lane: lane, got: false }; world.coins.push(c); return c; }
     function spawnPattern() {
-      var r = Math.random(), type = r < 0.4 ? "hurdle" : r < 0.7 ? "beam" : "block", n = type === "block" ? 1 + (Math.random() < 0.4 ? 1 : 0) : 1 + ((Math.random() * 3) | 0), lanes = [];
+      var r = Math.random(), type = r < 0.26 ? "hurdle" : r < 0.44 ? "beam" : r < 0.56 ? "block" : r < 0.8 ? "plank" : "tunnel", n = (type === "block" || type === "plank" || type === "tunnel") ? 1 + (Math.random() < 0.35 ? 1 : 0) : 1 + ((Math.random() * 3) | 0), lanes = [];
       while (lanes.length < n) { var l = (Math.random() * LANES) | 0; if (lanes.indexOf(l) < 0) lanes.push(l); }
       lanes.forEach(function (l) { mkObstacle(type, l, -125); });
       var free = []; for (var i = 0; i < LANES; i++) if (lanes.indexOf(i) < 0) free.push(i);
       var cl = free[(Math.random() * free.length) | 0]; for (var k = 0; k < 5; k++) mkCoin(cl, -118 - k * 1.9);
-      if (type !== "block" && Math.random() < 0.5) { var jl = lanes[0]; for (var j = 0; j < 3; j++) mkCoin(jl, -127 - (j - 1) * 1.6, 1.6 + (j === 1 ? 0.5 : 0)); }
+      if ((type === "hurdle" || type === "beam") && Math.random() < 0.5) { var jl = lanes[0]; for (var j = 0; j < 3; j++) mkCoin(jl, -127 - (j - 1) * 1.6, 1.6 + (j === 1 ? 0.5 : 0)); }
     }
     function killAhead() { // buang yang masih jauh di depan agar jalur jawaban bersih
       world.obs.forEach(function (o) { if (o.g.position.z < -14) o.dying = true; });
@@ -461,14 +479,17 @@
       st.gateSpawned = true; killAhead(); sfx.gate();
       var q = cur(), grp = new T.Group(); grp.position.z = -dist;
       LET.forEach(function (L, i) {
-        var has = !!q.o[L], g = new T.Group(), c = has ? COL[i] : (LT() ? 0xa9a1c8 : 0x3a3355), x = laneX(i);
-        [-1, 1].forEach(function (s) { var p = box(0.3, 3.6, 0.5, mkMat(c)); p.position.set(x + s * (LW / 2 - 0.2), 1.8, 0); g.add(p); });
-        var top = box(LW - 0.1, 0.45, 0.5, mkMat(c)); top.position.set(x, 3.6, 0); g.add(top);
+        var has = !!q.o[L], g = new T.Group(), c = has ? COL[i] : (LT() ? 0xa9a1c8 : 0x3a3355), x = laneX(i), pw = LW - 0.3, ph = 3.4, fm = mkMat(c);
+        [-1, 1].forEach(function (s) { var p = box(0.07, ph + 0.07, 0.07, fm); p.position.set(x + s * pw / 2, ph / 2, 0); g.add(p); });
+        var top = box(pw + 0.07, 0.07, 0.07, fm); top.position.set(x, ph, 0); g.add(top);
         if (has) {
-          var sp = new T.Sprite(new T.SpriteMaterial({ map: G.lt[i], fog: false, depthTest: false })); sp.scale.set(1.9, 1.9, 1); sp.position.set(x, 4.7, 0); sp.renderOrder = 10; g.add(sp);
-          var f = new T.Mesh(new T.PlaneGeometry(LW - 0.5, 3.4), mkMat(c, { transparent: true, opacity: 0.22, side: T.DoubleSide, depthWrite: false })); f.position.set(x, 1.8, 0); g.add(f);
-          var fs = new T.Mesh(new T.PlaneGeometry(LW - 0.2, 3), mkMat(c, { transparent: true, opacity: 0.28, depthWrite: false })); fs.rotation.x = -Math.PI / 2; fs.position.set(x, 0.04, 0); g.add(fs);
-        } else { var wall = box(LW - 0.4, 3.4, 0.4, G.wall); wall.position.set(x, 1.7, 0); g.add(wall); }
+          var gm = mkMat(c, { transparent: true, opacity: 0.22, blending: T.AdditiveBlending, depthWrite: false });
+          [-1, 1].forEach(function (s) { var gb = box(0.32, ph, 0.32, gm); gb.position.set(x + s * pw / 2, ph / 2, 0); g.add(gb); });
+          var gt = box(pw, 0.32, 0.32, gm); gt.position.set(x, ph, 0); g.add(gt);
+          var f = new T.Mesh(new T.PlaneGeometry(pw, ph), G.gateTex[i]); f.position.set(x, ph / 2, 0); g.add(f);
+          var fs = new T.Mesh(new T.PlaneGeometry(pw, 3), mkMat(c, { transparent: true, opacity: 0.3, blending: T.AdditiveBlending, depthWrite: false })); fs.rotation.x = -Math.PI / 2; fs.position.set(x, 0.04, 0); g.add(fs);
+          var sp = new T.Sprite(new T.SpriteMaterial({ map: G.lt[i], fog: false, depthTest: false })); sp.scale.set(1.5, 1.5, 1); sp.position.set(x, ph + 0.95, 0); sp.renderOrder = 10; g.add(sp);
+        } else { var wl = new T.Mesh(new T.PlaneGeometry(pw, ph), mkMat(c, { transparent: true, opacity: 0.55, side: T.DoubleSide, depthWrite: false })); wl.position.set(x, ph / 2, 0); g.add(wl); }
         grp.add(g);
       });
       scene.add(grp); st.gate = { g: grp, done: false }; world.gates.push(st.gate);
@@ -490,7 +511,7 @@
       if (st.paused || st.phase === "end" || st.phase === "load") return;
       var n = st.lane + d; if (n < 0 || n >= LANES) return; if (!laneOk(n)) return; st.lane = n; sfx.lane(); tutAct(d < 0 ? "left" : "right");
     }
-    function jump() { if (st.paused || st.y > 0.01 || st.phase === "load" || st.phase === "end") return; st.vy = 9.2; st.slideT = 0; sfx.jump(); tutAct("jump"); }
+    function jump() { if (st.paused || st.y > (st.gy || 0) + 0.05 || st.phase === "load" || st.phase === "end") return; st.vy = 9.2; st.slideT = 0; sfx.jump(); tutAct("jump"); }
     function slide() { if (st.paused || st.phase === "load" || st.phase === "end") return; if (st.y > 0.01) st.vy = -14; st.slideT = 0.75; sfx.slide(); tutAct("slide"); }
     function onKey(e) {
       if (e.repeat && !/Arrow|^[ADWS]$/i.test(e.key)) return; var k = e.key;
@@ -630,7 +651,9 @@
       if (cloudG && cloudG.visible) cloudG.children.forEach(function (c) { c.userData.az += c.userData.v * dt; if (c.userData.az > 1.45) c.userData.az = -1.45; placeCloud(c); var dx = Math.abs(c.position.x - moon.position.x) / (c.scale.x * 0.5 + 40), dy = Math.abs(c.position.y - moon.position.y) / (c.scale.y * 0.5 + 40); c.material.opacity = Math.min(0.88, 0.1 + Math.max(dx, dy) * 0.8); });
       // pemain
       var tx2 = laneX(st.lane); st.x += (tx2 - st.x) * Math.min(1, dt * 15);
-      if (st.y > 0 || st.vy > 0) { st.vy -= 26 * dt; st.y += st.vy * dt; if (st.y <= 0) { st.y = 0; st.vy = 0; } }
+      var gy = 0; world.obs.forEach(function (o) { if (o.type === "plank" && o.on && !o.dying && !o.hit) gy = Math.max(gy, o.h); }); st.gy = gy;
+      if (st.y > gy + 0.001 || st.vy > 0) { st.vy -= 26 * dt; st.y += st.vy * dt; if (st.y <= gy && st.vy <= 0) { st.y = gy; st.vy = 0; } }
+      else if (st.y < gy) { st.y = Math.min(gy, st.y + 9 * dt); st.vy = 0; } else st.vy = 0;
       st.slideT = Math.max(0, st.slideT - dt);
       player.position.set(st.x, st.y, 0);
       var ph = st.runT, sl = st.slideT > 0, air = st.y > 0.02, hurt = st.stumbleT > 0, B = limbs.body, P = st.pose;
@@ -654,7 +677,11 @@
       world.obs.forEach(function (o) {
         o.g.position.z += v * dt;
         if (o.dying) { o.g.scale.multiplyScalar(0.82); if (o.g.scale.x < 0.05) o.rm = true; }
-        if (!o.hit && !o.dying && o.g.position.z > -0.55 && o.g.position.z < 0.55 && o.lane === st.lane) {
+        if (o.len) {
+          var cov = Math.abs(o.g.position.z) <= o.len / 2 && o.lane === st.lane && !o.dying && !o.hit;
+          if (o.type === "plank") { if (cov && !o.on) { if (st.y >= o.h - 0.35) o.on = true; else hitO(o); } else if (!cov) o.on = false; }
+          else if (cov && st.slideT <= 0) hitO(o);
+        } else if (!o.hit && !o.dying && o.g.position.z > -0.55 && o.g.position.z < 0.55 && o.lane === st.lane) {
           var hitIt = o.type === "hurdle" ? st.y < 0.62 : o.type === "beam" ? st.slideT <= 0 : st.y < 1.45;
           if (hitIt) { o.hit = true; if (st.invul <= 0) { st.invul = 1.7; st.stumbleT = 1.3; sfx.bump(); shake(); burst(st.x, 0.8, 0, 0xff6b9a, 10); } }
         }
