@@ -60,5 +60,16 @@ ok(/\.hband \.ttl h1\{[^}]*#ffffff,#ffe9a8/.test(html), "tulisan ASTERION terang
 ok(/\.badge\.nx\{background:linear-gradient\(135deg,#fde68a,#fbbf24 55%,#f59e0b\)/.test(html), "warna cerah untuk Besok/Lusa");
 ok((html.match(/class='badge nx'/g) || []).length === 2, "label Besok/Lusa dan BESOK memakai warna cerah");
 
+/* 6. label & caption GAME KUIS: tiga mode (game, mode soal, simulasi ujian) */
+ok(!/GAME RUN/i.test(html + run), "tidak ada lagi tulisan GAME RUN");
+ok(/<h1>GAME KUIS<\/h1>/.test(run) && /n:"GAME KUIS"/.test(html) && /run:"GAME KUIS"/.test(html), "label GAME KUIS di judul, menu, dan judul halaman");
+ok(/Tiga mode: 🎮 <b>Game<\/b>/.test(run) && /gerbang <b>A–E<\/b>/.test(run), "caption menyebut mode game & gerbang A–E");
+ok(/📝 <b>Mode Soal<\/b> — tanpa game, kunci &amp; pembahasan tiap pilihan/.test(run), "caption menyebut Mode Soal + pembahasan per pilihan");
+ok(/🎓 <b>Simulasi Ujian<\/b> — jawaban baru terbuka di akhir/.test(run), "caption menyebut Simulasi Ujian (jawaban di akhir)");
+ok(/kembali ke nomor sebelumnya, lompat ke nomor mana pun, dan menandai soal \(flag\)/.test(run), "caption menyebut pindah nomor & flag soal");
+ok(/Skor: benar \+1, salah\/kosong 0\. Waktu <b>per soal<\/b>\. Setelah selesai, kamu mendapat pembahasan semua soal\./.test(run), "caption tetap memuat skor, waktu per soal, dan pembahasan akhir");
+ok(["#/run/play/", "#/run/quiz/", "#/run/exam/"].every(function (x) { return run.indexOf(x) > -1; }), "tiga tombol mode tersedia di kartu kategori");
+ok(/s:"3 mode: game 3D, mode soal & simulasi ujian"/.test(html), "subjudul menu home menyebut tiga mode");
+
 console.log(fail ? "HASIL: GAGAL" : "HASIL: SEMUA LOLOS");
 process.exit(fail);
