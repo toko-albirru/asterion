@@ -83,7 +83,7 @@
   async function home(k) {
     var r = await rapi("cats"); if (!alive(k)) return; if (!r.ok) return setRR(errBox(r));
     RS.cats = r.j.cats; RS.set = r.j.settings;
-    var h = "<div class='rn-hero g'><h1>GAME KUIS</h1><div class='yr' style='color:var(--gold);letter-spacing:.35em;font-size:11px'>3D · EDUKASI · KEDOKTERAN</div><p>Berlari di lintasan lima jalur dan jawab soal dengan melewati gerbang <b>A–E</b> — atau pilih <b>Mode Soal</b> kalau mau langsung mengerjakan soal tanpa game. Skor: benar +1, salah/kosong 0. Waktu <b>per soal</b>. Setelah selesai, kamu mendapat pembahasan semua soal.</p>" +
+    var h = "<div class='rn-hero g'><h1>GAME KUIS</h1><div class='yr' style='color:var(--gold);letter-spacing:.35em;font-size:11px'>3D · EDUKASI · KEDOKTERAN</div><p>Tiga mode: 🎮 <b>Game</b> — berlari di lintasan lima jalur, jawab soal dengan melewati gerbang <b>A–E</b>; 📝 <b>Mode Soal</b> — tanpa game, kunci &amp; pembahasan tiap pilihan langsung muncul setelah menjawab; 🎓 <b>Simulasi Ujian</b> — jawaban baru terbuka di akhir, tapi tetap bisa kembali ke nomor sebelumnya, lompat ke nomor mana pun, dan menandai soal (flag). Skor: benar +1, salah/kosong 0. Waktu <b>per soal</b>. Setelah selesai, kamu mendapat pembahasan semua soal.</p>" +
       "<div class='rn-row'><a class='btn s' href='#/run/lb/global'>🌍 Leaderboard global</a><a class='btn s' href='#/run/hist'>🕘 Riwayat</a><a class='btn s' href='#/run/tutorial'>🎮 Tutorial</a>" + (S.admin ? "<a class='btn' href='#/run/admin'>⚙️ Panel Admin</a>" : "") + "</div></div>";
     RS.nick = r.j.nick; RS.prefs = r.j.prefs;
     h += nickBar() + prefsBar() + "<div class='sec'>PILIH KATEGORI</div>";

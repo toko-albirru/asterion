@@ -212,7 +212,18 @@ select.in option{background:#241a3f;color:#fff}
 .gate{max-width:380px;margin:0 auto;padding:18px 18px 40px}
 .gate .pn{margin-top:10px}.gthm{display:flex;justify-content:flex-end;padding:calc(6px + env(safe-area-inset-top,0px)) 0 0}
 /* ---------- TEMA TERANG: kontras teks (perbaikan teks putih hilang) ---------- */
-:root[data-theme="light"] html{background-color:#efe6fb;background-image:linear-gradient(180deg,#f8f2fd 0,#e8dafb 34%,#d3bcf6 68%,#bb9bef 100%);background-attachment:fixed;background-repeat:no-repeat}
+:root[data-theme="light"] html{background-color:#fdfcff;background-image:linear-gradient(180deg,#ffffff 0,#fcfbff 55%,#f7f4fe 100%);background-attachment:fixed;background-repeat:no-repeat;overflow-x:hidden}
+:root[data-theme="light"] .hband{position:relative;z-index:0}
+:root[data-theme="light"] .hband::before{content:"";position:absolute;z-index:-1;top:var(--hb-t,0px);bottom:0;left:50%;width:100vw;margin-left:-50vw;background:linear-gradient(180deg,#8b5cf6 0,#7c3aed 58%,#6d28d9 100%);border-radius:0 0 26px 26px;box-shadow:0 12px 30px rgba(109,40,217,.22)}
+:root[data-theme="light"] .gate .hband{margin:0 -18px;padding:0 18px;--hb-t:-18px}
+:root[data-theme="light"] .hband .mark{filter:drop-shadow(0 10px 26px rgba(30,10,70,.35))}
+:root[data-theme="light"] .hband .ttl h1{background:linear-gradient(180deg,#ffffff,#ffe9a8);-webkit-background-clip:text;background-clip:text;color:transparent;filter:drop-shadow(0 6px 18px rgba(20,5,50,.35))}
+:root[data-theme="light"] .hband .yr{color:#ffe9a8}
+:root[data-theme="light"] body[data-r="home"] .top::before{background:linear-gradient(180deg,#7c3aed,#6d28d9);border-bottom:1px solid rgba(255,255,255,.22);box-shadow:0 10px 26px rgba(109,40,217,.28)}
+:root[data-theme="light"] body[data-r="home"] .top h2{color:#fff}
+:root[data-theme="light"] body[data-r="home"] .top .ib{background:rgba(255,255,255,.2);color:#fff;border-color:rgba(255,255,255,.38)}
+.badge.nx{background:linear-gradient(135deg,#fde68a,#fbbf24 55%,#f59e0b);color:#4a2f86;box-shadow:0 2px 10px rgba(245,158,11,.45)}
+:root[data-theme="light"] .badge.nx{color:#4a2f86}
 :root[data-theme="light"] body{color:#241a3f}
 :root[data-theme="light"] .chip{color:#241a3f;background:rgba(255,255,255,.82);border:1px solid rgba(48,28,88,.16)}
 :root[data-theme="light"] .chip.on{color:#4a2f86;background:linear-gradient(135deg,rgba(245,192,74,.42),rgba(160,120,255,.22));border-color:rgba(154,106,18,.5)}
@@ -321,9 +332,11 @@ select.in option{background:#241a3f;color:#fff}
 <div id="toast"></div>
 
 <div id="gate" class="gate" hidden>
+  <div class="hband">
   <div class="gthm"><button class="ib g" id="gthm" title="Ganti tema">🌙</button></div>
   <div class="hero"><img class="mark" alt="" src="logo.webp"></div>
   <div class="ttl" style="margin-top:-46px"><h1>ASTERION</h1><div class="yr">MMXXV</div></div>
+  </div>
   <div id="fLogin" class="pn g">
     <label for="lu">Username</label><input id="lu" autocomplete="username" autocapitalize="characters" placeholder="G0025001">
     <label for="lp">Password</label><input id="lp" type="password" autocomplete="current-password" placeholder="Password">
@@ -427,7 +440,7 @@ async function api(p,o){o=o||{};var r=await fetch("/api/"+p,{method:o.m||"GET",h
   if(r.status===401&&p!=="login"){logout();throw 0}var j=null;try{j=await r.json()}catch(e){}return{ok:r.ok,s:r.status,j:j}}
 function setUser(){var u=S.t.split(".")[0]||"";S.u=u;S.admin=u==="admin"}
 function logout(){clearInterval(BT);BT=0;localStorage.removeItem("tk");S.t="";S.data=null;location.hash="#/";show("gate");$("lp").value=""}
-function show(w){["gate","shell"].forEach(function(i){$(i).hidden=i!==w});if(w==="gate"){$("fLogin").hidden=false;$("fPw").hidden=true}}
+function show(w){["gate","shell"].forEach(function(i){$(i).hidden=i!==w});document.body.dataset.r=w==="gate"?"login":(location.hash.replace(/^#\/?/,"").split("/")[0]||"home");if(w==="gate"){$("fLogin").hidden=false;$("fPw").hidden=true}}
 $("out").onclick=logout;
 
 async function doLogin(){
@@ -1236,7 +1249,7 @@ function cards(items){return items.map(function(c){return "<a class='card g' hre
 /* ---------- pengaturan menu / navbar / kategori (admin) ---------- */
 var UI_DEF={
   nav:[{id:"home",n:"Beranda",i:"🏠"},{id:"materi",n:"Materi",i:"📚"},{id:"rekaman",n:"Rekaman",i:"🎬"},{id:"jadwal",n:"Jadwal",i:"🗓️"},{id:"tutor",n:"Tutor",i:"👥"},{id:"run",n:"Kuis",i:"🏃"},{id:"dokter",n:"Dokter",i:"📞"}],
-  menu:[{id:"materi",n:"Materi & Rangkuman",i:"📚",s:"Per blok, lab, dan Google Drive"},{id:"rekaman",n:"Rekaman Kuliah",i:"🎬",s:"Putar langsung per tahun"},{id:"jadwal",n:"Jadwal Kuliah",i:"🗓️",s:"Terhubung ke spreadsheet"},{id:"tutor",n:"Jadwal Tutorial",i:"👥",s:"Kelompok, tutor & ruang · konfirmasi WA ke tutor"},{id:"run",n:"GAME KUIS",i:"🏃",s:"Game 3D edukasi · jawab soal sambil berlari"},{id:"dokter",n:"Kontak Dokter",i:"📞",s:"Nomor HP dosen & dokter · bisa usul ubah/tambah"}],
+  menu:[{id:"materi",n:"Materi & Rangkuman",i:"📚",s:"Per blok, lab, dan Google Drive"},{id:"rekaman",n:"Rekaman Kuliah",i:"🎬",s:"Putar langsung per tahun"},{id:"jadwal",n:"Jadwal Kuliah",i:"🗓️",s:"Terhubung ke spreadsheet"},{id:"tutor",n:"Jadwal Tutorial",i:"👥",s:"Kelompok, tutor & ruang · konfirmasi WA ke tutor"},{id:"run",n:"GAME KUIS",i:"🏃",s:"3 mode: game 3D, mode soal & simulasi ujian"},{id:"dokter",n:"Kontak Dokter",i:"📞",s:"Nomor HP dosen & dokter · bisa usul ubah/tambah"}],
   mp:[{id:"blok",n:"PILIH BLOK",i:"📘"},{id:"drive",n:"DRIVE",i:"🗂️",c:"Google Drive Materi"}],
   cm:[{id:"all",n:"Seluruh Blok",i:"📖"},{id:"lab",n:"Lab",i:"🔬"}],
   cr:[{id:"kl",n:"Kuliah Lain",i:"📝"},{id:"blok",n:"Blok",i:"🧠"},{id:"lab",n:"Lab",i:"🔬"}]
@@ -1287,7 +1300,7 @@ async function uiAct(b,a){
 /* ---------- pages ---------- */
 function pHome(){
   setTimeout(todayFill,0);
-  return "<div class='hero'><img class='mark' alt='' src='logo.webp'></div><div class='ttl'><h1>ASTERION</h1><div class='yr'>MMXXV</div></div>"+
+  return "<div class='hband'><div class='hero'><img class='mark' alt='' src='logo.webp'></div><div class='ttl'><h1>ASTERION</h1><div class='yr'>MMXXV</div></div></div>"+
   "<p class='hint' style='text-align:center;font-size:14px'>Halo, <b>"+esc(myName())+"</b> 👋<br>Seluruh rekaman, rangkuman, soal, dan materi kuliah ada disini, semangat belajarnya 🤩✨</p>"+
   "<div class='sec'>HARI INI</div><div id='today' class='pn g empty'>Memuat jadwal…</div><div id='next'></div>"+
   "<div class='sec'>MENU</div>"+cards(uiList("menu").filter(function(x){return !x.h}).map(function(x){return["#/"+x.id,x.i,x.n,x.s]}))+
@@ -1304,7 +1317,7 @@ async function todayFill(){
     var up=r.j.filter(function(x){return x.iso>iso&&x.items.length}).sort(function(a,b){return a.iso<b.iso?-1:1}).slice(0,2);
     nx.innerHTML=up.length?"<div class='sec'>JADWAL TERDEKAT</div>"+up.map(function(x){
       var n=Math.round((Date.parse(x.iso)-Date.parse(iso))/864e5),lb=n===1?"Besok":n===2?"Lusa":"";
-      return"<div class='day g'><h3>"+esc(x.d)+(lb?"<span class='badge'>"+lb+"</span>":"")+"</h3>"+x.items.map(slot).join("")+"</div>"}).join("")+
+      return"<div class='day g'><h3>"+esc(x.d)+(lb?"<span class='badge nx'>"+lb+"</span>":"")+"</h3>"+x.items.map(slot).join("")+"</div>"}).join("")+
       "<div class='hint' style='text-align:center'>Dari jadwal “"+esc(tb.n)+"”. Ganti di menu Jadwal.</div>":""
   }catch(e){}}
 function pMateri(P){
@@ -1612,7 +1625,7 @@ function tutCard(it,k){
   var iso=jkt(),today=it.iso&&it.iso===iso,past=it.iso&&it.iso<iso,n=it.iso?Math.round((Date.parse(it.iso)-Date.parse(iso))/864e5):9,d=dkFind(it.tutor),wa="";
   if(d)wa=[d.h1,d.h2].filter(Boolean).map(function(x){x=ph(x);return"<a class='tag ok' href='tel:"+x+"'>📞 "+x+"</a><a class='tag' href='https://wa.me/62"+x.slice(1)+"' data-tw='"+k+"' data-h='"+x+"'>Konfirmasi Kehadiran (WA)</a>"}).join("");
   else if(S.dk)wa="<a class='tag' href='#/dokter'>＋ Nomor belum ada · usulkan di Kontak Dokter</a>";
-  return"<div class='day g"+(today?" today":"")+"'"+(past?" style='opacity:.55'":"")+"><h3>"+esc(it.sk+" · "+it.pt)+(today?"<span class='badge'>HARI INI</span>":n===1?"<span class='badge'>BESOK</span>":"")+"</h3>"+
+  return"<div class='day g"+(today?" today":"")+"'"+(past?" style='opacity:.55'":"")+"><h3>"+esc(it.sk+" · "+it.pt)+(today?"<span class='badge'>HARI INI</span>":n===1?"<span class='badge nx'>BESOK</span>":"")+"</h3>"+
   "<div class='sl'><div class='tm'>"+esc(it.jam)+"</div><div class='bd'><b>"+esc(it.tutor||"—")+"</b><div class='mt'><span class='tag'>Kelompok "+esc(kLbl(it.kel))+"</span><span class='tag'>📍 "+esc(it.ruang)+"</span><span class='tag'>📅 "+esc(it.tgl)+"</span></div>"+(wa?"<div class='mt'>"+wa+"</div>":"")+"</div></div></div>"}
 function pTutor(){
   setTimeout(tInit,0);
@@ -1691,7 +1704,7 @@ function route(){
   if(!S.data)return;
   var P=location.hash.replace(/^#\/?/,"").split("/").filter(Boolean),tab=P[0]||"home",v;
   if(tab==="materi")v=pMateri(P);else if(tab==="rekaman")v=pRekaman(P);else if(tab==="jadwal")v=pJadwal(P);else if(tab==="tutor")v=pTutor(P);else if(tab==="run"&&window.pRun)v=window.pRun(P);else if(tab==="dokter")v=pDokter(P);else if(tab==="atur")v=pAtur();else if(tab==="akun")v=pAkun();else{tab="home";v=pHome()}
-  renderNav();$("main").innerHTML=v;$("ttl").textContent=(tab!=="home"&&tab!=="atur"&&uiName(tab)?uiName(tab).toUpperCase():TT[tab]);
+  document.body.dataset.r=tab;renderNav();$("main").innerHTML=v;$("ttl").textContent=(tab!=="home"&&tab!=="atur"&&uiName(tab)?uiName(tab).toUpperCase():TT[tab]);
   $("back").hidden=P.length<2;$("back").href="#/"+P.slice(0,-1).join("/");
   [].forEach.call(document.querySelectorAll(".nav a"),function(a){a.classList.toggle("on",a.dataset.t===tab)});
   if(tab!=="jadwal")window.scrollTo(0,0)}
