@@ -83,7 +83,39 @@
     ".rg-tut{position:absolute;left:50%;transform:translateX(-50%);bottom:12px;width:min(420px,calc(100% - 24px));text-align:center;padding:12px 14px;border-radius:16px;background:rgba(18,10,40,.88);border:1px solid #f5c04a;font-weight:600;line-height:1.4;pointer-events:none}" +
     ".rg-tut small{display:block;color:#d9cdf5;font-weight:400;margin-top:3px}" +
     ".rg-lb{position:absolute;inset:0;z-index:6;background:rgba(0,0,0,.9);display:flex;align-items:center;justify-content:center;padding:12px}.rg-lb img{max-width:100%;max-height:100%;background:#fff;border-radius:8px}" +
-    ".rg-load{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:10px;color:#d9cdf5;text-align:center;padding:20px}";
+    ".rg-load{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:10px;color:#d9cdf5;text-align:center;padding:20px}" +
+    ":root[data-theme=\"light\"] .rg{background:#e6eeff;color:#241a3f}" +
+    ":root[data-theme=\"light\"] .rg-hud{background:linear-gradient(#f8f5ff,#ebe5fa)}" +
+    ":root[data-theme=\"light\"] .rg-pill{background:rgba(255,255,255,.92);border-color:rgba(48,28,88,.22);color:#241a3f}" +
+    ":root[data-theme=\"light\"] .rg-pill.ok{color:#127a3e}" +
+    ":root[data-theme=\"light\"] .rg-pill.en{color:#9a6a12}" +
+    ":root[data-theme=\"light\"] .rg-prog{background:rgba(48,28,88,.16)}" +
+    ":root[data-theme=\"light\"] .rg-tmb{background:rgba(48,28,88,.16)}" +
+    ":root[data-theme=\"light\"] .rg-btn{background:rgba(255,255,255,.92);border-color:rgba(48,28,88,.22);color:#241a3f}" +
+    ":root[data-theme=\"light\"] .rg-card{background:rgba(255,255,255,.82);border-color:rgba(154,106,18,.45)}" +
+    ":root[data-theme=\"light\"] .rg-tmv{color:#9a6a12}" +
+    ":root[data-theme=\"light\"] .rg-tm.warn .rg-tmv{color:#b7791f}" +
+    ":root[data-theme=\"light\"] .rg-tm.crit .rg-tmv{color:#c62828}" +
+    ":root[data-theme=\"light\"] .rg-opts li{background:rgba(48,28,88,.07)}" +
+    ":root[data-theme=\"light\"] .rg-opts li.on{border-color:#4a2f86;background:rgba(122,90,220,.22)}" +
+    ":root[data-theme=\"light\"] .rg-opts li.ok{border-color:#127a3e;background:rgba(34,160,80,.24);box-shadow:0 0 0 1px #127a3e inset}" +
+    ":root[data-theme=\"light\"] .rg-opts li.no{border-color:#c62828;background:rgba(220,60,60,.22);box-shadow:0 0 0 1px #c62828 inset}" +
+    ":root[data-theme=\"light\"] .rg-tg{color:#4b3f66}" +
+    ":root[data-theme=\"light\"] .rg-foot{background:linear-gradient(#ebe5fa,#f8f5ff)}" +
+    ":root[data-theme=\"light\"] .rg-lane{background:rgba(255,255,255,.94);border-color:#241a3f;color:#241a3f}" +
+    ":root[data-theme=\"light\"] .rg-msg{color:#241a3f;text-shadow:0 2px 16px rgba(255,255,255,.95)}" +
+    ":root[data-theme=\"light\"] .rg-msg.ok{color:#127a3e}" +
+    ":root[data-theme=\"light\"] .rg-msg.bad{color:#c62828}" +
+    ":root[data-theme=\"light\"] .rg-msg.blank{color:#4b3f66}" +
+    ":root[data-theme=\"light\"] .rg-ov{background:rgba(238,233,252,.86)}" +
+    ":root[data-theme=\"light\"] .rg-box{background:linear-gradient(160deg,#fff,#f1ebfc);border-color:rgba(154,106,18,.5)}" +
+    ":root[data-theme=\"light\"] .rg-box h3{color:#9a6a12}" +
+    ":root[data-theme=\"light\"] .rg-box p{color:#4b3f66}" +
+    ":root[data-theme=\"light\"] .rg-box button{background:rgba(48,28,88,.08);color:#241a3f;border-color:rgba(48,28,88,.22)}" +
+    ":root[data-theme=\"light\"] .rg-box button.pri{background:linear-gradient(135deg,#f5c04a,#e08a2e);color:#241a3f;border:0}" +
+    ":root[data-theme=\"light\"] .rg-tut{background:rgba(255,255,255,.94);color:#241a3f}" +
+    ":root[data-theme=\"light\"] .rg-tut small{color:#4b3f66}" +
+    ":root[data-theme=\"light\"] .rg-load{color:#4b3f66}";
   function injectCss() { if (document.getElementById("rg-css")) return; var s = document.createElement("style"); s.id = "rg-css"; s.textContent = CSS; document.head.appendChild(s); }
 
   function el(tag, cls, html) { var e = document.createElement(tag); if (cls) e.className = cls; if (html != null) e.innerHTML = html; return e; }
@@ -187,32 +219,44 @@
     function mkLam(c, o) { return new T.MeshLambertMaterial(Object.assign({ color: c }, o || {})); }
     function box(w, h, d, m) { return new T.Mesh(new T.BoxGeometry(w, h, d), m); }
     var G = {}; // geometri/material bersama
+    var LT = function () { return document.documentElement.getAttribute("data-theme") === "light"; };
     function initShared() {
       G.coin = new T.OctahedronGeometry(0.34); G.coinM = mkMat(0xffd166);
       G.postG = new T.BoxGeometry(0.22, 1, 0.22); G.purple = mkLam(0x5b3fb0, { emissive: 0x2a1b66 }); G.gold = mkMat(0xf5c04a); G.red = mkMat(0xff6b9a, { transparent: true, opacity: 0.95 });
-      G.dark = mkLam(0x2a1c52); G.white = mkLam(0xf4f0ff);
-      G.lt = LET.map(function (L, i) {
-        var c = document.createElement("canvas"); c.width = c.height = 128; var g = c.getContext("2d");
-        g.fillStyle = "rgba(10,6,24,.85)"; g.beginPath(); g.arc(64, 64, 58, 0, 7); g.fill(); g.lineWidth = 8; g.strokeStyle = CSSC[i]; g.stroke();
-        g.fillStyle = "#fff"; g.font = "900 78px Cinzel,Georgia,serif"; g.textAlign = "center"; g.textBaseline = "middle"; g.fillText(L, 64, 70);
-        return new T.CanvasTexture(c);
+      G.dark = mkLam(0x2a1c52); G.white = mkLam(0xf4f0ff); G.wall = mkLam(0x2b2442);
+      G.ltc = []; G.lt = LET.map(function (L, i) {
+        var c = document.createElement("canvas"); c.width = c.height = 128; G.ltc.push(c); return new T.CanvasTexture(c);
+      }); paintLt();
+    }
+    function paintLt() {
+      var light = LT();
+      G.ltc.forEach(function (c, i) {
+        var g = c.getContext("2d"); g.clearRect(0, 0, 128, 128);
+        g.fillStyle = light ? "rgba(255,255,255,.95)" : "rgba(10,6,24,.85)"; g.beginPath(); g.arc(64, 64, 58, 0, 7); g.fill(); g.lineWidth = 8; g.strokeStyle = CSSC[i]; g.stroke();
+        g.fillStyle = light ? "#241a3f" : "#fff"; g.font = "900 78px Cinzel,Georgia,serif"; g.textAlign = "center"; g.textBaseline = "middle"; g.fillText(L_(i), 64, 70);
+        G.lt[i].needsUpdate = true;
       });
     }
-    function floorTex() {
-      var c = document.createElement("canvas"); c.width = c.height = 512; var g = c.getContext("2d");
-      var gr = g.createLinearGradient(0, 0, 0, 512); gr.addColorStop(0, "#1d1438"); gr.addColorStop(1, "#150e2c"); g.fillStyle = gr; g.fillRect(0, 0, 512, 512);
-      g.strokeStyle = "rgba(245,192,74,.6)"; g.lineWidth = 4; for (var i = 0; i <= LANES; i++) { var x = (i * 512) / LANES; g.beginPath(); g.moveTo(x, 0); g.lineTo(x, 512); g.stroke(); }
-      g.strokeStyle = "rgba(177,140,255,.35)"; g.lineWidth = 3; [0, 256].forEach(function (y) { g.beginPath(); g.moveTo(0, y); g.lineTo(512, y); g.stroke(); });
-      g.fillStyle = "rgba(255,255,255,.05)"; for (var k = 0; k < 40; k++) g.fillRect(Math.random() * 512, Math.random() * 512, 2, 2);
-      var t = new T.CanvasTexture(c); t.wrapS = t.wrapT = T.RepeatWrapping; t.anisotropy = 4; return t;
+    function L_(i) { return LET[i]; }
+    var floorCv;
+    function paintFloor() {
+      var light = LT(), g = floorCv.getContext("2d");
+      var gr = g.createLinearGradient(0, 0, 0, 512); gr.addColorStop(0, light ? "#f1ecfc" : "#1d1438"); gr.addColorStop(1, light ? "#e1d8f4" : "#150e2c"); g.fillStyle = gr; g.fillRect(0, 0, 512, 512);
+      g.strokeStyle = light ? "rgba(176,118,12,.75)" : "rgba(245,192,74,.6)"; g.lineWidth = 4; for (var i = 0; i <= LANES; i++) { var x = (i * 512) / LANES; g.beginPath(); g.moveTo(x, 0); g.lineTo(x, 512); g.stroke(); }
+      g.strokeStyle = light ? "rgba(110,70,200,.40)" : "rgba(177,140,255,.35)"; g.lineWidth = 3; [0, 256].forEach(function (y) { g.beginPath(); g.moveTo(0, y); g.lineTo(512, y); g.stroke(); });
+      g.fillStyle = light ? "rgba(60,40,110,.07)" : "rgba(255,255,255,.05)"; for (var k = 0; k < 40; k++) g.fillRect(Math.random() * 512, Math.random() * 512, 2, 2);
     }
-    var floorT, laneGlow, moon;
+    function floorTex() {
+      floorCv = document.createElement("canvas"); floorCv.width = floorCv.height = 512; paintFloor();
+      var t = new T.CanvasTexture(floorCv); t.wrapS = t.wrapT = T.RepeatWrapping; t.anisotropy = 4; return t;
+    }
+    var floorT, laneGlow, moon, amb, dirL, gndM, starsP;
     function buildScene() {
       scene = new T.Scene(); scene.background = new T.Color(0x120c24); scene.fog = new T.Fog(0x120c24, 30, 140);
-      scene.add(new T.AmbientLight(0xcbb8ff, 0.85)); var dl = new T.DirectionalLight(0xffffff, 0.8); dl.position.set(3, 8, 6); scene.add(dl);
+      amb = new T.AmbientLight(0xcbb8ff, 0.85); scene.add(amb); var dl = dirL = new T.DirectionalLight(0xffffff, 0.8); dl.position.set(3, 8, 6); scene.add(dl);
       var LEN = 320; floorT = floorTex(); floorT.repeat.set(1, LEN / (LANES * LW));
       var fl = new T.Mesh(new T.PlaneGeometry(LANES * LW, LEN), mkMat(0xffffff, { map: floorT })); fl.rotation.x = -Math.PI / 2; fl.position.set(0, 0, -LEN / 2 + 25); scene.add(fl);
-      var gnd = new T.Mesh(new T.PlaneGeometry(160, LEN), mkMat(0x0b0718)); gnd.rotation.x = -Math.PI / 2; gnd.position.set(0, -0.06, -LEN / 2 + 25); scene.add(gnd);
+      gndM = mkMat(0x0b0718); var gnd = new T.Mesh(new T.PlaneGeometry(160, LEN), gndM); gnd.rotation.x = -Math.PI / 2; gnd.position.set(0, -0.06, -LEN / 2 + 25); scene.add(gnd);
       [-1, 1].forEach(function (s) { var rail = box(0.14, 0.3, LEN, G.gold); rail.position.set(s * (LANES * LW / 2 + 0.07), 0.15, -LEN / 2 + 25); scene.add(rail); });
       laneGlow = new T.Mesh(new T.PlaneGeometry(LW - 0.15, 36), mkMat(0xffffff, { transparent: true, opacity: 0.13, depthWrite: false })); laneGlow.rotation.x = -Math.PI / 2; laneGlow.position.set(0, 0.03, -14); scene.add(laneGlow);
       // pylon sisi jalan
@@ -238,11 +282,20 @@
       // bintang & bulan
       var pos = []; for (var s2 = 0; s2 < (low ? 150 : 420); s2++) { var th = Math.random() * 6.283, ph = Math.random() * 1.2 + 0.1, r = 220 + Math.random() * 60; pos.push(Math.cos(th) * Math.cos(ph) * r, Math.sin(ph) * r * 0.9 + 6, -Math.abs(Math.sin(th) * Math.cos(ph) * r) - 30); }
       var sg = new T.BufferGeometry(); sg.setAttribute("position", new T.Float32BufferAttribute(pos, 3));
-      scene.add(new T.Points(sg, new T.PointsMaterial({ color: 0xffffff, size: 1.4, sizeAttenuation: false, fog: false })));
+      starsP = new T.Points(sg, new T.PointsMaterial({ color: 0xffffff, size: 1.4, sizeAttenuation: false, fog: false })); scene.add(starsP);
       var mc = document.createElement("canvas"); mc.width = mc.height = 128; var mg = mc.getContext("2d"), rg = mg.createRadialGradient(64, 64, 4, 64, 64, 62);
       rg.addColorStop(0, "rgba(255,236,170,1)"); rg.addColorStop(0.45, "rgba(245,192,74,.9)"); rg.addColorStop(1, "rgba(245,192,74,0)"); mg.fillStyle = rg; mg.fillRect(0, 0, 128, 128);
       moon = new T.Sprite(new T.SpriteMaterial({ map: new T.CanvasTexture(mc), fog: false, depthWrite: false })); moon.scale.set(60, 60, 1); moon.position.set(45, 48, -240); scene.add(moon);
-      buildPlayer();
+      buildPlayer(); applyTheme();
+    }
+    function applyTheme() {
+      if (!scene) return; var light = LT();
+      scene.background.setHex(light ? 0xdde9ff : 0x120c24); scene.fog.color.setHex(light ? 0xdde9ff : 0x120c24);
+      amb.color.setHex(light ? 0xffffff : 0xcbb8ff); amb.intensity = light ? 1.0 : 0.85; dirL.intensity = light ? 0.65 : 0.8;
+      gndM.color.setHex(light ? 0xd3caec : 0x0b0718); G.dark.color.setHex(light ? 0x8c7cc8 : 0x2a1c52); G.wall.color.setHex(light ? 0x6c5aa6 : 0x2b2442);
+      laneGlow.material.color.setHex(light ? 0x7a5ae0 : 0xffffff); starsP.visible = !light;
+      moon.material.opacity = light ? 0.9 : 1; moon.material.transparent = true;
+      paintFloor(); floorT.needsUpdate = true; paintLt();
     }
     var limbs = {};
     function buildPlayer() {
@@ -309,14 +362,14 @@
       st.gateSpawned = true; killAhead(); sfx.gate();
       var q = cur(), grp = new T.Group(); grp.position.z = -dist;
       LET.forEach(function (L, i) {
-        var has = !!q.o[L], g = new T.Group(), c = has ? COL[i] : 0x3a3355, x = laneX(i);
+        var has = !!q.o[L], g = new T.Group(), c = has ? COL[i] : (LT() ? 0xa9a1c8 : 0x3a3355), x = laneX(i);
         [-1, 1].forEach(function (s) { var p = box(0.3, 3.6, 0.5, mkMat(c)); p.position.set(x + s * (LW / 2 - 0.2), 1.8, 0); g.add(p); });
         var top = box(LW - 0.1, 0.45, 0.5, mkMat(c)); top.position.set(x, 3.6, 0); g.add(top);
         if (has) {
           var sp = new T.Sprite(new T.SpriteMaterial({ map: G.lt[i], fog: false, depthTest: false })); sp.scale.set(1.9, 1.9, 1); sp.position.set(x, 4.7, 0); sp.renderOrder = 10; g.add(sp);
           var f = new T.Mesh(new T.PlaneGeometry(LW - 0.5, 3.4), mkMat(c, { transparent: true, opacity: 0.22, side: T.DoubleSide, depthWrite: false })); f.position.set(x, 1.8, 0); g.add(f);
           var fs = new T.Mesh(new T.PlaneGeometry(LW - 0.2, 3), mkMat(c, { transparent: true, opacity: 0.28, depthWrite: false })); fs.rotation.x = -Math.PI / 2; fs.position.set(x, 0.04, 0); g.add(fs);
-        } else { var wall = box(LW - 0.4, 3.4, 0.4, mkLam(0x2b2442)); wall.position.set(x, 1.7, 0); g.add(wall); }
+        } else { var wall = box(LW - 0.4, 3.4, 0.4, G.wall); wall.position.set(x, 1.7, 0); g.add(wall); }
         grp.add(g);
       });
       scene.add(grp); st.gate = { g: grp, done: false }; world.gates.push(st.gate);
@@ -543,7 +596,8 @@
     }
 
     /* ---------- pasang ---------- */
-    var onResize = function () { fitHud(); if (R) sizeCam(); }, ro = null;
+    var onResize = function () { fitHud(); if (R) sizeCam(); }, ro = null, tmo = null;
+    try { tmo = new MutationObserver(function () { applyTheme(); }); tmo.observe(document.documentElement, { attributes: true, attributeFilter: ["data-theme"] }); } catch (e) {}
     try { if (window.ResizeObserver) { ro = new ResizeObserver(onResize); ro.observe($("rgStage")); } } catch (e) {}
     $("rgSnd").onclick = function () { ac(); toggleSnd(); }; $("rgPause").onclick = togglePause; $("rgR").onclick = callGate;
     $("rgTg").onclick = function () { root.classList.toggle("min"); $("rgTg").textContent = root.classList.contains("min") ? "Tampilkan pilihan ▼" : "Sembunyikan pilihan ▲"; fitHud(); };
@@ -555,7 +609,7 @@
     var ctrl = {
       state: st,
       destroy: function () {
-        if (st.destroyed) return; st.destroyed = true; cancelAnimationFrame(raf); try { ro && ro.disconnect(); } catch (e) {}
+        if (st.destroyed) return; st.destroyed = true; cancelAnimationFrame(raf); try { ro && ro.disconnect(); tmo && tmo.disconnect(); } catch (e) {}
         window.removeEventListener("keydown", onKey); window.removeEventListener("resize", onResize); document.removeEventListener("visibilitychange", onVis);
         try { if (R) { R.dispose(); R.forceContextLoss && R.forceContextLoss(); } } catch (e) {} root.remove();
       },
