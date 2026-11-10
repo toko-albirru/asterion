@@ -242,7 +242,7 @@
       var hc = document.createElement("canvas"); hc.width = 64; hc.height = 32; var hg = hc.getContext("2d"); hg.fillStyle = "#1b1740"; hg.fillRect(0, 0, 64, 32); hg.fillStyle = "#ff4f9a";
       for (var hx = -32; hx < 80; hx += 32) { hg.beginPath(); hg.moveTo(hx, 32); hg.lineTo(hx + 16, 32); hg.lineTo(hx + 32, 0); hg.lineTo(hx + 16, 0); hg.closePath(); hg.fill(); }
       var ht = new T.CanvasTexture(hc); ht.wrapS = ht.wrapT = T.RepeatWrapping; ht.repeat.set(4, 1); G.hazard = mkMat(0xffffff, { map: ht });
-      G.postG = new T.BoxGeometry(0.22, 1, 0.22); G.purple = mkLam(0x5b3fb0, { emissive: 0x2a1b66 }); G.gold = mkMat(0xf5c04a); G.red = mkMat(0xff6b9a, { transparent: true, opacity: 0.95 });
+      G.postG = new T.BoxGeometry(0.22, 1, 0.22); G.purple = mkLam(0x5b3fb0, { emissive: 0x2a1b66 }); G.gold = mkMat(0xf5c04a); G.laser = mkMat(0xe2a92f, { transparent: true, opacity: 0.55, depthWrite: false }); G.laserGlow = mkMat(0xf0b840, { transparent: true, opacity: 0.14, depthWrite: false }); G.red = mkMat(0xff6b9a, { transparent: true, opacity: 0.95 });
       G.foamG = new T.RingGeometry(0.95, 2.1, 24); G.foam = mkMat(0xffffff, { transparent: true, opacity: 0.6, depthWrite: false, side: T.DoubleSide }); G.dark = mkLam(0x2a1c52); G.white = mkLam(0xf4f0ff); G.wall = mkLam(0x2b2442);
       G.ltc = []; G.lt = LET.map(function (L, i) {
         var c = document.createElement("canvas"); c.width = c.height = 128; G.ltc.push(c); return new T.CanvasTexture(c);
@@ -317,7 +317,7 @@
       var fl = new T.Mesh(new T.PlaneGeometry(LANES * LW, LEN), mkMat(0xffffff, { map: floorT })); fl.rotation.x = -Math.PI / 2; fl.position.set(0, 0, -LEN / 2 + 25); scene.add(fl);
       seaCv = document.createElement("canvas"); seaCv.width = seaCv.height = 256; seaT = new T.CanvasTexture(seaCv); seaT.wrapS = seaT.wrapT = T.RepeatWrapping; seaT.repeat.set(4, 8); seaT.anisotropy = 4; paintSea();
       gndM = mkMat(0xffffff, { map: seaT }); var gnd = new T.Mesh(new T.PlaneGeometry(160, LEN), gndM); gnd.rotation.x = -Math.PI / 2; gnd.position.set(0, -0.06, -LEN / 2 + 25); scene.add(gnd);
-      [-1, 1].forEach(function (s) { var rail = box(0.1, 0.22, LEN, G.gold); rail.position.set(s * (LANES * LW / 2 + 0.05), 0.11, -LEN / 2 + 25); scene.add(rail); var rl = box(0.05, 0.02, LEN, mkMat(0xfff3c4)); rl.position.set(s * (LANES * LW / 2 + 0.05), 0.23, -LEN / 2 + 25); scene.add(rl); });
+      [-1, 1].forEach(function (s) { var rail = box(0.08, 0.2, LEN, G.laser); var rg2 = box(0.3, 0.32, LEN, G.laserGlow); rg2.position.set(s * (LANES * LW / 2 + 0.05), 0.14, -LEN / 2 + 25); scene.add(rg2); rail.position.set(s * (LANES * LW / 2 + 0.05), 0.11, -LEN / 2 + 25); scene.add(rail); var rl = box(0.03, 0.02, LEN, mkMat(0xffe9a6, { transparent: true, opacity: 0.7, depthWrite: false })); rl.position.set(s * (LANES * LW / 2 + 0.05), 0.23, -LEN / 2 + 25); scene.add(rl); });
       laneGlow = new T.Mesh(new T.PlaneGeometry(LW - 0.15, 36), mkMat(0xffffff, { transparent: true, opacity: 0.13, depthWrite: false })); laneGlow.rotation.x = -Math.PI / 2; laneGlow.position.set(0, 0.03, -14); scene.add(laneGlow);
       // pylon sisi jalan
       var N = low ? 9 : 16, sp = 14;
@@ -327,14 +327,14 @@
           var b = box(1.3, h + 3, 1.3, G.dark); b.position.y = (h - 3) / 2; g.add(b);
           var pl = box(1.9, 0.4, 1.9, G.dark); pl.position.y = 0.2; g.add(pl);
           var foam = new T.Mesh(G.foamG, G.foam); foam.rotation.x = -Math.PI / 2; foam.position.y = -0.02; g.add(foam);
-          var stripe = box(0.12, h * 0.85, 0.06, i % 2 ? G.gold : mkMat(0xb18cff)); stripe.position.set(-s * 0.66, h / 2, 0); g.add(stripe);
+          var stripe = box(0.12, h * 0.85, 0.06, i % 2 ? G.laser : mkMat(0xb18cff)); stripe.position.set(-s * 0.66, h / 2, 0); g.add(stripe);
           var cap = box(1.5, 0.2, 1.5, mkMat(0xb18cff)); cap.position.y = h; g.add(cap);
           g.position.set(s * (LANES * LW / 2 + 2.2), 0, 8 - i * sp); scene.add(g); world.pyl.push(g);
         }
       });
       // lengkung emas di atas lintasan
       for (var a = 0; a < (low ? 3 : 6); a++) {
-        var arc = new T.Mesh(new T.TorusGeometry(LANES * LW / 2 + 0.6, 0.04, 8, 48, Math.PI), G.gold); arc.position.set(0, 0, -a * 38 + 5); arc.userData.sp = 38 * (low ? 3 : 6); scene.add(arc); world.arch.push(arc);
+        var arc = new T.Mesh(new T.TorusGeometry(LANES * LW / 2 + 0.6, 0.035, 8, 48, Math.PI), G.laser); arc.position.set(0, 0, -a * 38 + 5); arc.userData.sp = 38 * (low ? 3 : 6); scene.add(arc); world.arch.push(arc);
       }
       // bintang & bulan
       var pos = []; for (var s2 = 0; s2 < (low ? 150 : 420); s2++) { var th = Math.random() * 6.283, ph = Math.random() * 1.2 + 0.1, r = 220 + Math.random() * 60; pos.push(Math.cos(th) * Math.cos(ph) * r, Math.sin(ph) * r * 0.9 + 6, -Math.abs(Math.sin(th) * Math.cos(ph) * r) - 30); }
