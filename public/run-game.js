@@ -223,7 +223,7 @@
     function initShared() {
       G.coin = new T.OctahedronGeometry(0.34); G.coinM = mkMat(0xffd166);
       G.postG = new T.BoxGeometry(0.22, 1, 0.22); G.purple = mkLam(0x5b3fb0, { emissive: 0x2a1b66 }); G.gold = mkMat(0xf5c04a); G.red = mkMat(0xff6b9a, { transparent: true, opacity: 0.95 });
-      G.dark = mkLam(0x2a1c52); G.white = mkLam(0xf4f0ff); G.wall = mkLam(0x2b2442);
+      G.foamG = new T.RingGeometry(0.95, 2.1, 24); G.foam = mkMat(0xffffff, { transparent: true, opacity: 0.6, depthWrite: false, side: T.DoubleSide }); G.dark = mkLam(0x2a1c52); G.white = mkLam(0xf4f0ff); G.wall = mkLam(0x2b2442);
       G.ltc = []; G.lt = LET.map(function (L, i) {
         var c = document.createElement("canvas"); c.width = c.height = 128; G.ltc.push(c); return new T.CanvasTexture(c);
       }); paintLt();
@@ -250,7 +250,31 @@
       floorCv = document.createElement("canvas"); floorCv.width = floorCv.height = 512; paintFloor();
       var t = new T.CanvasTexture(floorCv); t.wrapS = t.wrapT = T.RepeatWrapping; t.anisotropy = 4; return t;
     }
-    var floorT, laneGlow, moon, amb, dirL, gndM, starsP, moonCv, moonTex, cloudG;
+    var floorT, laneGlow, moon, amb, dirL, gndM, starsP, moonCv, moonTex, cloudG, seaCv, seaT;
+    function paintSea() {
+      var light = LT(), g = seaCv.getContext("2d"), N = 256, i, k;
+      var gr = g.createLinearGradient(0, 0, 0, N);
+      gr.addColorStop(0, light ? "#2f86d6" : "#041a46"); gr.addColorStop(1, light ? "#4a9de6" : "#062a66"); g.fillStyle = gr; g.fillRect(0, 0, N, N);
+      g.lineCap = "round";
+      for (i = 0; i < 14; i++) {
+        var y0 = (i * 37 + (i % 3) * 11) % N, amp = 3 + (i % 4) * 2, cyc = 2 + (i % 3), ph = i * 1.7;
+        [-N, 0, N].forEach(function (off) {
+          g.beginPath();
+          for (var x = 0; x <= N; x += 4) { var y = y0 + off + Math.sin((x / N) * cyc * 6.283 + ph) * amp; x ? g.lineTo(x, y) : g.moveTo(x, y); }
+          if (light) { g.strokeStyle = "rgba(255,255,255,.38)"; g.lineWidth = 2.5; g.shadowBlur = 0; }
+          else { g.strokeStyle = i % 2 ? "rgba(40,255,225,.55)" : "rgba(90,170,255,.5)"; g.lineWidth = 2.5; g.shadowColor = i % 2 ? "#19ffe0" : "#4aa8ff"; g.shadowBlur = 12; }
+          g.stroke();
+        });
+      }
+      g.shadowBlur = 0;
+      for (k = 0; k < (light ? 40 : 70); k++) {
+        var sx = Math.random() * N, sy = Math.random() * N, r = 1 + Math.random() * (light ? 1.5 : 2.2);
+        if (light) { g.fillStyle = "rgba(255,255,255,.7)"; } else { g.fillStyle = Math.random() < 0.5 ? "rgba(120,255,235,.95)" : "rgba(150,210,255,.95)"; g.shadowColor = "#2ff"; g.shadowBlur = 10; }
+        [-N, 0, N].forEach(function (o) { g.beginPath(); g.arc(sx, sy + o, r, 0, 7); g.fill(); });
+        g.shadowBlur = 0;
+      }
+      if (seaT) seaT.needsUpdate = true;
+    }
     function paintMoon() {
       var g = moonCv.getContext("2d"), light = LT(); g.clearRect(0, 0, 128, 128);
       var rg = g.createRadialGradient(64, 64, 4, 64, 64, 62);
@@ -267,7 +291,8 @@
       amb = new T.AmbientLight(0xcbb8ff, 0.85); scene.add(amb); var dl = dirL = new T.DirectionalLight(0xffffff, 0.8); dl.position.set(3, 8, 6); scene.add(dl);
       var LEN = 320; floorT = floorTex(); floorT.repeat.set(1, LEN / (LANES * LW));
       var fl = new T.Mesh(new T.PlaneGeometry(LANES * LW, LEN), mkMat(0xffffff, { map: floorT })); fl.rotation.x = -Math.PI / 2; fl.position.set(0, 0, -LEN / 2 + 25); scene.add(fl);
-      gndM = mkMat(0x0b0718); var gnd = new T.Mesh(new T.PlaneGeometry(160, LEN), gndM); gnd.rotation.x = -Math.PI / 2; gnd.position.set(0, -0.06, -LEN / 2 + 25); scene.add(gnd);
+      seaCv = document.createElement("canvas"); seaCv.width = seaCv.height = 256; seaT = new T.CanvasTexture(seaCv); seaT.wrapS = seaT.wrapT = T.RepeatWrapping; seaT.repeat.set(4, 8); seaT.anisotropy = 4; paintSea();
+      gndM = mkMat(0xffffff, { map: seaT }); var gnd = new T.Mesh(new T.PlaneGeometry(160, LEN), gndM); gnd.rotation.x = -Math.PI / 2; gnd.position.set(0, -0.06, -LEN / 2 + 25); scene.add(gnd);
       [-1, 1].forEach(function (s) { var rail = box(0.14, 0.3, LEN, G.gold); rail.position.set(s * (LANES * LW / 2 + 0.07), 0.15, -LEN / 2 + 25); scene.add(rail); });
       laneGlow = new T.Mesh(new T.PlaneGeometry(LW - 0.15, 36), mkMat(0xffffff, { transparent: true, opacity: 0.13, depthWrite: false })); laneGlow.rotation.x = -Math.PI / 2; laneGlow.position.set(0, 0.03, -14); scene.add(laneGlow);
       // pylon sisi jalan
@@ -275,7 +300,9 @@
       [-1, 1].forEach(function (s) {
         for (var i = 0; i < N; i++) {
           var h = 5 + ((i * 7) % 5), g = new T.Group(); g.userData.sp = sp * N;
-          var b = box(1.3, h, 1.3, G.dark); b.position.y = h / 2; g.add(b);
+          var b = box(1.3, h + 3, 1.3, G.dark); b.position.y = (h - 3) / 2; g.add(b);
+          var pl = box(1.9, 0.4, 1.9, G.dark); pl.position.y = 0.2; g.add(pl);
+          var foam = new T.Mesh(G.foamG, G.foam); foam.rotation.x = -Math.PI / 2; foam.position.y = -0.02; g.add(foam);
           var stripe = box(0.12, h * 0.85, 0.06, i % 2 ? G.gold : mkMat(0xb18cff)); stripe.position.set(-s * 0.66, h / 2, 0); g.add(stripe);
           var cap = box(1.5, 0.2, 1.5, mkMat(0xb18cff)); cap.position.y = h; g.add(cap);
           g.position.set(s * (LANES * LW / 2 + 2.2), 0, 8 - i * sp); scene.add(g); world.pyl.push(g);
@@ -290,14 +317,14 @@
       var sg = new T.BufferGeometry(); sg.setAttribute("position", new T.Float32BufferAttribute(pos, 3));
       starsP = new T.Points(sg, new T.PointsMaterial({ color: 0xffffff, size: 1.4, sizeAttenuation: false, fog: false })); scene.add(starsP);
       moonCv = document.createElement("canvas"); moonCv.width = moonCv.height = 128; moonTex = new T.CanvasTexture(moonCv); paintMoon();
-      moon = new T.Sprite(new T.SpriteMaterial({ map: moonTex, fog: false, depthWrite: false })); moon.scale.set(60, 60, 1); moon.position.set(45, 48, -240); scene.add(moon);
+      moon = new T.Sprite(new T.SpriteMaterial({ map: moonTex, fog: false, depthWrite: false })); moon.scale.set(60, 60, 1); moon.renderOrder = 5; moon.material.depthTest = false; moon.position.set(45, 48, -240); scene.add(moon);
       // awan siang hari
       var cc = document.createElement("canvas"); cc.width = 128; cc.height = 64; var cg2 = cc.getContext("2d");
       [[40, 38, 22], [64, 28, 26], [90, 38, 22], [64, 42, 30]].forEach(function (b) { var r = cg2.createRadialGradient(b[0], b[1], 2, b[0], b[1], b[2]); r.addColorStop(0, "rgba(255,255,255,.95)"); r.addColorStop(1, "rgba(255,255,255,0)"); cg2.fillStyle = r; cg2.fillRect(0, 0, 128, 64); });
       var ctex = new T.CanvasTexture(cc); cloudG = new T.Group();
-      for (var q = 0; q < (low ? 7 : 14); q++) {
-        var cl = new T.Sprite(new T.SpriteMaterial({ map: ctex, fog: false, depthWrite: false, transparent: true, opacity: 0.85 })); var sc = 40 + Math.random() * 50; cl.scale.set(sc * 2, sc, 1);
-        cl.position.set(-170 + Math.random() * 340, 22 + Math.random() * 55, -200 - Math.random() * 60); cl.userData.v = 0.6 + Math.random() * 1.2; cloudG.add(cl);
+      for (var q = 0; q < (low ? 22 : 48); q++) {
+        var cl = new T.Sprite(new T.SpriteMaterial({ map: ctex, fog: false, depthWrite: false, transparent: true, opacity: 0.85 })); var sc = 45 + Math.random() * 50; cl.scale.set(sc * 2, sc, 1);
+        cl.position.set(-230 + Math.random() * 460, 12 + Math.random() * 80, -200 - Math.random() * 60); cl.userData.v = 0.6 + Math.random() * 1.2; cl.renderOrder = 0; cloudG.add(cl);
       }
       scene.add(cloudG);
       buildPlayer(); applyTheme();
@@ -306,10 +333,10 @@
       if (!scene) return; var light = LT();
       scene.background.setHex(light ? 0xcfdcf5 : 0x120c24); scene.fog.color.setHex(light ? 0xcfdcf5 : 0x120c24);
       amb.color.setHex(light ? 0xffffff : 0xcbb8ff); amb.intensity = light ? 0.8 : 0.85; dirL.intensity = light ? 0.6 : 0.8;
-      gndM.color.setHex(light ? 0xb4a8da : 0x0b0718); G.dark.color.setHex(light ? 0x6a5aac : 0x2a1c52); G.wall.color.setHex(light ? 0x56468f : 0x2b2442); G.white.color.setHex(light ? 0x22264f : 0xf4f0ff);
+      G.dark.color.setHex(light ? 0x6a5aac : 0x2a1c52); G.foam.color.setHex(light ? 0xffffff : 0x4dffe6); G.wall.color.setHex(light ? 0x56468f : 0x2b2442); G.white.color.setHex(light ? 0x22264f : 0xf4f0ff);
       laneGlow.material.color.setHex(light ? 0x7a5ae0 : 0xffffff); starsP.visible = !light;
       moon.material.transparent = true; cloudG.visible = light; paintMoon();
-      paintFloor(); floorT.needsUpdate = true; paintLt();
+      paintFloor(); floorT.needsUpdate = true; paintLt(); paintSea();
     }
     var limbs = {};
     function buildPlayer() {
@@ -536,13 +563,15 @@
       var targetMul = st.stumbleT > 0 ? 0.12 : 1; st.speedMul += (targetMul - st.speedMul) * Math.min(1, dt * (targetMul < st.speedMul ? 14 : 2.6)); // jatuh cepat, pulih perlahan
       var v = SPEED * st.speedMul * (st.phase === "load" ? 0 : 1), gv = SPEED * st.speedMul; st.runT += dt * (3 + 6.5 * st.speedMul);
       // lantai & dunia
+      seaT.offset.y += (v * dt) / 40 + dt * 0.02; seaT.offset.x += dt * 0.015;
+      if (!low && !LT()) gndM.color.setScalar(0.85 + 0.15 * Math.sin(t / 700)); else gndM.color.setScalar(1);
       floorT.offset.y += (v * dt) / (LANES * LW); laneGlow.position.x += (laneX(st.lane) - laneGlow.position.x) * Math.min(1, dt * 14);
       laneGlow.material.color.setHex(laneOk(st.lane) ? COL[st.lane] : 0x666666);
       world.pyl.forEach(function (g) { g.position.z += v * dt; if (g.position.z > 14) g.position.z -= g.userData.sp; });
       world.arch.forEach(function (g) { g.position.z += v * dt; if (g.position.z > 10) g.position.z -= g.userData.sp; });
       world.holo.forEach(function (g) { g.position.z += v * dt; g.rotation.y += dt * 1.2; if (g.position.z > 10) g.position.z -= g.userData.sp; });
       moon.position.x = 45 + Math.sin(t / 9000) * 4;
-      if (cloudG && cloudG.visible) cloudG.children.forEach(function (c) { c.position.x += c.userData.v * dt; if (c.position.x > 190) c.position.x = -190; });
+      if (cloudG && cloudG.visible) cloudG.children.forEach(function (c) { c.position.x += c.userData.v * dt; if (c.position.x > 240) c.position.x = -240; var dx = Math.abs(c.position.x - moon.position.x) / (c.scale.x * 0.5 + 40), dy = Math.abs(c.position.y - moon.position.y) / (c.scale.y * 0.5 + 40); c.material.opacity = Math.min(0.88, 0.1 + Math.max(dx, dy) * 0.8); });
       // pemain
       var tx2 = laneX(st.lane); st.x += (tx2 - st.x) * Math.min(1, dt * 15);
       if (st.y > 0 || st.vy > 0) { st.vy -= 26 * dt; st.y += st.vy * dt; if (st.y <= 0) { st.y = 0; st.vy = 0; } }
