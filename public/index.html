@@ -1544,7 +1544,8 @@ function fxTick(){
   var rem=fxLeft(),t=$("fxT");if(t)t.textContent=fxFmt(rem);
   var e=$("fxEarly");if(e)e.textContent=rem>0?"⏹ Akhiri lebih awal":"✅ Selesai";
   if(rem<=0)fxEnd(0)}
-function fxWarn(m){Dlg.alert(m+"\n\nMode fokus masih berjalan.\nSisa waktu: "+fxFmt(fxLeft())+"\nKamu baru bisa keluar setelah waktu habis.",{title:"Mode fokus aktif",icon:"🎯",okText:"Mengerti"})}
+function fxRefs(){if(FX.on&&!document.fullscreenElement)fxFs().catch(function(){})}
+function fxWarn(m){return Dlg.alert(m+"\n\nMode fokus masih berjalan.\nSisa waktu: "+fxFmt(fxLeft())+"\nKamu baru bisa keluar setelah waktu habis.",{title:"Mode fokus aktif",icon:"🎯",okText:"Mengerti"}).then(fxRefs)}
 async function fxEnd(early){
   if(!FX.on)return;
   if(early&&!(await Dlg.confirm("Akhiri mode fokus sebelum waktunya? Progres fokusmu akan hilang.",{title:"Akhiri mode fokus",icon:"⏹",okText:"Akhiri",danger:true})))return;
@@ -1555,12 +1556,14 @@ async function fxEnd(early){
   toast(early?"Mode fokus diakhiri.":"Mode fokus selesai. Kerja bagus! 🎉")}
 document.addEventListener("fullscreenchange",function(){
   if(!FX.on)return;
-  if(!document.fullscreenElement){fxWarn("Kamu keluar dari layar penuh.");
-    setTimeout(function(){if(FX.on)fxFs().catch(function(){})},1200)}});
+  if(!document.fullscreenElement){fxRefs();fxWarn("Kamu keluar dari layar penuh.")}});
 document.addEventListener("visibilitychange",function(){
   if(!FX.on)return;
   if(document.hidden)FX.left=true;
-  else if(FX.left){FX.left=false;fxWarn("Kamu meninggalkan halaman ini.");if(!document.fullscreenElement)fxFs().catch(function(){})}});
+  else if(FX.left){FX.left=false;fxRefs();fxWarn("Kamu meninggalkan halaman ini.")}});
+/* browser hanya mengizinkan layar penuh setelah ada sentuhan/klik: sentuhan pertama setelah kembali langsung memulihkannya */
+["pointerdown","touchend","click","keydown"].forEach(function(ev){document.addEventListener(ev,fxRefs,true)});
+window.addEventListener("focus",fxRefs);
 window.addEventListener("beforeunload",function(e){if(FX.on){e.preventDefault();e.returnValue="Mode fokus masih berjalan.";return e.returnValue}});
 (function fxInit(){
   try{FX.min=+localStorage.getItem("fxMin")||25}catch(e){}
