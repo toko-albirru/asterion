@@ -130,7 +130,7 @@
     var qTime = (cfg.qTime || 60) * 1000, t0 = performance.now();
 
     var root = el("div", "rg"); root.id = "rg";
-    root.innerHTML = '<div class="rg-hud"><div class="rg-bar"><span class="rg-pill" id="rgN">Soal 1/1</span><div class="rg-prog"><i id="rgP"></i></div><span class="rg-pill ok" id="rgS" title="Skor akademik">✔ 0</span><span class="rg-pill en" id="rgE" title="Energi (hiasan, tidak memengaruhi skor)">✨ 0</span>' +
+    root.innerHTML = '<div class="rg-hud"><div class="rg-bar"><span class="rg-pill" id="rgN">Soal 1/1</span><div class="rg-prog"><i id="rgP"></i></div><span class="rg-pill ok" id="rgS" title="Skor akademik">✔ 0</span><span class="rg-pill en" id="rgE" title="Koin terkumpul (masuk leaderboard koin, terpisah dari skor)">🪙 0</span>' +
       '<button class="rg-btn" id="rgSnd" aria-label="Suara">🔊</button><button class="rg-btn" id="rgPause" aria-label="Jeda">⏸</button></div>' +
       '<div class="rg-card" id="rgCard"><div class="rg-tm" id="rgTm"><span class="rg-tmv" id="rgTv">60</span><div class="rg-tmb"><i id="rgTb"></i></div></div><div class="rg-q" id="rgQ"></div><div class="rg-imgs" id="rgI" hidden></div><ul class="rg-opts" id="rgO"></ul></div>' +
       '<button class="rg-tg" id="rgTg">Sembunyikan pilihan ▲</button></div>' +
@@ -141,7 +141,7 @@
     var $ = function (id) { return root.querySelector("#" + id); };
     if (TUT) { $("rgTm").style.display = "none"; $("rgP").parentNode.style.visibility = "hidden"; $("rgS").style.display = "none"; }
 
-    var st = { phase: "load", cur: cfg.cur || 0, lane: 2, x: 0, y: 0, vy: 0, slideT: 0, stumbleT: 0, invul: 0, speedMul: 1, remMs: qTime, qEnd: 0, locked: false, paused: false, gate: null, gateSpawned: false, score: cfg.score || 0, energy: 0, obsT: 1.2, runT: 0, pose: { l: 0, r: 0, al: 0, ar: 0, bx: -0.16, by: 0, bz: 0 }, tutStep: 0, tutT: 0, destroyed: false, lastSec: -1 };
+    var st = { phase: "load", cur: cfg.cur || 0, lane: 2, x: 0, y: 0, vy: 0, slideT: 0, stumbleT: 0, invul: 0, speedMul: 1, remMs: qTime, qEnd: 0, locked: false, paused: false, gate: null, gateSpawned: false, score: cfg.score || 0, energy: cfg.coins || 0, coinSent: cfg.coins || 0, obsT: 1.2, runT: 0, pose: { l: 0, r: 0, al: 0, ar: 0, bx: -0.16, by: 0, bz: 0 }, tutStep: 0, tutT: 0, destroyed: false, lastSec: -1 };
     var qs = cfg.qs, raf = 0, last = 0;
     var R, scene, cam, player, parts = [], world = { obs: [], coins: [], gates: [], pyl: [], arch: [], holo: [] };
 
@@ -212,7 +212,7 @@
     function flash(c) { if (!fx) return; var f = root.querySelector(".rg-flash"); f.className = "rg-flash"; void f.offsetWidth; f.className = "rg-flash " + c; }
     function shake() { if (!fx) return; root.classList.remove("shake"); void root.offsetWidth; root.classList.add("shake"); }
     function sndUI() { $("rgSnd").textContent = snd.on ? "🔊" : "🔇"; }
-    sndUI(); if (S.sound === 0) $("rgSnd").style.display = "none";
+    $("rgE").textContent = "🪙 " + st.energy; sndUI(); if (S.sound === 0) $("rgSnd").style.display = "none";
 
     /* ---------- tiga dimensi ---------- */
     function mkMat(c, o) { return new T.MeshBasicMaterial(Object.assign({ color: c }, o || {})); }
@@ -361,7 +361,7 @@
       scene.background.setHex(light ? 0xcfdcf5 : 0x120c24); scene.fog.color.setHex(light ? 0xcfdcf5 : 0x120c24);
       amb.color.setHex(light ? 0xffffff : 0xcbb8ff); amb.intensity = light ? 0.8 : 0.85; dirL.intensity = light ? 0.6 : 0.8;
       G.dark.color.setHex(light ? 0x6a5aac : 0x2a1c52); G.foam.color.setHex(light ? 0xffffff : 0x4dffe6); G.wall.color.setHex(light ? 0x56468f : 0x2b2442); G.white.color.setHex(light ? 0x9275d0 : 0xf4f0ff);
-      G.pCoat.color.setHex(light ? 0x22b35e : 0xffffff); G.pScrub.color.setHex(light ? 0x15803d : 0xffffff); G.pScrubD.color.setHex(light ? 0x14532d : 0xffffff);
+      G.pCoat.color.setHex(light ? 0x22b35e : 0xd6d6dc); G.pScrub.color.setHex(light ? 0x15803d : 0xd6d6dc); G.pScrubD.color.setHex(light ? 0x14532d : 0xd6d6dc);
       laneGlow.material.color.setHex(light ? 0x7a5ae0 : 0xffffff); starsP.visible = !light;
       moon.material.transparent = true; cloudG.visible = light; paintMoon();
       paintFloor(); floorT.needsUpdate = true; paintLt(); paintSea();
@@ -440,7 +440,7 @@
         [-1, 1].forEach(function (s) { var e = box(0.06, 0.06, L + 0.04, G.neon2); e.position.set(s * pw / 2, H + 0.04, 0); g.add(e); });
         var pf = box(pw + 0.02, 0.22, 0.06, G.hazard); pf.position.set(0, H * 0.5, L / 2 + 0.02); g.add(pf);
       } else if (type === "tunnel") {
-        var TH = 6, tb = box(w, 0.3, 0.3, G.hazard); tb.position.y = 1.55; g.add(tb);
+        var TH = 3, tb = box(w, 0.3, 0.3, G.hazard); tb.position.y = 1.55; g.add(tb);
         [1.72, 1.38].forEach(function (y) { var e = box(w, 0.04, 0.34, G.neon); e.position.y = y; g.add(e); });
         [-1, 1].forEach(function (s) {
           var p = box(0.2, TH, 0.2, G.obsDark); p.position.set(s * w / 2, TH / 2, 0); g.add(p);
@@ -555,13 +555,14 @@
       $("rgS").textContent = "✔ " + st.score;
     }
     async function submitAnswer(letter) {
-      if (st.locked) return; st.locked = true; st.pending = letter; var idx = st.cur, r = null;
+      if (st.locked) return; st.locked = true; st.pending = letter; var idx = st.cur, r = null, cd = Math.max(0, st.energy - st.coinSent);
       for (var k = 0; k < 6 && !r; k++) {
-        try { r = await host.answer(idx, letter); } catch (e) { r = { ok: false, status: 0 }; }
+        try { r = await host.answer(idx, letter, cd); } catch (e) { r = { ok: false, status: 0 }; }
         if (st.destroyed) return;
         if (!r.ok && r.status === 0) { host.toast && host.toast("Koneksi bermasalah, mencoba lagi…"); r = null; await sleep(800 * (k + 1)); }
       }
       if (!r) { host.toast && host.toast("Gagal mengirim jawaban."); showPauseMenu("Koneksi terputus", "Jawabanmu belum terkirim. Periksa internet lalu coba lagi.", true); return; }
+      if (r.ok) st.coinSent += cd;
       if (!r.ok) { // 409: urutan tidak sinkron → ikuti server
         var p = host.resync ? await host.resync() : null; if (st.destroyed) return;
         if (p && p.status === "done") return finishGame(); if (p && p.qs) { qs = p.qs; st.score = p.score || st.score; showQuestion(p.cur, p.remaining); return; }
@@ -691,7 +692,7 @@
       world.coins.forEach(function (c) {
         c.m.position.z += v * dt; c.m.rotation.y += dt * 4;
         if (c.dying) { c.m.scale.multiplyScalar(0.8); if (c.m.scale.x < 0.05) c.rm = true; }
-        if (!c.got && !c.dying && c.lane === st.lane && Math.abs(c.m.position.z) < 0.7 && Math.abs(c.m.position.y - (st.y + 1.0)) < 1.1) { c.got = true; c.rm = true; st.energy++; $("rgE").textContent = "✨ " + st.energy; sfx.coin(); burst(c.m.position.x, c.m.position.y, 0, 0xffd166, 5); }
+        if (!c.got && !c.dying && c.lane === st.lane && Math.abs(c.m.position.z) < 0.7 && Math.abs(c.m.position.y - (st.y + 1.0)) < 1.1) { c.got = true; c.rm = true; st.energy++; $("rgE").textContent = "🪙 " + st.energy; sfx.coin(); burst(c.m.position.x, c.m.position.y, 0, 0xffd166, 5); }
         if (c.m.position.z > 9) c.rm = true;
       });
       [world.obs, world.coins].forEach(function (arr) { for (var i = arr.length - 1; i >= 0; i--) if (arr[i].rm) { var o = arr[i]; scene.remove(o.g || o.m); arr.splice(i, 1); } });
