@@ -43,5 +43,22 @@ ok(/class='rn-hist'/.test(run) && /\.rn-hist \.card \.t small\{[^}]*line-height:
 ok(/\.rn-lb \.n small\{[^}]*text-overflow:ellipsis/.test(run), "teks leaderboard dipangkas rapi");
 ok(/#tl \.sl \.bd b\{[^}]*overflow-wrap:anywhere/.test(run), "teks tutorial ditata rapi");
 
+/* 4. mode terang: pita ungu hanya di atas (logo + navbar home/login) */
+ok(!/#bb9bef/.test(html), "gradasi ungu full-page dihapus");
+ok(/:root\[data-theme="light"\] html\{background-color:#fdfcff[^}]*overflow-x:hidden/.test(html), "latar halaman putih terang");
+ok(/\.hband::before\{[^}]*width:100vw[^}]*#8b5cf6[^}]*#6d28d9/.test(html), "pita ungu melebar full width");
+ok(/\.hband::before\{[^}]*border-radius:0 0 26px 26px/.test(html), "pita ungu berhenti dengan sudut membulat di bawah logo");
+ok(/\.gate \.hband\{margin:0 -18px;padding:0 18px;--hb-t:-18px\}/.test(html), "pita ungu login mulai dari paling atas");
+ok(/<div class="hband">\s*<div class="gthm">/.test(html) && /class="ttl" style="margin-top:-46px"><h1>ASTERION<\/h1>[\s\S]{0,80}<\/div>\s*<\/div>/.test(html), "logo login dibungkus pita ungu");
+ok(/class='hband'><div class='hero'>[\s\S]{0,140}ASTERION/.test(html), "logo home dibungkus pita ungu");
+ok(/body\[data-r="home"\] \.top::before\{background:linear-gradient\(180deg,#7c3aed,#6d28d9\)/.test(html), "navbar atas ungu di home");
+ok(/body\[data-r="home"\] \.top h2\{color:#fff\}/.test(html), "judul navbar putih di atas ungu");
+ok(/document\.body\.dataset\.r=tab;/.test(html) && /document\.body\.dataset\.r=w==="gate"\?"login"/.test(html), "halaman aktif ditandai (home/login)");
+ok(/\.hband \.ttl h1\{[^}]*#ffffff,#ffe9a8/.test(html), "tulisan ASTERION terang di atas ungu");
+
+/* 5. label Besok/Lusa berwarna cerah */
+ok(/\.badge\.nx\{background:linear-gradient\(135deg,#fde68a,#fbbf24 55%,#f59e0b\)/.test(html), "warna cerah untuk Besok/Lusa");
+ok((html.match(/class='badge nx'/g) || []).length === 2, "label Besok/Lusa dan BESOK memakai warna cerah");
+
 console.log(fail ? "HASIL: GAGAL" : "HASIL: SEMUA LOLOS");
 process.exit(fail);
