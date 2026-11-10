@@ -3,7 +3,7 @@
    Skor akademik HANYA ditentukan server (+1 benar, 0 salah/kosong); obstacle & energi murni visual. */
 (function () {
   "use strict";
-  var LET = ["A", "B", "C", "D", "E"], COL = [0xb18cff, 0x4cc9f0, 0x4ade80, 0xfbbf24, 0xff6b9a], CSSC = ["#b18cff", "#4cc9f0", "#4ade80", "#fbbf24", "#ff6b9a"];
+  var LET = ["A", "B", "C", "D", "E"], COL = [0xf97316, 0x4cc9f0, 0x4ade80, 0xfbbf24, 0xff6b9a], CSSC = ["#f97316", "#4cc9f0", "#4ade80", "#fbbf24", "#ff6b9a"];
   var PLANK_L = 22, TUN_L = 0.5, LW = 2.4, LANES = 5, SPEED = 20, GATE_DIST = 95, GATE_MIN = 24, FB_MS = 2400;
   var laneX = function (i) { return (i - 2) * LW; };
   var THREE_URL = "https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js", p3;
@@ -48,7 +48,7 @@
     ".rg-hud{position:relative;flex:none;padding:calc(6px + env(safe-area-inset-top,0px)) 10px 4px;display:flex;flex-direction:column;align-items:center;gap:4px;background:linear-gradient(#150e2c,#1a1136);border-bottom:1px solid rgba(245,192,74,.28);z-index:2}" +
     ".rg-bar{width:min(720px,100%);flex:none;display:flex;align-items:center;gap:8px}" +
     ".rg-pill{padding:6px 10px;border-radius:999px;background:rgba(20,12,44,.78);border:1px solid rgba(255,255,255,.2);font-weight:600;font-size:12px;white-space:nowrap}" +
-    ".rg-pill.ok{color:#4ade80}.rg-pill.en{color:#f5c04a}" +
+    ".rg-pill.ok{color:#4ade80}.rg-pill.en{color:#f5c04a}.rg-ci{display:inline-block;width:14px;height:14px;border-radius:50%;background:radial-gradient(circle at 35% 30%,#fff3b0,#f5c04a 45%,#c98a10);box-shadow:inset 0 0 0 1.5px #a86f00;margin-right:5px;vertical-align:-2px}" +
     ".rg-prog{flex:1;height:8px;border-radius:99px;background:rgba(255,255,255,.15);overflow:hidden}.rg-prog i{display:block;height:100%;width:0;background:linear-gradient(90deg,#b18cff,#f5c04a);transition:width .4s}" +
     ".rg-btn{width:36px;height:36px;border-radius:12px;border:1px solid rgba(255,255,255,.25);background:rgba(20,12,44,.78);color:#fff;font-size:16px;cursor:pointer;flex:none}" +
     ".rg-card{width:min(720px,100%);flex:none;overflow:visible;border-radius:14px;padding:6px 10px;background:rgba(255,255,255,.05);border:1px solid rgba(245,192,74,.35)}" +
@@ -130,7 +130,7 @@
     var qTime = (cfg.qTime || 60) * 1000, t0 = performance.now();
 
     var root = el("div", "rg"); root.id = "rg";
-    root.innerHTML = '<div class="rg-hud"><div class="rg-bar"><span class="rg-pill" id="rgN">Soal 1/1</span><div class="rg-prog"><i id="rgP"></i></div><span class="rg-pill ok" id="rgS" title="Skor akademik">✔ 0</span><span class="rg-pill en" id="rgE" title="Koin terkumpul (masuk leaderboard koin, terpisah dari skor)">🪙 0</span>' +
+    root.innerHTML = '<div class="rg-hud"><div class="rg-bar"><span class="rg-pill" id="rgN">Soal 1/1</span><div class="rg-prog"><i id="rgP"></i></div><span class="rg-pill ok" id="rgS" title="Skor akademik">✔ 0</span><span class="rg-pill en" id="rgE" title="Koin terkumpul (masuk leaderboard koin, terpisah dari skor)"><i class="rg-ci"></i>0</span>' +
       '<button class="rg-btn" id="rgSnd" aria-label="Suara">🔊</button><button class="rg-btn" id="rgPause" aria-label="Jeda">⏸</button></div>' +
       '<div class="rg-card" id="rgCard"><div class="rg-tm" id="rgTm"><span class="rg-tmv" id="rgTv">60</span><div class="rg-tmb"><i id="rgTb"></i></div></div><div class="rg-q" id="rgQ"></div><div class="rg-imgs" id="rgI" hidden></div><ul class="rg-opts" id="rgO"></ul></div>' +
       '<button class="rg-tg" id="rgTg">Sembunyikan pilihan ▲</button></div>' +
@@ -212,7 +212,7 @@
     function flash(c) { if (!fx) return; var f = root.querySelector(".rg-flash"); f.className = "rg-flash"; void f.offsetWidth; f.className = "rg-flash " + c; }
     function shake() { if (!fx) return; root.classList.remove("shake"); void root.offsetWidth; root.classList.add("shake"); }
     function sndUI() { $("rgSnd").textContent = snd.on ? "🔊" : "🔇"; }
-    $("rgE").textContent = "🪙 " + st.energy; sndUI(); if (S.sound === 0) $("rgSnd").style.display = "none";
+    $("rgE").innerHTML = '<i class="rg-ci"></i>' + st.energy; sndUI(); if (S.sound === 0) $("rgSnd").style.display = "none";
 
     /* ---------- tiga dimensi ---------- */
     function mkMat(c, o) { return new T.MeshBasicMaterial(Object.assign({ color: c }, o || {})); }
@@ -692,7 +692,7 @@
       world.coins.forEach(function (c) {
         c.m.position.z += v * dt; c.m.rotation.y += dt * 4;
         if (c.dying) { c.m.scale.multiplyScalar(0.8); if (c.m.scale.x < 0.05) c.rm = true; }
-        if (!c.got && !c.dying && c.lane === st.lane && Math.abs(c.m.position.z) < 0.7 && Math.abs(c.m.position.y - (st.y + 1.0)) < 1.1) { c.got = true; c.rm = true; st.energy++; $("rgE").textContent = "🪙 " + st.energy; sfx.coin(); burst(c.m.position.x, c.m.position.y, 0, 0xffd166, 5); }
+        if (!c.got && !c.dying && c.lane === st.lane && Math.abs(c.m.position.z) < 0.7 && Math.abs(c.m.position.y - (st.y + 1.0)) < 1.1) { c.got = true; c.rm = true; st.energy++; $("rgE").innerHTML = '<i class="rg-ci"></i>' + st.energy; sfx.coin(); burst(c.m.position.x, c.m.position.y, 0, 0xffd166, 5); }
         if (c.m.position.z > 9) c.rm = true;
       });
       [world.obs, world.coins].forEach(function (arr) { for (var i = arr.length - 1; i >= 0; i--) if (arr[i].rm) { var o = arr[i]; scene.remove(o.g || o.m); arr.splice(i, 1); } });
