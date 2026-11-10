@@ -397,6 +397,7 @@ async function runDb(env) {
     await env.DB.batch(RUN_DDL.map((s) => env.DB.prepare(s)));
     const cols = (await env.DB.prepare("PRAGMA table_info(run_sessions)").all()).results || [];
     if (!cols.some((c) => c.name === "mode")) await env.DB.prepare("ALTER TABLE run_sessions ADD COLUMN mode TEXT NOT NULL DEFAULT 'game'").run(); // game | quiz | exam
+    if (!cols.some((c) => c.name === "coins")) await env.DB.prepare("ALTER TABLE run_sessions ADD COLUMN coins INTEGER NOT NULL DEFAULT 0").run(); // koin terkumpul (leaderboard koin terpisah dari skor)
     const acols = (await env.DB.prepare("PRAGMA table_info(run_answers)").all()).results || [];
     if (!acols.some((c) => c.name === "flag")) await env.DB.prepare("ALTER TABLE run_answers ADD COLUMN flag INTEGER NOT NULL DEFAULT 0").run(); // tanda ragu (mode ujian)
     const qcols = (await env.DB.prepare("PRAGMA table_info(run_questions)").all()).results || [];
@@ -469,7 +470,7 @@ async function runView(db, s, extra) { // keadaan sesi untuk klien — TANPA kun
   const rows = (await db.prepare("SELECT idx, snap FROM run_answers WHERE sid = ? ORDER BY idx").bind(s.id).all()).results;
   const qs = rows.map((r) => { const q = JSON.parse(r.snap); return { idx: r.idx, q: q.q, o: { A: q.a, B: q.b, C: q.c, D: q.d, E: q.e }, img: q.img || "" }; });
   const t = Date.now();
-  return { sid: s.id, status: s.status, mode: s.mode || "game", total: s.total, requested: s.requested, adjusted: s.requested > 0 && s.total < s.requested, q_time: s.q_time, cur: s.cur, score: s.score,
+  return { sid: s.id, status: s.status, mode: s.mode || "game", total: s.total, requested: s.requested, adjusted: s.requested > 0 && s.total < s.requested, q_time: s.q_time, cur: s.cur, score: s.score, coins: s.coins || 0,
     remaining: s.status === "active" ? Math.max(0, s.q_time * 1000 - ((s.paused_at || t) - s.qstart)) : null, paused: !!s.paused_at, qs, ...extra };
 }
 // preferensi pribadi mahasiswa: jumlah soal per sesi (0 = ikut kategori) & tema tampilan ('' = ikut perangkat)
@@ -585,7 +586,8 @@ async function runApi(request, env, a, path, url, body, M) {
       out.push({ id: c.id, name: c.name, descr: c.descr, active: c.active, per_session: c.per_session, q_time: c.q_time, show_explain: c.show_explain, aq: c.aq, play: (prefPer > 0 ? Math.min(prefPer, c.aq) : (c.per_session > 0 ? Math.min(c.per_session, c.aq) : c.aq)), players: c.players, me, resume: rs ? { cur: rs.cur, total: rs.total, mode: rs.mode || "game" } : null });
     }
     const myNick = a.admin ? undefined : ((await db.prepare("SELECT nick FROM run_players WHERE u = ?").bind(a.u).first()) || {}).nick || null;
-    return J({ cats: out, settings: set, nick: myNick, prefs: await runPref(db, a.u) });
+    const myCoins = a.admin ? 0 : ((await db.prepare("SELECT COALESCE(SUM(coins), 0) c FROM run_sessions WHERE u = ?").bind(a.u).first()) || {}).c || 0;
+    return J({ cats: out, settings: set, nick: myNick, prefs: await runPref(db, a.u), coins: myCoins });
   }
 
   // ---------- preferensi pribadi: jumlah soal per sesi & tema ----------
@@ -706,13 +708,16 @@ async function runApi(request, env, a, path, url, body, M) {
     if (ans === null && el < lim - RUN_EARLY) return runErr("Waktu soal belum habis.", 400, { remaining: lim - el });
     const r = await runRecord(db, s, ans, t, el > lim + RUN_GRACE);
     if (!r) return runErr("Soal ini sudah dijawab.", 409);
+    // koin hanya berupa catatan (tidak memengaruhi skor akademik); dibatasi wajar per soal agar tidak mudah dimanipulasi
+    const cg = Math.max(0, Math.min(Math.ceil(s.q_time * 5), parseInt(body.coins, 10) || 0));
+    if (cg && (s.mode || "game") === "game") await db.prepare("UPDATE run_sessions SET coins = coins + ? WHERE id = ?").bind(cg, s.id).run();
     const n = await runGet(db, s.id);
     // kunci jawaban dibuka segera setelah soal ini dijawab (soal ini sudah terkunci, tidak bisa dijawab ulang);
     // pembahasan hanya dikirim di mode soal dan bila fitur pembahasan aktif
     const quiz = (s.mode || "game") === "quiz", ex = quiz && (await runSettings(db)).explain && s.show_explain ? true : false;
     const snapRow = ex ? await db.prepare("SELECT snap FROM run_answers WHERE sid = ? AND idx = ?").bind(s.id, idx).first() : null;
     const exOpt = snapRow ? JSON.parse(snapRow.snap).ex || null : null; // pembahasan tiap pilihan jawaban
-    return J({ ...r, ex: exOpt, expl: ex ? r.expl : null, explain: ex, score: n.score, done: n.status === "done", cur: n.cur });
+    return J({ ...r, ex: exOpt, expl: ex ? r.expl : null, explain: ex, score: n.score, coins: n.coins || 0, done: n.status === "done", cur: n.cur });
   }
 
   // ---------- hasil, riwayat, leaderboard ----------
@@ -741,6 +746,18 @@ async function runApi(request, env, a, path, url, body, M) {
       return o;
     }));
     return J({ rows, me: me ? { rank: me.rank } : null, count: all.length, nick: a.admin ? undefined : nm.get(a.u) || null });
+  }
+  // leaderboard KOIN — terpisah dari leaderboard skor (total koin dari semua sesi game tiap mahasiswa)
+  if (path === "coinlb" && M === "GET") {
+    const since = runSince(qp("p")), N = 50;
+    const all = (await db.prepare("SELECT u, SUM(coins) coins, COUNT(*) games FROM run_sessions WHERE u <> 'admin' AND coins > 0 AND started >= ? GROUP BY u ORDER BY coins DESC, u ASC").bind(since).all()).results.map((x, i) => ({ ...x, rank: i + 1 }));
+    const me = all.find((x) => x.u === a.u), nm = await runNicks(db);
+    const rows = await Promise.all(all.slice(0, N).map(async (x) => {
+      const o = { ...x, nick: nm.get(x.u) || (await runAnon(env, x.u)), me: x.u === a.u };
+      if (!a.admin) delete o.u;
+      return o;
+    }));
+    return J({ rows, me: me ? { rank: me.rank, coins: me.coins } : null, count: all.length, nick: a.admin ? undefined : nm.get(a.u) || null });
   }
   if (path === "nick" && M === "POST") {
     if (a.admin) return runErr("Admin tidak memakai nama samaran.");
