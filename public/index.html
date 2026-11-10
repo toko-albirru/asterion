@@ -26,9 +26,9 @@
 :root[data-theme="light"] .rn-nums button,:root[data-theme="light"] .ex-nums button{background:rgba(48,28,88,.08);color:#241a3f}
 :root[data-theme="light"] .rn-nums button.cur,:root[data-theme="light"] .ex-nums button.cur{background:var(--gold);color:#fff}
 /* ---------- MODE FOKUS MENGAMBANG ---------- */
-.fx{position:fixed;right:14px;bottom:calc(84px + env(safe-area-inset-bottom,0));z-index:60;display:flex;align-items:center;gap:6px;padding:10px 14px;border-radius:999px;border:1px solid rgba(245,192,74,.5);font:700 12px Inter,sans-serif;cursor:pointer;color:#241a3f;background:linear-gradient(135deg,#f5c04a,#e08a2e);box-shadow:0 8px 24px rgba(8,4,24,.35)}
+.fx{position:fixed;right:14px;bottom:calc(84px + env(safe-area-inset-bottom,0));z-index:9997;display:flex;align-items:center;gap:6px;padding:10px 14px;border-radius:999px;border:1px solid rgba(245,192,74,.5);font:700 12px Inter,sans-serif;cursor:pointer;color:#241a3f;background:linear-gradient(135deg,#f5c04a,#e08a2e);box-shadow:0 8px 24px rgba(8,4,24,.35)}
 .fx.on{background:linear-gradient(135deg,#4ade80,#22c55e);border-color:rgba(34,197,94,.6);color:#0b2415}
-.fxp{position:fixed;right:14px;bottom:calc(140px + env(safe-area-inset-bottom,0));z-index:61;width:min(330px,calc(100vw - 28px));padding:14px;border-radius:18px;color:#fff}
+.fxp{position:fixed;right:14px;bottom:calc(140px + env(safe-area-inset-bottom,0));z-index:9999;width:min(330px,calc(100vw - 28px));padding:14px;border-radius:18px;color:#fff}
 :root[data-theme="light"] .fxp{color:#241a3f}
 .fxp b{display:block;margin-bottom:8px;font-size:14px}
 .fxp .fxr{display:flex;gap:6px;flex-wrap:wrap;margin:8px 0}
@@ -130,7 +130,7 @@ a.tag{text-decoration:none}
 .tag.ok{background:rgba(74,222,128,.2);color:var(--ok)}.tag.warn{background:rgba(251,191,36,.2);color:var(--warn)}
 .note{font-size:12px;color:var(--warn);padding:8px 0 10px;border-top:1px solid rgba(255,255,255,.12)}
 .empty{text-align:center;color:var(--mut);padding:26px 10px;font-size:14px}
-#toast{position:fixed;left:50%;top:calc(16px + env(safe-area-inset-top,0));transform:translate(-50%,-90px);z-index:210;display:flex;align-items:center;gap:8px;max-width:min(440px,calc(100vw - 28px));padding:11px 18px;border-radius:999px;background:rgba(30,22,56,.97);border:1px solid rgba(245,192,74,.34);color:#fff;font:600 13px Inter,sans-serif;box-shadow:0 12px 34px rgba(6,3,18,.5);opacity:0;transition:transform .28s cubic-bezier(.2,.9,.3,1.2),opacity .2s}
+#toast{position:fixed;left:50%;top:calc(16px + env(safe-area-inset-top,0));transform:translate(-50%,-90px);z-index:10001;display:flex;align-items:center;gap:8px;max-width:min(440px,calc(100vw - 28px));padding:11px 18px;border-radius:999px;background:rgba(30,22,56,.97);border:1px solid rgba(245,192,74,.34);color:#fff;font:600 13px Inter,sans-serif;box-shadow:0 12px 34px rgba(6,3,18,.5);opacity:0;transition:transform .28s cubic-bezier(.2,.9,.3,1.2),opacity .2s}
 #toast.on{transform:translate(-50%,0);opacity:1}
 #toast .ti{font-size:15px;flex:none;line-height:1}
 #toast.bad{border-color:rgba(248,113,113,.62)}
@@ -314,7 +314,7 @@ select.in option{background:#241a3f;color:#fff}
 .pp .nb.no{color:#b9aee0}
 .pp .ct,.pp .nh2{color:#b9aee0}
 /* ---------- DIALOG & TOAST KUSTOM ---------- */
-#dlg{position:fixed;inset:0;z-index:200;display:flex;align-items:center;justify-content:center;padding:20px;background:rgba(12,8,26,.62);-webkit-backdrop-filter:blur(10px);backdrop-filter:blur(10px);opacity:0;pointer-events:none;transition:opacity .18s}
+#dlg{position:fixed;inset:0;z-index:10000;display:flex;align-items:center;justify-content:center;padding:20px;background:rgba(12,8,26,.62);-webkit-backdrop-filter:blur(10px);backdrop-filter:blur(10px);opacity:0;pointer-events:none;transition:opacity .18s}
 #dlg.on{opacity:1;pointer-events:auto}
 #dlg .dx{width:min(420px,100%);border-radius:22px;padding:20px 20px 16px;background:linear-gradient(160deg,rgba(40,29,70,.99),rgba(23,17,42,.99));border:1px solid rgba(245,192,74,.34);box-shadow:0 24px 60px rgba(4,2,14,.6);transform:translateY(12px) scale(.97);transition:transform .2s cubic-bezier(.2,.9,.3,1.15)}
 #dlg.on .dx{transform:none}
@@ -338,6 +338,42 @@ select.in option{background:#241a3f;color:#fff}
 :root[data-theme="light"] #dlg .db button{background:rgba(48,28,88,.07);color:#241a3f;border-color:rgba(48,28,88,.2)}
 :root[data-theme="light"] #dlg .db .ok{background:linear-gradient(135deg,#f5c04a,#e08a2e);color:#241a3f}
 :root[data-theme="light"] #dlg .db .ok.bad{background:linear-gradient(135deg,#ef4444,#b3261e);color:#fff}
+
+/* ---------- TOMBOL MENGAMBANG: bisa digeser ---------- */
+.fx,.thmf,.fxo{touch-action:none;-webkit-user-select:none;user-select:none}
+.fx,.thmf{cursor:grab}
+.fxo{cursor:grab}.fxo .fxb .btn{cursor:pointer}
+.fxp .fxgrip{cursor:grab;touch-action:none;-webkit-user-select:none;user-select:none}
+.fx.dragging,.thmf.dragging,.fxo.dragging,.fxp.dragging{cursor:grabbing;opacity:.92;transition:none}
+.fxo h2::before{content:"⠿ ";letter-spacing:0}
+.fxp .fxgrip::before{content:"⠿ ";opacity:.6}
+/* ---------- PEMBACA MATERI: MODE TERANG BENAR-BENAR TERANG ---------- */
+:root[data-theme="light"] .pv-m{background:rgba(247,245,250,.97)}
+:root[data-theme="light"] .pv-m .bar{background:linear-gradient(180deg,rgba(255,255,255,.98),rgba(246,242,252,.94));border-bottom:1px solid rgba(48,28,88,.14);color:#241a3f;box-shadow:0 4px 16px rgba(60,40,110,.08)}
+:root[data-theme="light"] .pv-m .bar a,:root[data-theme="light"] .pv-m .bar button{color:#241a3f}
+:root[data-theme="light"] .pv-m .bar .tl span,:root[data-theme="light"] .pv-m .bar .fsx .fc{color:#4b3f66}
+:root[data-theme="light"] .pv-m .bar .fsx{background:#fff;border-color:rgba(48,28,88,.22)}
+:root[data-theme="light"] .pv-m .bar .fsx input{color:#241a3f}
+:root[data-theme="light"] .pv-m .bar .fsx button{color:#4b3f66}
+:root[data-theme="light"] .pv-m .bar .fsx button:hover,:root[data-theme="light"] .pv-m .bar .fsx button:active{background:rgba(48,28,88,.10);color:#241a3f}
+:root[data-theme="light"] .pv-m .bar .fs.on .fso{color:#9a6a12;border-color:#9a6a12}
+:root[data-theme="light"] .pnote{background:#fff7e3;color:#7a4d05;border-bottom:1px solid rgba(48,28,88,.12)}
+:root[data-theme="light"] .pst{color:#4b3f66}
+:root[data-theme="light"] .pbar{background:rgba(48,28,88,.14)}
+:root[data-theme="light"] .pdfc{background:#ebe6f3}
+:root[data-theme="light"] .pdfc .pg{box-shadow:0 4px 16px rgba(60,40,110,.22)}
+:root[data-theme="light"] .pp .sg{background:#ebe6f3}
+:root[data-theme="light"] .pp .sw{background:#fff;box-shadow:0 4px 16px rgba(60,40,110,.22)}
+:root[data-theme="light"] .pp .spl{background:#f3effa;border-top:1px solid rgba(48,28,88,.14)}
+:root[data-theme="light"] .pp .spl i{background:rgba(48,28,88,.30)}
+:root[data-theme="light"] .pp .spl:hover i,:root[data-theme="light"] .pp .spl.dr i{background:#9a6a12}
+:root[data-theme="light"] .pp .nt{background:#fff}
+:root[data-theme="light"] .pp .nh{border-bottom:1px solid rgba(48,28,88,.12)}
+:root[data-theme="light"] .pp .nh button{color:#241a3f}
+:root[data-theme="light"] .pp .nb{color:#241a3f}
+:root[data-theme="light"] .pp .nb.no{color:#6a5d86}
+:root[data-theme="light"] .pp .ct,:root[data-theme="light"] .pp .nh2{color:#6a5d86}
+:root[data-theme="light"] .vw img.pi{background:#f3effa}
 </style>
 </head>
 <body>
@@ -372,7 +408,7 @@ select.in option{background:#241a3f;color:#fff}
   <button class="ib g thmf" id="thm" title="Ganti tema" aria-label="Ganti tema">🌙</button>
   <button class="fx" id="fxBtn" aria-label="Mode fokus">🎯 <span>Fokus</span></button>
   <div class="fxp g" id="fxP" hidden>
-    <b>🎯 Mode fokus</b>
+    <b class="fxgrip" title="Geser panel">🎯 Mode fokus</b>
     <div class="hint" style="margin:0 0 8px">Web masuk layar penuh dan terkunci sampai waktu habis. Kalau keluar sebelum waktunya, muncul peringatan.</div>
     <label for="fxMin" style="font-size:12px">Durasi (menit)</label>
     <input id="fxMin" type="number" min="1" max="240" value="25" class="in" style="width:100%;padding:9px;border-radius:10px;border:1px solid var(--line);background:rgba(10,6,28,.5);color:#fff">
@@ -1544,6 +1580,64 @@ window.addEventListener("beforeunload",function(e){if(FX.on){e.preventDefault();
     var x=e.target.closest?e.target.closest("[data-fxo]"):null;
     if(x&&x.getAttribute("data-fxo")==="early")fxEnd(1)});
 })();
+
+/* ---------- GESER TOMBOL TEMA, FOKUS, TIMER & PANEL (posisi diingat) ---------- */
+var DRG=(function(){
+  var KEY="ast.pos.",M=6;
+  function load(k){try{return JSON.parse(localStorage.getItem(KEY+k)||"null")}catch(e){return null}}
+  function save(k,x,y){try{localStorage.setItem(KEY+k,JSON.stringify({x:x,y:y}))}catch(e){}}
+  function clamp(el,x,y){var w=el.offsetWidth,h=el.offsetHeight,vw=window.innerWidth,vh=window.innerHeight;
+    return{x:Math.max(M,Math.min(vw-w-M,x)),y:Math.max(M,Math.min(vh-h-M,y))}}
+  function put(el,x,y){var c=clamp(el,x,y);el.style.left=c.x+"px";el.style.top=c.y+"px";el.style.right="auto";el.style.bottom="auto";return c}
+  /* handle = elemen yang ditekan untuk menggeser (default: el sendiri) */
+  function make(el,key,handle,persist){
+    if(!el||el._drg)return;el._drg=1;handle=handle||el;
+    var st=null,moved=false;
+    handle.addEventListener("pointerdown",function(e){
+      if(e.button!==undefined&&e.button!==0)return;
+      var ic=e.target.closest&&e.target.closest("button,input,select,a,textarea");if(ic&&ic!==el&&handle===el)return;
+      var r=el.getBoundingClientRect();st={id:e.pointerId,sx:e.clientX,sy:e.clientY,ox:r.left,oy:r.top};moved=false;
+      try{handle.setPointerCapture(e.pointerId)}catch(_){}});
+    handle.addEventListener("pointermove",function(e){
+      if(!st||e.pointerId!==st.id)return;
+      var dx=e.clientX-st.sx,dy=e.clientY-st.sy;
+      if(!moved&&Math.abs(dx)+Math.abs(dy)<7)return;
+      if(!moved){moved=true;el.classList.add("dragging")}
+      e.preventDefault();put(el,st.ox+dx,st.oy+dy)});
+    function end(e){
+      if(!st||(e&&e.pointerId!==st.id))return;
+      try{handle.releasePointerCapture(st.id)}catch(_){}
+      st=null;el.classList.remove("dragging");
+      if(moved){var r=el.getBoundingClientRect();if(persist!==false)save(key,r.left,r.top);
+        el._dragged=Date.now()}}
+    handle.addEventListener("pointerup",end);handle.addEventListener("pointercancel",end);
+    /* seret ≠ klik: abaikan klik yang lahir dari geseran */
+    el.addEventListener("click",function(e){if(el._dragged&&Date.now()-el._dragged<350){e.stopPropagation();e.preventDefault();el._dragged=0}},true);
+    if(persist!==false){var p=load(key);if(p&&isFinite(p.x)&&isFinite(p.y))put(el,p.x,p.y)}
+  }
+  /* jaga tetap di dalam layar saat ukuran jendela berubah / layar penuh */
+  function refit(){["thm","fxBtn","fxOver"].forEach(function(id){var el=$(id);if(!el||el.hidden||!el.style.left)return;
+    var r=el.getBoundingClientRect();if(!r.width)return;put(el,r.left,r.top)})}
+  window.addEventListener("resize",refit);
+  document.addEventListener("fullscreenchange",function(){setTimeout(refit,120)});
+  return{make:make,put:put,clamp:clamp,refit:refit}
+})();
+/* panel fokus: muncul di dekat tombol Fokus (kecuali sudah digeser sendiri) */
+function fxPlacePanel(){
+  var p=$("fxP"),b=$("fxBtn");if(!p||!b||p.hidden||p._moved)return;
+  var r=b.getBoundingClientRect(),w=p.offsetWidth,h=p.offsetHeight,vw=window.innerWidth;
+  var x=r.right-w,y=r.top-h-10;if(y<6)y=r.bottom+10;
+  var c=DRG.clamp(p,x,y);p.style.left=c.x+"px";p.style.top=c.y+"px";p.style.right="auto";p.style.bottom="auto"}
+(function(){
+  DRG.make($("thm"),"thm");
+  DRG.make($("fxBtn"),"fx");
+  DRG.make($("fxOver"),"fxo");
+  var p=$("fxP"),g=p&&p.querySelector(".fxgrip");
+  if(p&&g){DRG.make(p,"fxp",g,false);
+    p.addEventListener("pointerup",function(){if(p._dragged)p._moved=1});
+    p.addEventListener("pointercancel",function(){if(p._dragged)p._moved=1})}
+  var fb=$("fxBtn");if(fb)fb.addEventListener("click",function(){setTimeout(function(){var q=$("fxP");if(q){if(q.hidden)q._moved=0;else fxPlacePanel()}},0)});
+  DRG.refit()})();
 $("main").addEventListener("change",function(e){if(e.target.id!=="tabSel")return;var tabs=S.tabs||S.data.sheet.tabs,t=tabs[+e.target.value];location.hash="#/jadwal/"+e.target.value});
 
 
