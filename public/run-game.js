@@ -221,8 +221,17 @@
     var G = {}; // geometri/material bersama
     var LT = function () { return document.documentElement.getAttribute("data-theme") === "light"; };
     function initShared() {
-      G.coinM = mkLam(0xffc22e, { emissive: 0x9a6200 }); G.coinRim = mkLam(0xffe58a, { emissive: 0xa87400 });
-      G.coinD = new T.CylinderGeometry(0.3, 0.3, 0.07, 28); G.coinR = new T.TorusGeometry(0.32, 0.045, 8, 28); G.coinE = new T.BoxGeometry(0.15, 0.15, 0.02);
+      G.coinM = mkLam(0xe6b02a, { emissive: 0x3d2700 }); G.coinRim = mkLam(0xf3cf68, { emissive: 0x3d2a00 });
+      var pc = document.createElement("canvas"); pc.width = pc.height = 128; var pg = pc.getContext("2d");
+      pg.translate(64, 64); pg.rotate(-Math.PI / 4);
+      pg.beginPath(); pg.arc(0, 0, 50, 0, 7); pg.lineWidth = 4; pg.strokeStyle = "rgba(120,78,0,.55)"; pg.stroke();
+      function capsule(c1, c2) { pg.beginPath(); pg.moveTo(-34, 0); pg.arc(-14, 0, 20, Math.PI / 2, Math.PI * 1.5); pg.lineTo(0, -20); pg.lineTo(0, 20); pg.closePath(); pg.fillStyle = c1; pg.fill();
+        pg.beginPath(); pg.moveTo(0, -20); pg.lineTo(14, -20); pg.arc(14, 0, 20, -Math.PI / 2, Math.PI / 2); pg.lineTo(0, 20); pg.closePath(); pg.fillStyle = c2; pg.fill(); }
+      capsule("#8a5a00", "#c98a10");
+      pg.beginPath(); pg.moveTo(-34, 0); pg.arc(-14, 0, 20, Math.PI / 2, Math.PI * 1.5); pg.lineTo(14, -20); pg.arc(14, 0, 20, -Math.PI / 2, Math.PI / 2); pg.lineTo(-14, 20); pg.closePath(); pg.lineWidth = 3.5; pg.strokeStyle = "#5e3c00"; pg.stroke();
+      pg.fillStyle = "rgba(255,240,190,.55)"; pg.fillRect(-26, -13, 22, 4);
+      G.coinTex = new T.CanvasTexture(pc); G.coinDecal = new T.MeshBasicMaterial({ map: G.coinTex, transparent: true });
+      G.coinD = new T.CylinderGeometry(0.3, 0.3, 0.07, 28); G.coinR = new T.TorusGeometry(0.32, 0.045, 8, 28); G.coinF = new T.CircleGeometry(0.27, 28);
       var gc = document.createElement("canvas"); gc.width = gc.height = 64; var gg = gc.getContext("2d"), grd = gg.createRadialGradient(32, 32, 2, 32, 32, 30);
       grd.addColorStop(0, "rgba(255,255,255,1)"); grd.addColorStop(1, "rgba(255,255,255,0)"); gg.fillStyle = grd; gg.fillRect(0, 0, 64, 64);
       G.glowTex = new T.CanvasTexture(gc);
@@ -349,7 +358,7 @@
       if (!scene) return; var light = LT();
       scene.background.setHex(light ? 0xcfdcf5 : 0x120c24); scene.fog.color.setHex(light ? 0xcfdcf5 : 0x120c24);
       amb.color.setHex(light ? 0xffffff : 0xcbb8ff); amb.intensity = light ? 0.8 : 0.85; dirL.intensity = light ? 0.6 : 0.8;
-      G.dark.color.setHex(light ? 0x6a5aac : 0x2a1c52); G.foam.color.setHex(light ? 0xffffff : 0x4dffe6); G.wall.color.setHex(light ? 0x56468f : 0x2b2442); G.white.color.setHex(light ? 0x22264f : 0xf4f0ff);
+      G.dark.color.setHex(light ? 0x6a5aac : 0x2a1c52); G.foam.color.setHex(light ? 0xffffff : 0x4dffe6); G.wall.color.setHex(light ? 0x56468f : 0x2b2442); G.white.color.setHex(light ? 0x9275d0 : 0xf4f0ff);
       laneGlow.material.color.setHex(light ? 0x7a5ae0 : 0xffffff); starsP.visible = !light;
       moon.material.transparent = true; cloudG.visible = light; paintMoon();
       paintFloor(); floorT.needsUpdate = true; paintLt(); paintSea();
@@ -357,37 +366,35 @@
     var limbs = {};
     function buildPlayer() {
       player = new T.Group(); var body = new T.Group(); player.add(body); limbs.body = body;
-      var skin = mkLam(0xf1c9a5), coat = G.white, scrub = mkLam(0x6b3fc4), pants = mkLam(0x2a2159), shoe = mkLam(0xf4f0ff), neon = G.neon2, glove = mkLam(0xe9e4ff);
+      var skin = mkLam(0xf1c9a5), coat = G.white, scrub = mkLam(0x1fa6a0), scrubD = mkLam(0x188a86), shoe = mkLam(0xf4f0ff), hair = mkLam(0x2b1d16), steth = mkLam(0x2b2f3a), metal = mkLam(0xb8bfcc);
       function cyl(rt, rb, h, m, seg) { return new T.Mesh(new T.CylinderGeometry(rt, rb, h, seg || 16), m); }
-      // badan: jaket ramping dengan garis neon
-      var torso = cyl(0.33, 0.28, 0.92, coat, 20); torso.scale.z = 0.62; torso.position.y = 1.0; body.add(torso);
-      var hem = cyl(0.285, 0.285, 0.07, scrub, 20); hem.scale.z = 0.62; hem.position.y = 0.57; body.add(hem);
-      [-1, 1].forEach(function (sd) { var st2 = box(0.035, 0.7, 0.2, neon); st2.position.set(sd * 0.305, 1.0, 0); body.add(st2); });
-      var collar = new T.Mesh(new T.TorusGeometry(0.19, 0.03, 8, 22), neon); collar.rotation.x = Math.PI / 2; collar.scale.y = 0.7; collar.position.y = 1.45; body.add(collar);
-      // lencana "25" di punggung
-      var lc = document.createElement("canvas"); lc.width = lc.height = 128; var lg = lc.getContext("2d");
-      var bg = lg.createLinearGradient(0, 0, 128, 128); bg.addColorStop(0, "#7b4fe0"); bg.addColorStop(1, "#4527a0"); lg.fillStyle = bg;
-      lg.beginPath(); if (lg.roundRect) lg.roundRect(8, 8, 112, 112, 30); else lg.rect(8, 8, 112, 112); lg.fill();
-      lg.lineWidth = 5; lg.strokeStyle = "#35e6ff"; lg.stroke();
-      lg.fillStyle = "#ffd466"; lg.font = "900 68px Cinzel,Georgia,serif"; lg.textAlign = "center"; lg.textBaseline = "middle"; lg.fillText("25", 64, 68);
-      var logo = new T.Mesh(new T.PlaneGeometry(0.4, 0.4), new T.MeshBasicMaterial({ map: new T.CanvasTexture(lc), transparent: true })); logo.position.set(0, 1.02, 0.215); body.add(logo);
-      // kepala + topi + headphone
+      // scrub di dalam + jas dokter
+      var inner = cyl(0.3, 0.27, 0.9, scrub, 18); inner.scale.z = 0.62; inner.position.y = 1.0; body.add(inner);
+      var torso = cyl(0.345, 0.34, 1.0, coat, 20); torso.scale.z = 0.66; torso.position.y = 0.96; body.add(torso);
+      var seam = box(0.025, 0.6, 0.03, mkLam(0x8a8fa3)); seam.position.set(0, 0.86, 0.225); body.add(seam);
+      var pk = box(0.13, 0.12, 0.03, mkLam(0x8a8fa3)); [-1, 1].forEach(function (sd) { var q = pk.clone(); q.position.set(sd * 0.2, 0.7, 0.215); body.add(q); });
+      var collar = new T.Mesh(new T.TorusGeometry(0.2, 0.045, 8, 22), coat); collar.rotation.x = Math.PI / 2; collar.scale.y = 0.75; collar.position.y = 1.44; body.add(collar);
+      // stetoskop
+      var st = new T.Mesh(new T.TorusGeometry(0.235, 0.022, 8, 24), steth); st.rotation.x = Math.PI / 2; st.scale.y = 0.8; st.position.y = 1.4; body.add(st);
+      [-1, 1].forEach(function (sd) { var tube = cyl(0.02, 0.02, 0.5, steth, 8); tube.position.set(sd * 0.12, 1.2, -0.2); tube.rotation.z = sd * 0.12; body.add(tube); });
+      var cp = cyl(0.07, 0.07, 0.03, metal, 16); cp.rotation.x = Math.PI / 2; cp.position.set(0, 0.95, -0.235); body.add(cp);
+      // kepala: rambut + scrub cap + masker
       var head = new T.Mesh(new T.SphereGeometry(0.28, 20, 16), skin); head.position.y = 1.7; body.add(head);
-      var cap = new T.Mesh(new T.SphereGeometry(0.305, 20, 12, 0, Math.PI * 2, 0, Math.PI / 2), scrub); cap.position.y = 1.74; body.add(cap);
-      var capR = new T.Mesh(new T.TorusGeometry(0.3, 0.025, 8, 28), neon); capR.rotation.x = Math.PI / 2; capR.position.y = 1.745; body.add(capR);
-      var brim = box(0.34, 0.04, 0.22, scrub); brim.position.set(0, 1.74, -0.36); body.add(brim);
-      [-1, 1].forEach(function (sd) { var ear = cyl(0.1, 0.1, 0.07, neon, 18); ear.rotation.z = Math.PI / 2; ear.position.set(sd * 0.3, 1.68, 0); body.add(ear); });
+      var hr = new T.Mesh(new T.SphereGeometry(0.295, 20, 12, 0, Math.PI * 2, 0, Math.PI * 0.62), hair); hr.position.y = 1.72; body.add(hr);
+      var cap = new T.Mesh(new T.SphereGeometry(0.31, 20, 12, 0, Math.PI * 2, 0, Math.PI / 2.15), scrub); cap.position.y = 1.745; body.add(cap);
+      var knot = new T.Mesh(new T.SphereGeometry(0.06, 10, 8), scrubD); knot.position.set(0, 1.76, 0.3); body.add(knot);
+      var mask = box(0.32, 0.17, 0.07, mkLam(0xcfeaf5)); mask.position.set(0, 1.62, -0.25); body.add(mask);
+      [-1, 1].forEach(function (sd) { var lp = box(0.02, 0.03, 0.3, mkLam(0xcfeaf5)); lp.position.set(sd * 0.27, 1.64, -0.1); body.add(lp); });
       [-1, 1].forEach(function (s) {
         var arm = new T.Group(); arm.position.set(s * 0.46, 1.38, 0);
         var sh = new T.Mesh(new T.SphereGeometry(0.115, 14, 12), coat); arm.add(sh);
-        var a = cyl(0.085, 0.07, 0.6, coat, 14); a.position.y = -0.32; arm.add(a);
-        var cuff = cyl(0.078, 0.078, 0.06, neon, 14); cuff.position.y = -0.58; arm.add(cuff);
-        var hand = new T.Mesh(new T.SphereGeometry(0.095, 12, 10), glove); hand.position.y = -0.7; arm.add(hand); body.add(arm); limbs[s < 0 ? "aL" : "aR"] = arm;
+        var a = cyl(0.095, 0.08, 0.6, coat, 14); a.position.y = -0.32; arm.add(a);
+        var cuff = cyl(0.083, 0.083, 0.05, scrub, 14); cuff.position.y = -0.6; arm.add(cuff);
+        var hand = new T.Mesh(new T.SphereGeometry(0.09, 12, 10), skin); hand.position.y = -0.7; arm.add(hand); body.add(arm); limbs[s < 0 ? "aL" : "aR"] = arm;
         var leg = new T.Group(); leg.position.set(s * 0.17, 0.58, 0);
-        var l = cyl(0.115, 0.09, 0.56, pants, 14); l.position.y = -0.27; leg.add(l);
-        var ls = box(0.03, 0.5, 0.1, neon); ls.position.set(s * 0.105, -0.27, 0); leg.add(ls);
-        var sn2 = new T.Mesh(new T.SphereGeometry(0.15, 14, 10), shoe); sn2.scale.set(0.95, 0.62, 1.55); sn2.position.set(0, -0.56, -0.05); leg.add(sn2);
-        var sole = box(0.27, 0.05, 0.5, neon); sole.position.set(0, -0.65, -0.05); leg.add(sole);
+        var l = cyl(0.115, 0.095, 0.56, scrubD, 14); l.position.y = -0.27; leg.add(l);
+        var sn2 = new T.Mesh(new T.SphereGeometry(0.15, 14, 10), shoe); sn2.scale.set(0.95, 0.6, 1.5); sn2.position.set(0, -0.57, -0.05); leg.add(sn2);
+        var sole = box(0.26, 0.04, 0.46, mkLam(0xc9cfdb)); sole.position.set(0, -0.65, -0.05); leg.add(sole);
         body.add(leg); limbs[s < 0 ? "lL" : "lR"] = leg;
       });
       body.scale.setScalar(1.15); var sh2 = new T.Mesh(new T.CircleGeometry(0.55, 20), mkMat(0x000000, { transparent: true, opacity: 0.4 })); sh2.rotation.x = -Math.PI / 2; sh2.position.y = 0.02; limbs.shadow = sh2;
@@ -434,8 +441,7 @@
     function mkCoin(lane, z, y) {
       var m = new T.Group(), d = new T.Mesh(G.coinD, G.coinM); d.rotation.x = Math.PI / 2; m.add(d);
       m.add(new T.Mesh(G.coinR, G.coinRim));
-      [-1, 1].forEach(function (sd) { var e = new T.Mesh(G.coinE, G.coinRim); e.rotation.z = Math.PI / 4; e.position.z = sd * 0.045; m.add(e); });
-      var gs = new T.Sprite(G.coinGlow); gs.scale.set(1.5, 1.5, 1); m.add(gs);
+      [-1, 1].forEach(function (sd) { var f = new T.Mesh(G.coinF, G.coinDecal); f.position.z = sd * 0.042; if (sd < 0) f.rotation.y = Math.PI; m.add(f); });
       m.position.set(laneX(lane), y || 1.0, z); scene.add(m); var c = { m: m, lane: lane, got: false }; world.coins.push(c); return c; }
     function spawnPattern() {
       var r = Math.random(), type = r < 0.4 ? "hurdle" : r < 0.7 ? "beam" : "block", n = type === "block" ? 1 + (Math.random() < 0.4 ? 1 : 0) : 1 + ((Math.random() * 3) | 0), lanes = [];
