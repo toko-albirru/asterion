@@ -1625,7 +1625,7 @@ function tutCard(it,k){
   var iso=jkt(),today=it.iso&&it.iso===iso,past=it.iso&&it.iso<iso,n=it.iso?Math.round((Date.parse(it.iso)-Date.parse(iso))/864e5):9,d=dkFind(it.tutor),wa="";
   if(d)wa=[d.h1,d.h2].filter(Boolean).map(function(x){x=ph(x);return"<a class='tag ok' href='tel:"+x+"'>📞 "+x+"</a><a class='tag' href='https://wa.me/62"+x.slice(1)+"' data-tw='"+k+"' data-h='"+x+"'>Konfirmasi Kehadiran (WA)</a>"}).join("");
   else if(S.dk)wa="<a class='tag' href='#/dokter'>＋ Nomor belum ada · usulkan di Kontak Dokter</a>";
-  return"<div class='day g"+(today?" today":"")+"'"+(past?" style='opacity:.55'":"")+"><h3>"+esc(it.sk+" · "+it.pt)+(today?"<span class='badge'>HARI INI</span>":n===1?"<span class='badge'>BESOK</span>":"")+"</h3>"+
+  return"<div class='day g"+(today?" today":"")+"'"+(past?" style='opacity:.55'":"")+"><h3>"+esc(it.sk+" · "+it.pt)+(today?"<span class='badge'>HARI INI</span>":n===1?"<span class='badge nx'>BESOK</span>":"")+"</h3>"+
   "<div class='sl'><div class='tm'>"+esc(it.jam)+"</div><div class='bd'><b>"+esc(it.tutor||"—")+"</b><div class='mt'><span class='tag'>Kelompok "+esc(kLbl(it.kel))+"</span><span class='tag'>📍 "+esc(it.ruang)+"</span><span class='tag'>📅 "+esc(it.tgl)+"</span></div>"+(wa?"<div class='mt'>"+wa+"</div>":"")+"</div></div></div>"}
 function pTutor(){
   setTimeout(tInit,0);
