@@ -357,20 +357,38 @@
     var limbs = {};
     function buildPlayer() {
       player = new T.Group(); var body = new T.Group(); player.add(body); limbs.body = body;
-      var skin = mkLam(0xf1c9a5), coat = G.white, scrub = mkLam(0x6b3fc4), pants = mkLam(0x3b2a78), shoe = mkLam(0xf5c04a);
-      var torso = box(0.72, 0.92, 0.42, coat); torso.position.y = 1.0; body.add(torso);
-      var panel = box(0.4, 0.5, 0.03, scrub); panel.position.set(0, 1.0, 0.22); body.add(panel);
+      var skin = mkLam(0xf1c9a5), coat = G.white, scrub = mkLam(0x6b3fc4), pants = mkLam(0x2a2159), shoe = mkLam(0xf4f0ff), neon = G.neon2, glove = mkLam(0xe9e4ff);
+      function cyl(rt, rb, h, m, seg) { return new T.Mesh(new T.CylinderGeometry(rt, rb, h, seg || 16), m); }
+      // badan: jaket ramping dengan garis neon
+      var torso = cyl(0.33, 0.28, 0.92, coat, 20); torso.scale.z = 0.62; torso.position.y = 1.0; body.add(torso);
+      var hem = cyl(0.285, 0.285, 0.07, scrub, 20); hem.scale.z = 0.62; hem.position.y = 0.57; body.add(hem);
+      [-1, 1].forEach(function (sd) { var st2 = box(0.035, 0.7, 0.2, neon); st2.position.set(sd * 0.305, 1.0, 0); body.add(st2); });
+      var collar = new T.Mesh(new T.TorusGeometry(0.19, 0.03, 8, 22), neon); collar.rotation.x = Math.PI / 2; collar.scale.y = 0.7; collar.position.y = 1.45; body.add(collar);
+      // lencana "25" di punggung
       var lc = document.createElement("canvas"); lc.width = lc.height = 128; var lg = lc.getContext("2d");
-      lg.fillStyle = "#f5c04a"; lg.font = "900 84px Cinzel,Georgia,serif"; lg.textAlign = "center"; lg.textBaseline = "middle"; lg.fillText("25", 64, 70);
-      var logo = new T.Mesh(new T.PlaneGeometry(0.36, 0.36), new T.MeshBasicMaterial({ map: new T.CanvasTexture(lc), transparent: true })); logo.position.set(0, 1.0, 0.25); body.add(logo);
-      var head = new T.Mesh(new T.SphereGeometry(0.29, 16, 12), skin); head.position.y = 1.7; body.add(head);
-      var cap = new T.Mesh(new T.SphereGeometry(0.31, 16, 10, 0, Math.PI * 2, 0, Math.PI / 2), scrub); cap.position.y = 1.74; body.add(cap);
-      var steth = new T.Mesh(new T.TorusGeometry(0.22, 0.035, 8, 18), G.gold); steth.rotation.x = Math.PI / 2; steth.position.y = 1.43; body.add(steth);
+      var bg = lg.createLinearGradient(0, 0, 128, 128); bg.addColorStop(0, "#7b4fe0"); bg.addColorStop(1, "#4527a0"); lg.fillStyle = bg;
+      lg.beginPath(); if (lg.roundRect) lg.roundRect(8, 8, 112, 112, 30); else lg.rect(8, 8, 112, 112); lg.fill();
+      lg.lineWidth = 5; lg.strokeStyle = "#35e6ff"; lg.stroke();
+      lg.fillStyle = "#ffd466"; lg.font = "900 68px Cinzel,Georgia,serif"; lg.textAlign = "center"; lg.textBaseline = "middle"; lg.fillText("25", 64, 68);
+      var logo = new T.Mesh(new T.PlaneGeometry(0.4, 0.4), new T.MeshBasicMaterial({ map: new T.CanvasTexture(lc), transparent: true })); logo.position.set(0, 1.02, 0.215); body.add(logo);
+      // kepala + topi + headphone
+      var head = new T.Mesh(new T.SphereGeometry(0.28, 20, 16), skin); head.position.y = 1.7; body.add(head);
+      var cap = new T.Mesh(new T.SphereGeometry(0.305, 20, 12, 0, Math.PI * 2, 0, Math.PI / 2), scrub); cap.position.y = 1.74; body.add(cap);
+      var capR = new T.Mesh(new T.TorusGeometry(0.3, 0.025, 8, 28), neon); capR.rotation.x = Math.PI / 2; capR.position.y = 1.745; body.add(capR);
+      var brim = box(0.34, 0.04, 0.22, scrub); brim.position.set(0, 1.74, -0.36); body.add(brim);
+      [-1, 1].forEach(function (sd) { var ear = cyl(0.1, 0.1, 0.07, neon, 18); ear.rotation.z = Math.PI / 2; ear.position.set(sd * 0.3, 1.68, 0); body.add(ear); });
       [-1, 1].forEach(function (s) {
-        var arm = new T.Group(); arm.position.set(s * 0.46, 1.38, 0); var a = box(0.17, 0.66, 0.17, coat); a.position.y = -0.3; arm.add(a);
-        var hand = new T.Mesh(new T.SphereGeometry(0.1, 8, 8), skin); hand.position.y = -0.68; arm.add(hand); body.add(arm); limbs[s < 0 ? "aL" : "aR"] = arm;
-        var leg = new T.Group(); leg.position.set(s * 0.19, 0.58, 0); var l = box(0.24, 0.55, 0.25, pants); l.position.y = -0.27; leg.add(l);
-        var sh = box(0.27, 0.14, 0.38, shoe); sh.position.set(0, -0.58, 0.05); leg.add(sh); body.add(leg); limbs[s < 0 ? "lL" : "lR"] = leg;
+        var arm = new T.Group(); arm.position.set(s * 0.46, 1.38, 0);
+        var sh = new T.Mesh(new T.SphereGeometry(0.115, 14, 12), coat); arm.add(sh);
+        var a = cyl(0.085, 0.07, 0.6, coat, 14); a.position.y = -0.32; arm.add(a);
+        var cuff = cyl(0.078, 0.078, 0.06, neon, 14); cuff.position.y = -0.58; arm.add(cuff);
+        var hand = new T.Mesh(new T.SphereGeometry(0.095, 12, 10), glove); hand.position.y = -0.7; arm.add(hand); body.add(arm); limbs[s < 0 ? "aL" : "aR"] = arm;
+        var leg = new T.Group(); leg.position.set(s * 0.17, 0.58, 0);
+        var l = cyl(0.115, 0.09, 0.56, pants, 14); l.position.y = -0.27; leg.add(l);
+        var ls = box(0.03, 0.5, 0.1, neon); ls.position.set(s * 0.105, -0.27, 0); leg.add(ls);
+        var sn2 = new T.Mesh(new T.SphereGeometry(0.15, 14, 10), shoe); sn2.scale.set(0.95, 0.62, 1.55); sn2.position.set(0, -0.56, -0.05); leg.add(sn2);
+        var sole = box(0.27, 0.05, 0.5, neon); sole.position.set(0, -0.65, -0.05); leg.add(sole);
+        body.add(leg); limbs[s < 0 ? "lL" : "lR"] = leg;
       });
       body.scale.setScalar(1.15); var sh2 = new T.Mesh(new T.CircleGeometry(0.55, 20), mkMat(0x000000, { transparent: true, opacity: 0.4 })); sh2.rotation.x = -Math.PI / 2; sh2.position.y = 0.02; limbs.shadow = sh2;
       player.add(sh2); scene.add(player);
