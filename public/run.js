@@ -18,7 +18,7 @@
   var CSS = "a.btn{display:inline-block;text-decoration:none;text-align:center}.btn.d{background:rgba(239,68,68,.35);color:#fff;border:1px solid var(--line)}.btn.sm{padding:7px 12px;font-size:12px;margin-top:6px}" +
     ".rn-hero{border-radius:24px;padding:20px 18px;margin:6px 0 14px;text-align:center;background:linear-gradient(135deg,rgba(177,140,255,.28),rgba(245,192,74,.14));border:1px solid rgba(245,192,74,.4)}" +
     ".rn-hero h1{font-size:clamp(26px,8vw,40px);margin:0 0 4px}.rn-hero p{margin:6px 0 12px;color:var(--mut);font-size:13px;line-height:1.5}" +
-    ".rn-row{display:flex;flex-wrap:wrap;gap:8px}.rn-row>*{flex:1;min-width:130px}" +
+    ".rn-row{display:flex;flex-wrap:wrap;gap:8px}.rn-row>*{flex:1;min-width:130px}.rn-row>a.btn,.rn-row>button.btn{display:flex;align-items:center;justify-content:center;text-align:center}" +
     ".rn-cat{padding:14px}.rn-cat b{font-size:16px}.rn-cat .mt{margin:8px 0}.rn-me{font-size:12px;color:var(--gold);margin:4px 0 8px}" +
     ".rn-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(110px,1fr));gap:8px;margin:12px 0}.rn-st{border-radius:16px;padding:12px 8px;text-align:center}.rn-st b{display:block;font-size:22px}.rn-st small{color:var(--mut);font-size:11px}" +
     ".rn-big{text-align:center;padding:22px 10px}.rn-big .sc{font:900 54px Cinzel,serif;background:linear-gradient(180deg,#fff,var(--gold));-webkit-background-clip:text;background-clip:text;color:transparent}.rn-big small{color:var(--mut)}" +
