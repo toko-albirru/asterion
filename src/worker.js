@@ -566,7 +566,7 @@ const RUN_QCOLS = "id, num, q, a, b, c, d, e, ans, expl, expl_opt, diff, img, ac
 
 async function runApi(request, env, a, path, url, body, M) {
   const db = await runDb(env).catch(() => null);
-  if (!db) return runErr(env.DB ? "Database ASTERION RUN belum siap." : "D1 belum terpasang. Ikuti PANDUAN.md (buat database & pasang binding DB).", 503);
+  if (!db) return runErr(env.DB ? "Database GAME KUIS belum siap." : "D1 belum terpasang. Ikuti PANDUAN.md (buat database & pasang binding DB).", 503);
   const t = Date.now(), qp = (k) => url.searchParams.get(k) || "";
 
   // ---------- pengaturan & kategori ----------
