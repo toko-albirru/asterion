@@ -221,7 +221,18 @@
     var G = {}; // geometri/material bersama
     var LT = function () { return document.documentElement.getAttribute("data-theme") === "light"; };
     function initShared() {
-      G.coin = new T.OctahedronGeometry(0.34); G.coinM = mkMat(0xffd166);
+      G.coinM = mkLam(0xffc22e, { emissive: 0x9a6200 }); G.coinRim = mkLam(0xffe58a, { emissive: 0xa87400 });
+      G.coinD = new T.CylinderGeometry(0.3, 0.3, 0.07, 28); G.coinR = new T.TorusGeometry(0.32, 0.045, 8, 28); G.coinE = new T.BoxGeometry(0.15, 0.15, 0.02);
+      var gc = document.createElement("canvas"); gc.width = gc.height = 64; var gg = gc.getContext("2d"), grd = gg.createRadialGradient(32, 32, 2, 32, 32, 30);
+      grd.addColorStop(0, "rgba(255,255,255,1)"); grd.addColorStop(1, "rgba(255,255,255,0)"); gg.fillStyle = grd; gg.fillRect(0, 0, 64, 64);
+      G.glowTex = new T.CanvasTexture(gc);
+      G.coinGlow = new T.SpriteMaterial({ map: G.glowTex, color: 0xffc22e, blending: T.AdditiveBlending, transparent: true, depthWrite: false, opacity: 0.55, fog: false });
+      G.neon = mkMat(0xff4f9a); G.neon2 = mkMat(0x35e6ff); G.obsDark = mkLam(0x2d2a63, { emissive: 0x151338 });
+      G.obsGlow = mkMat(0xff4f9a, { transparent: true, opacity: 0.32, depthWrite: false, blending: T.AdditiveBlending });
+      G.postC = new T.CylinderGeometry(0.1, 0.12, 0.8, 14); G.capC = new T.CylinderGeometry(0.15, 0.15, 0.07, 14); G.barC = new T.CylinderGeometry(0.09, 0.09, 1, 12);
+      var hc = document.createElement("canvas"); hc.width = 64; hc.height = 32; var hg = hc.getContext("2d"); hg.fillStyle = "#1b1740"; hg.fillRect(0, 0, 64, 32); hg.fillStyle = "#ff4f9a";
+      for (var hx = -32; hx < 80; hx += 32) { hg.beginPath(); hg.moveTo(hx, 32); hg.lineTo(hx + 16, 32); hg.lineTo(hx + 32, 0); hg.lineTo(hx + 16, 0); hg.closePath(); hg.fill(); }
+      var ht = new T.CanvasTexture(hc); ht.wrapS = ht.wrapT = T.RepeatWrapping; ht.repeat.set(4, 1); G.hazard = mkMat(0xffffff, { map: ht });
       G.postG = new T.BoxGeometry(0.22, 1, 0.22); G.purple = mkLam(0x5b3fb0, { emissive: 0x2a1b66 }); G.gold = mkMat(0xf5c04a); G.red = mkMat(0xff6b9a, { transparent: true, opacity: 0.95 });
       G.foamG = new T.RingGeometry(0.95, 2.1, 24); G.foam = mkMat(0xffffff, { transparent: true, opacity: 0.6, depthWrite: false, side: T.DoubleSide }); G.dark = mkLam(0x2a1c52); G.white = mkLam(0xf4f0ff); G.wall = mkLam(0x2b2442);
       G.ltc = []; G.lt = LET.map(function (L, i) {
@@ -275,6 +286,10 @@
       }
       if (seaT) seaT.needsUpdate = true;
     }
+    function placeCloud(c) {
+      var R2 = 230, az = c.userData.az, el = c.userData.el;
+      c.position.set(Math.sin(az) * Math.cos(el) * R2, Math.sin(el) * R2 + 4, -Math.cos(az) * Math.cos(el) * R2);
+    }
     function paintMoon() {
       var g = moonCv.getContext("2d"), light = LT(); g.clearRect(0, 0, 128, 128);
       var rg = g.createRadialGradient(64, 64, 4, 64, 64, 62);
@@ -293,7 +308,7 @@
       var fl = new T.Mesh(new T.PlaneGeometry(LANES * LW, LEN), mkMat(0xffffff, { map: floorT })); fl.rotation.x = -Math.PI / 2; fl.position.set(0, 0, -LEN / 2 + 25); scene.add(fl);
       seaCv = document.createElement("canvas"); seaCv.width = seaCv.height = 256; seaT = new T.CanvasTexture(seaCv); seaT.wrapS = seaT.wrapT = T.RepeatWrapping; seaT.repeat.set(4, 8); seaT.anisotropy = 4; paintSea();
       gndM = mkMat(0xffffff, { map: seaT }); var gnd = new T.Mesh(new T.PlaneGeometry(160, LEN), gndM); gnd.rotation.x = -Math.PI / 2; gnd.position.set(0, -0.06, -LEN / 2 + 25); scene.add(gnd);
-      [-1, 1].forEach(function (s) { var rail = box(0.14, 0.3, LEN, G.gold); rail.position.set(s * (LANES * LW / 2 + 0.07), 0.15, -LEN / 2 + 25); scene.add(rail); });
+      [-1, 1].forEach(function (s) { var rail = box(0.1, 0.22, LEN, G.gold); rail.position.set(s * (LANES * LW / 2 + 0.05), 0.11, -LEN / 2 + 25); scene.add(rail); var rl = box(0.05, 0.02, LEN, mkMat(0xfff3c4)); rl.position.set(s * (LANES * LW / 2 + 0.05), 0.23, -LEN / 2 + 25); scene.add(rl); });
       laneGlow = new T.Mesh(new T.PlaneGeometry(LW - 0.15, 36), mkMat(0xffffff, { transparent: true, opacity: 0.13, depthWrite: false })); laneGlow.rotation.x = -Math.PI / 2; laneGlow.position.set(0, 0.03, -14); scene.add(laneGlow);
       // pylon sisi jalan
       var N = low ? 9 : 16, sp = 14;
@@ -310,7 +325,7 @@
       });
       // lengkung emas di atas lintasan
       for (var a = 0; a < (low ? 3 : 6); a++) {
-        var arc = new T.Mesh(new T.TorusGeometry(LANES * LW / 2 + 0.6, 0.07, 6, 36, Math.PI), G.gold); arc.position.set(0, 0, -a * 38 + 5); arc.userData.sp = 38 * (low ? 3 : 6); scene.add(arc); world.arch.push(arc);
+        var arc = new T.Mesh(new T.TorusGeometry(LANES * LW / 2 + 0.6, 0.04, 8, 48, Math.PI), G.gold); arc.position.set(0, 0, -a * 38 + 5); arc.userData.sp = 38 * (low ? 3 : 6); scene.add(arc); world.arch.push(arc);
       }
       // bintang & bulan
       var pos = []; for (var s2 = 0; s2 < (low ? 150 : 420); s2++) { var th = Math.random() * 6.283, ph = Math.random() * 1.2 + 0.1, r = 220 + Math.random() * 60; pos.push(Math.cos(th) * Math.cos(ph) * r, Math.sin(ph) * r * 0.9 + 6, -Math.abs(Math.sin(th) * Math.cos(ph) * r) - 30); }
@@ -322,9 +337,10 @@
       var cc = document.createElement("canvas"); cc.width = 128; cc.height = 64; var cg2 = cc.getContext("2d");
       [[40, 38, 22], [64, 28, 26], [90, 38, 22], [64, 42, 30]].forEach(function (b) { var r = cg2.createRadialGradient(b[0], b[1], 2, b[0], b[1], b[2]); r.addColorStop(0, "rgba(255,255,255,.95)"); r.addColorStop(1, "rgba(255,255,255,0)"); cg2.fillStyle = r; cg2.fillRect(0, 0, 128, 64); });
       var ctex = new T.CanvasTexture(cc); cloudG = new T.Group();
-      for (var q = 0; q < (low ? 22 : 48); q++) {
-        var cl = new T.Sprite(new T.SpriteMaterial({ map: ctex, fog: false, depthWrite: false, transparent: true, opacity: 0.85 })); var sc = 45 + Math.random() * 50; cl.scale.set(sc * 2, sc, 1);
-        cl.position.set(-230 + Math.random() * 460, 12 + Math.random() * 80, -200 - Math.random() * 60); cl.userData.v = 0.6 + Math.random() * 1.2; cl.renderOrder = 0; cloudG.add(cl);
+      for (var q = 0; q < (low ? 40 : 90); q++) {
+        var cl = new T.Sprite(new T.SpriteMaterial({ map: ctex, fog: false, depthWrite: false, transparent: true, opacity: 0.85 })); var sc = 38 + Math.random() * 60; cl.scale.set(sc * 2, sc, 1);
+        cl.userData.az = -1.45 + Math.random() * 2.9; cl.userData.el = 0.02 + Math.random() * 0.62; cl.userData.v = 0.0025 + Math.random() * 0.004; cl.renderOrder = 0;
+        placeCloud(cl); cloudG.add(cl);
       }
       scene.add(cloudG);
       buildPlayer(); applyTheme();
@@ -375,18 +391,34 @@
     /* ---------- obstacle / energi / gerbang ---------- */
     function mkObstacle(type, lane, z) {
       var g = new T.Group(), x = laneX(lane), w = LW * 0.86;
+      var gl = new T.Mesh(new T.PlaneGeometry(w + 0.3, 1.5), G.obsGlow); gl.rotation.x = -Math.PI / 2; gl.position.y = 0.03; g.add(gl);
       if (type === "hurdle") {
-        var bar = box(w, 0.2, 0.2, G.red); bar.position.y = 0.55; g.add(bar);
-        [-1, 1].forEach(function (s) { var p = new T.Mesh(G.postG, G.purple); p.scale.y = 0.6; p.position.set(s * w / 2, 0.3, 0); g.add(p); });
+        var bar = new T.Mesh(G.barC, G.neon); bar.scale.y = w; bar.rotation.z = Math.PI / 2; bar.position.y = 0.55; g.add(bar);
+        [-1, 1].forEach(function (s) {
+          var p = new T.Mesh(G.postC, G.obsDark); p.position.set(s * w / 2, 0.4, 0); g.add(p);
+          var cp = new T.Mesh(G.capC, G.neon2); cp.position.set(s * w / 2, 0.82, 0); g.add(cp);
+        });
       } else if (type === "beam") {
-        var b2 = box(w, 0.3, 0.3, G.red); b2.position.y = 1.55; g.add(b2);
-        [-1, 1].forEach(function (s) { var p = new T.Mesh(G.postG, G.purple); p.scale.y = 2.7; p.position.set(s * w / 2, 1.35, 0); g.add(p); });
+        var b2 = box(w, 0.3, 0.3, G.hazard); b2.position.y = 1.55; g.add(b2);
+        [1.72, 1.38].forEach(function (y) { var e = box(w, 0.04, 0.34, G.neon); e.position.y = y; g.add(e); });
+        [-1, 1].forEach(function (s) {
+          var p = box(0.2, 2.9, 0.2, G.obsDark); p.position.set(s * w / 2, 1.45, 0); g.add(p);
+          var st = box(0.05, 2.6, 0.22, G.neon2); st.position.set(s * w / 2, 1.4, 0); g.add(st);
+        });
       } else { // block
-        var bk = box(w * 0.9, 1.4, 1.1, G.purple); bk.position.y = 0.7; g.add(bk); var st2 = box(w * 0.92, 0.18, 1.12, G.red); st2.position.y = 1.2; g.add(st2);
+        var bw = w * 0.9, bk = box(bw, 1.4, 1.1, G.obsDark); bk.position.y = 0.7; g.add(bk);
+        var hb = box(bw + 0.02, 0.24, 1.12, G.hazard); hb.position.y = 0.45; g.add(hb);
+        var tp = box(bw, 0.07, 1.14, G.neon); tp.position.y = 1.4; g.add(tp);
+        var ed = new T.LineSegments(new T.EdgesGeometry(new T.BoxGeometry(bw, 1.4, 1.1)), new T.LineBasicMaterial({ color: 0x35e6ff })); ed.position.y = 0.7; g.add(ed);
       }
       g.position.set(x, 0, z); scene.add(g); var o = { g: g, type: type, lane: lane, hit: false, dying: false }; world.obs.push(o); return o;
     }
-    function mkCoin(lane, z, y) { var m = new T.Mesh(G.coin, G.coinM); m.scale.z = 0.4; m.position.set(laneX(lane), y || 1.0, z); scene.add(m); var c = { m: m, lane: lane, got: false }; world.coins.push(c); return c; }
+    function mkCoin(lane, z, y) {
+      var m = new T.Group(), d = new T.Mesh(G.coinD, G.coinM); d.rotation.x = Math.PI / 2; m.add(d);
+      m.add(new T.Mesh(G.coinR, G.coinRim));
+      [-1, 1].forEach(function (sd) { var e = new T.Mesh(G.coinE, G.coinRim); e.rotation.z = Math.PI / 4; e.position.z = sd * 0.045; m.add(e); });
+      var gs = new T.Sprite(G.coinGlow); gs.scale.set(1.5, 1.5, 1); m.add(gs);
+      m.position.set(laneX(lane), y || 1.0, z); scene.add(m); var c = { m: m, lane: lane, got: false }; world.coins.push(c); return c; }
     function spawnPattern() {
       var r = Math.random(), type = r < 0.4 ? "hurdle" : r < 0.7 ? "beam" : "block", n = type === "block" ? 1 + (Math.random() < 0.4 ? 1 : 0) : 1 + ((Math.random() * 3) | 0), lanes = [];
       while (lanes.length < n) { var l = (Math.random() * LANES) | 0; if (lanes.indexOf(l) < 0) lanes.push(l); }
@@ -422,7 +454,7 @@
     function burst(x, y, z, color, n) {
       if (!fx) return; n = low ? n >> 1 : n;
       for (var i = 0; i < n; i++) {
-        var m = new T.Mesh(new T.BoxGeometry(0.14, 0.14, 0.14), mkMat(color, { transparent: true })); m.position.set(x, y, z); scene.add(m);
+        var m = new T.Sprite(new T.SpriteMaterial({ map: G.glowTex, color: color, blending: T.AdditiveBlending, transparent: true, depthWrite: false, fog: false })); var ps = 0.3 + Math.random() * 0.45; m.scale.set(ps, ps, 1); m.userData.s = ps; m.position.set(x, y, z); scene.add(m);
         parts.push({ m: m, vx: (Math.random() - 0.5) * 7, vy: Math.random() * 6 + 2, vz: (Math.random() - 0.5) * 6, t: 0.9 });
       }
     }
@@ -571,7 +603,7 @@
       world.arch.forEach(function (g) { g.position.z += v * dt; if (g.position.z > 10) g.position.z -= g.userData.sp; });
       world.holo.forEach(function (g) { g.position.z += v * dt; g.rotation.y += dt * 1.2; if (g.position.z > 10) g.position.z -= g.userData.sp; });
       moon.position.x = 45 + Math.sin(t / 9000) * 4;
-      if (cloudG && cloudG.visible) cloudG.children.forEach(function (c) { c.position.x += c.userData.v * dt; if (c.position.x > 240) c.position.x = -240; var dx = Math.abs(c.position.x - moon.position.x) / (c.scale.x * 0.5 + 40), dy = Math.abs(c.position.y - moon.position.y) / (c.scale.y * 0.5 + 40); c.material.opacity = Math.min(0.88, 0.1 + Math.max(dx, dy) * 0.8); });
+      if (cloudG && cloudG.visible) cloudG.children.forEach(function (c) { c.userData.az += c.userData.v * dt; if (c.userData.az > 1.45) c.userData.az = -1.45; placeCloud(c); var dx = Math.abs(c.position.x - moon.position.x) / (c.scale.x * 0.5 + 40), dy = Math.abs(c.position.y - moon.position.y) / (c.scale.y * 0.5 + 40); c.material.opacity = Math.min(0.88, 0.1 + Math.max(dx, dy) * 0.8); });
       // pemain
       var tx2 = laneX(st.lane); st.x += (tx2 - st.x) * Math.min(1, dt * 15);
       if (st.y > 0 || st.vy > 0) { st.vy -= 26 * dt; st.y += st.vy * dt; if (st.y <= 0) { st.y = 0; st.vy = 0; } }
@@ -619,8 +651,8 @@
       }
       // partikel
       for (var pi = parts.length - 1; pi >= 0; pi--) {
-        var p = parts[pi]; p.t -= dt; p.vy -= 18 * dt; p.m.position.x += p.vx * dt; p.m.position.y += p.vy * dt; p.m.position.z += p.vz * dt; p.m.material.opacity = Math.max(0, p.t / 0.9);
-        if (p.t <= 0 || p.m.position.y < 0) { scene.remove(p.m); p.m.geometry.dispose(); p.m.material.dispose(); parts.splice(pi, 1); }
+        var p = parts[pi]; p.t -= dt; p.vy -= 18 * dt; p.m.position.x += p.vx * dt; p.m.position.y += p.vy * dt; p.m.position.z += p.vz * dt; p.m.material.opacity = Math.max(0, p.t / 0.9); if (p.m.userData.s) { var k2 = 0.4 + 0.6 * Math.max(0, p.t / 0.9); p.m.scale.set(p.m.userData.s * k2, p.m.userData.s * k2, 1); }
+        if (p.t <= 0 || p.m.position.y < 0) { scene.remove(p.m); if (!p.m.isSprite) p.m.geometry.dispose(); p.m.material.dispose(); parts.splice(pi, 1); }
       }
       // kamera
       var b = cam.userData.base; cam.position.x += (st.x * 0.35 - cam.position.x) * Math.min(1, dt * 8); cam.position.y += (b.y + Math.min(0.4, st.y * 0.15) - cam.position.y) * Math.min(1, dt * 8); cam.position.z = b.z; cam.lookAt(st.x * 0.2, 0.5, b.tz);
