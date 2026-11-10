@@ -70,6 +70,7 @@
     destroyGame(); quizStop(); examStop();
     try {
       if (sub === "") return await home(k);
+      if (sub === "coinlb") return await coinLbPage(P[2] || "all", k);
       if (sub === "lb") return await lbPage(P[2] || "", P[3] || "all", k);
       if (sub === "hist") return await histPage(k);
       if (sub === "result") return await resultPage(P[2], k);
@@ -84,8 +85,9 @@
     var r = await rapi("cats"); if (!alive(k)) return; if (!r.ok) return setRR(errBox(r));
     RS.cats = r.j.cats; RS.set = r.j.settings;
     var h = "<div class='rn-hero g'><h1>GAME KUIS</h1><div class='yr' style='color:var(--gold);letter-spacing:.35em;font-size:11px'>3D · EDUKASI · KEDOKTERAN</div><p>Tiga mode: 🎮 <b>Game</b> — berlari di lintasan lima jalur, jawab soal dengan melewati gerbang <b>A–E</b>; 📝 <b>Mode Soal</b> — tanpa game, kunci &amp; pembahasan tiap pilihan langsung muncul setelah menjawab; 🎓 <b>Simulasi Ujian</b> — jawaban baru terbuka di akhir, tapi tetap bisa kembali ke nomor sebelumnya, lompat ke nomor mana pun, dan menandai soal (flag). Skor: benar +1, salah/kosong 0. Waktu <b>per soal</b>. Setelah selesai, kamu mendapat pembahasan semua soal.</p>" +
-      "<div class='rn-row'><a class='btn s' href='#/run/lb/global'>🌍 Leaderboard global</a><a class='btn s' href='#/run/hist'>🕘 Riwayat</a><a class='btn s' href='#/run/tutorial'>🎮 Tutorial</a>" + (S.admin ? "<a class='btn' href='#/run/admin'>⚙️ Panel Admin</a>" : "") + "</div></div>";
+      "<div class='rn-row'><a class='btn s' href='#/run/lb/global'>🌍 Leaderboard global</a><a class='btn s' href='#/run/coinlb'>🪙 Leaderboard koin</a><a class='btn s' href='#/run/hist'>🕘 Riwayat</a><a class='btn s' href='#/run/tutorial'>🎮 Tutorial</a>" + (S.admin ? "<a class='btn' href='#/run/admin'>⚙️ Panel Admin</a>" : "") + "</div></div>";
     RS.nick = r.j.nick; RS.prefs = r.j.prefs;
+    if (!S.admin) h += "<div class='pn g rn-hd'><span>🪙 Total koin terkumpul: <b>" + (r.j.coins || 0) + "</b></span><span class='sp'></span><a class='btn s sm' href='#/run/coinlb'>🏆 Leaderboard koin</a></div>";
     h += nickBar() + prefsBar() + "<div class='sec'>PILIH KATEGORI</div>";
     if (!RS.cats.length) h += "<div class='pn g empty'>Belum ada kategori." + (S.admin ? " Buat di Panel Admin." : "") + "</div>";
     RS.cats.forEach(function (c) {
@@ -158,10 +160,10 @@
     var sid = p.sid;
     document.body.style.overflow = "hidden";
     RS.game = AsterionGame.play({
-      qs: p.qs, cur: p.cur, score: p.score, qTime: p.q_time, remaining: p.status === "active" ? p.remaining : null, fresh: p.status === "ready", settings: RS.set,
+      qs: p.qs, cur: p.cur, score: p.score, coins: p.coins || 0, qTime: p.q_time, remaining: p.status === "active" ? p.remaining : null, fresh: p.status === "ready", settings: RS.set,
       host: {
         begin: function () { return rapi("begin", { m: "POST", b: { sid: sid } }).then(function (r) { return r.j; }); },
-        answer: function (idx, ans) { return rapi("answer", { m: "POST", b: { sid: sid, idx: idx, ans: ans } }).then(function (r) { return { ok: r.ok, status: r.s, j: r.j || {} }; }); },
+        answer: function (idx, ans, coins) { return rapi("answer", { m: "POST", b: { sid: sid, idx: idx, ans: ans, coins: coins || 0 } }).then(function (r) { return { ok: r.ok, status: r.s, j: r.j || {} }; }); },
         pause: function () { return rapi("pause", { m: "POST", b: { sid: sid } }); },
         resume: function () { return rapi("resume", { m: "POST", b: { sid: sid } }).then(function (r) { return r.j; }); },
         resync: function () { return rapi("session?sid=" + sid).then(function (r) { return r.ok ? r.j : null; }); },
@@ -515,6 +517,26 @@
     setRR("<div class='sec'>LEADERBOARD</div><div id='rnNkW'></div><select class='in' id='rnLbSel' data-per='" + per + "'>" + opts + "</select><div class='chips'>" + chips + "</div><div id='rnLbB'><div class='empty'>Memuat…</div></div>");
     var b = await lbBody(cat, per, glob); if (alive(k) && g("rnLbB")) g("rnLbB").innerHTML = b;
     if (alive(k) && g("rnNkW")) g("rnNkW").innerHTML = nickBar();
+  }
+
+  /* ======================= LEADERBOARD KOIN (terpisah dari skor) ======================= */
+  async function coinLbPage(per, k) {
+    var chips = [["all", "Sepanjang waktu"], ["month", "Bulan ini"], ["week", "Minggu ini"]].map(function (p) { return "<a class='chip g" + (per === p[0] ? " on" : "") + "' href='#/run/coinlb/" + p[0] + "'>" + p[1] + "</a>"; }).join("");
+    setRR("<div class='sec'>LEADERBOARD KOIN</div><div id='rnNkW'></div><div class='chips'>" + chips + "</div><div id='rnLbB'><div class='empty'>Memuat…</div></div><div class='rn-row'><a class='btn s' href='#/run'>← Kembali</a><a class='btn s' href='#/run/lb/global'>🌍 Leaderboard skor</a></div>");
+    var r = await rapi("coinlb?p=" + per); if (!alive(k)) return;
+    var b;
+    if (!r.ok) b = errBox(r);
+    else {
+      if ("nick" in r.j) RS.nick = r.j.nick;
+      b = "<div class='hint'>Jumlah koin yang kamu kumpulkan saat bermain mode Game. Peringkat ini <b>terpisah</b> dari leaderboard skor dan tidak memengaruhinya.</div>";
+      if (!r.j.rows.length) b += "<div class='pn g empty'>Belum ada koin terkumpul pada periode ini.</div>";
+      r.j.rows.forEach(function (x) {
+        b += "<div class='rn-lb g" + (x.me ? " me" : "") + "'><div class='r'>" + medal(x.rank) + "</div><div class='n'><b>" + esc(x.nick) + "</b>" + (x.me ? " " + tag("kamu", "ok") : "") + "<small>" + (S.admin ? esc(nmOf(x.u)) + " · " + esc(x.u) + " · " : "") + x.games + " permainan</small></div><div class='v'>🪙 " + x.coins + "<small>koin</small></div></div>";
+      });
+      if (r.j.me && r.j.me.rank > r.j.rows.length) b += "<div class='hint' style='text-align:center'>Peringkatmu: <b>#" + r.j.me.rank + "</b> dari " + r.j.count + " pemain</div>";
+    }
+    if (g("rnLbB")) g("rnLbB").innerHTML = b;
+    if (g("rnNkW")) g("rnNkW").innerHTML = nickBar();
   }
 
   /* ======================= PANEL ADMIN ======================= */
