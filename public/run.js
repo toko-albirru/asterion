@@ -14,6 +14,22 @@
   var medal = function (r) { return r === 1 ? "🥇" : r === 2 ? "🥈" : r === 3 ? "🥉" : "#" + r; };
   var nmOf = function (u) { return (window.MHS || {})[String(u || "").toUpperCase()] || u; };
   var tag = function (t, c) { return "<span class='tag " + (c || "") + "'>" + t + "</span>"; };
+  // filter tingkat kesulitan (disimpan di perangkat; dikirim saat memulai sesi baru). "" = semua
+  function diffGet() { try { return localStorage.getItem("run.diff") || ""; } catch (e) { return ""; } }
+  function diffSet(v) { try { localStorage.setItem("run.diff", v); } catch (e) {} }
+  function sb(cid, mode, extra) { var o = { cat: cid, mode: mode }, d = diffGet(); if (d) o.diff = d; for (var k in (extra || {})) o[k] = extra[k]; return o; }
+  var MODEICO = { game: "🎮", quiz: "📝", exam: "🎓", relax: "🌿" }, KINDICO = { wrong: "🔁", mark: "🔖" };
+  var modeIco = function (m, kind) { return KINDICO[kind] || MODEICO[m] || "🎮"; };
+  var MODEPATH = { game: "play", quiz: "quiz", exam: "exam", relax: "relax" };
+  // simpan / hapus soal tersimpan → { on, qid } atau null bila gagal
+  async function bmToggle(sid, idx, isOn, qid) {
+    var r = await rapi("bookmark", { m: "POST", b: isOn ? { qid: qid, on: 0 } : { sid: sid, idx: idx, on: 1 } });
+    if (!r.ok) { toast((r.j && r.j.err) || "Gagal menyimpan soal"); return null; }
+    toast(isOn ? "Dihapus dari soal tersimpan" : "Soal disimpan 🔖 (lihat di GAME KUIS → Soal tersimpan)"); return r.j;
+  }
+  var bmLabel = function (on) { return on ? "★ Tersimpan" : "☆ Simpan soal"; };
+  // badge baru → toast (hanya yang baru diraih sejak kunjungan terakhir)
+  function badgeToast(j) { if (!j || !j.fresh || !j.fresh.length) return; var names = (j.badges || []).filter(function (b) { return j.fresh.indexOf(b.id) >= 0; }).map(function (b) { return b.icon + " " + b.name; }); if (names.length) toast("🏅 Badge baru: " + names.slice(0, 3).join(", ") + (names.length > 3 ? " +" + (names.length - 3) : "")); }
 
   var CSS = "a.btn{display:inline-block;text-decoration:none;text-align:center}.btn.d{background:rgba(239,68,68,.35);color:#fff;border:1px solid var(--line)}.btn.sm{padding:7px 12px;font-size:12px;margin-top:6px}" +
     ".rn-hero{border-radius:24px;padding:20px 18px;margin:6px 0 14px;text-align:center;background:linear-gradient(135deg,rgba(177,140,255,.28),rgba(245,192,74,.14));border:1px solid rgba(245,192,74,.4)}" +
@@ -45,27 +61,32 @@
     ".ex-nums{display:flex;flex-wrap:wrap;gap:5px;margin:8px 0}.ex-nums button{width:34px;height:34px;border-radius:10px;border:1px solid var(--line);background:rgba(255,255,255,.08);color:#fff;font-size:12px;cursor:pointer;font-family:inherit}" +
     ".ex-nums .ans{background:rgba(74,222,128,.35);border-color:var(--ok)}.ex-nums .flg{background:rgba(236,72,153,.55);border-color:#f472b6;color:#fff;font-weight:700;box-shadow:inset 0 0 0 2px #f472b6}.ex-nums .flg.ans{background:linear-gradient(135deg,rgba(74,222,128,.45),rgba(236,72,153,.6))}.ex-nums .cur{outline:2px solid var(--gold)}" +
     ".rn-qo.pick{border-color:var(--gold);background:rgba(245,192,74,.18)}.rn-flag{border-color:#f472b6;color:#fff;background:rgba(236,72,153,.35)}.rn-flag:hover{border-color:#fb7fb8}";
-  (function () { var s = document.createElement("style"); s.textContent = CSS; document.head.appendChild(s); })();
+  var CSS2 = ".rn-x{margin-left:auto;flex:none;align-self:center;width:26px;height:26px;border-radius:8px;display:grid;place-items:center;font-size:12px;color:var(--mut);border:1px solid var(--line);background:rgba(255,255,255,.06);cursor:pointer;font-weight:400}.rn-x:hover{color:#fff;border-color:var(--gold)}" +
+    ".rn-qo.struck>span:not(.rn-x),.rn-qo.struck>b{opacity:.45}.rn-qo.struck>span:not(.rn-x){text-decoration:line-through}.rn-qo.struck .rn-x{color:var(--bad);border-color:var(--bad)}.rn-qo:disabled .rn-x{display:none}" +
+    ".rn-me2{padding:12px 14px;margin:0 0 12px}.rn-me2 .big{font:800 20px Inter,sans-serif}.rn-me2 .rn-prog{margin:6px 0 4px}.rn-weak{margin-top:8px;padding:8px 10px;border-radius:12px;background:rgba(248,113,113,.12);border:1px solid rgba(248,113,113,.35);font-size:12.5px;line-height:1.45}" +
+    ".rn-sv-q{white-space:pre-line;line-height:1.5;margin:6px 0 10px;overflow-wrap:anywhere}";
+  (function () { var s = document.createElement("style"); s.textContent = CSS + CSS2; document.head.appendChild(s); })();
 
   function errBox(r) {
     if (r && r.s === 503) return "<div class='pn g'><b>⚙️ Database belum dipasang</b><div class='hint'>GAME KUIS memakai Cloudflare D1 (binding <code>DB</code>). Admin: ikuti <b>PANDUAN.md</b> (buat database, jalankan migrasi, pasang binding, deploy ulang). Fitur lain ASTERION tetap berjalan normal.</div></div>";
     return "<div class='pn g empty'>" + esc((r && r.j && r.j.err) || "Gagal memuat. Coba lagi.") + "</div>";
   }
   function destroyGame() { if (RS.game) { try { RS.game.destroy(); } catch (e) {} RS.game = null; document.body.style.overflow = ""; } }
-  window.addEventListener("hashchange", function () { if (RS.game && !/^#\/run\/(play|tutorial)/.test(location.hash)) destroyGame(); if (RS.quiz && !/^#\/run\/quiz/.test(location.hash)) quizStop(); if (RS.exam && !/^#\/run\/exam/.test(location.hash)) examStop(); });
+  window.addEventListener("hashchange", function () { if (RS.game && !/^#\/run\/(play|tutorial)/.test(location.hash)) destroyGame(); if (RS.quiz && !/^#\/run\/(quiz|relax)/.test(location.hash)) quizStop(); if (RS.exam && !/^#\/run\/exam/.test(location.hash)) examStop(); });
   function loadGameLib() { return window.AsterionGame ? Promise.resolve() : window.AsterionPdf && 0 ? 0 : new Promise(function (res, rej) { var s = document.createElement("script"); s.src = "run-game.js"; s.onload = res; s.onerror = function () { rej(new Error("run-game.js tidak ditemukan")); }; document.head.appendChild(s); }); }
   function loadPdfLib() { return window.AsterionPdf ? Promise.resolve() : new Promise(function (res, rej) { var s = document.createElement("script"); s.src = "run-pdf.js"; s.onload = res; s.onerror = function () { rej(new Error("run-pdf.js tidak ditemukan")); }; document.head.appendChild(s); }); }
 
   /* ======================= ROUTER ======================= */
   window.pRun = function (P) {
     var k = ++RS.route; setTimeout(function () { rRoute(P, k); }, 0);
-    return "<div id='rr'><div class='empty'>Memuat…</div></div>";
+    return "<div id='rr'>" + skel(4) + "</div>";
   };
   async function rRoute(P, k) {
     var sub = P[1] || "";
     if (sub === "play") return startFlow(+P[2], k);
     if (sub === "tutorial") return tutorial(k);
-    if (sub === "quiz") return quizFlow(+P[2], k);
+    if (sub === "quiz") return quizFlow(+P[2], k, "quiz", "");
+    if (sub === "relax") return quizFlow(+P[2], k, "relax", P[3] === "wrong" || P[3] === "mark" ? P[3] : "");
     if (sub === "exam") return examFlow(+P[2], k);
     destroyGame(); quizStop(); examStop();
     try {
@@ -73,6 +94,7 @@
       if (sub === "coinlb") return await coinLbPage(P[2] || "all", k);
       if (sub === "lb") return await lbPage(P[2] || "", P[3] || "all", k);
       if (sub === "hist") return await histPage(k);
+      if (sub === "saved") return await savedPage(+P[2] || 0, k);
       if (sub === "result") return await resultPage(P[2], k);
       if (sub === "review") return await reviewPage(P[2], k);
       if (sub === "admin") return S.admin ? await adminRoute(P, k) : (location.hash = "#/run");
@@ -84,33 +106,66 @@
   async function home(k) {
     var r = await rapi("cats"); if (!alive(k)) return; if (!r.ok) return setRR(errBox(r));
     RS.cats = r.j.cats; RS.set = r.j.settings;
-    var h = "<div class='rn-hero g'><h1>GAME KUIS</h1><div class='yr' style='color:var(--gold);letter-spacing:.35em;font-size:11px'>3D · EDUKASI · KEDOKTERAN</div><p style='margin:10px 0 6px'>Pilih salah satu dari tiga mode belajar:</p><div style='display:grid;gap:8px;max-width:560px;margin:0 auto;text-align:left;line-height:1.5'><div style='padding:8px 12px;border-radius:12px;background:rgba(127,127,160,.14)'><b>🎮 Game</b><br>Berlari di lintasan lima jalur dan jawab soal dengan melewati gerbang A–E.</div><div style='padding:8px 12px;border-radius:12px;background:rgba(127,127,160,.14)'><b>📝 Mode Soal</b><br>Tanpa game. Kunci dan pembahasan tiap pilihan langsung muncul setelah menjawab.</div><div style='padding:8px 12px;border-radius:12px;background:rgba(127,127,160,.14)'><b>🎓 Simulasi Ujian</b><br>Jawaban baru terbuka di akhir. Kamu tetap bisa kembali ke nomor sebelumnya, melompat ke nomor mana pun, dan menandai soal (flag).</div></div><p style='margin:10px 0 0;font-size:12.5px'>Skor: benar +1, salah/kosong 0 · Waktu dihitung per soal · Setelah selesai, kamu mendapat pembahasan semua soal.</p>" +
-      "<div class='rn-row'><a class='btn s' href='#/run/lb/global'>🌍 Leaderboard global</a><a class='btn s' href='#/run/coinlb'>🪙 Leaderboard koin</a><a class='btn s' href='#/run/hist'>🕘 Riwayat</a><a class='btn s' href='#/run/tutorial'>🎮 Tutorial</a>" + (S.admin ? "<a class='btn' href='#/run/admin'>⚙️ Panel Admin</a>" : "") + "</div></div>";
+    var h = "<div class='rn-hero g'><h1>GAME KUIS</h1><div class='yr' style='color:var(--gold);letter-spacing:.35em;font-size:11px'>3D · EDUKASI · KEDOKTERAN</div><p style='margin:10px 0 6px'>Pilih salah satu dari empat mode belajar:</p><div style='display:grid;gap:8px;max-width:560px;margin:0 auto;text-align:left;line-height:1.5'><div style='padding:8px 12px;border-radius:12px;background:rgba(127,127,160,.14)'><b>🎮 Game</b><br>Berlari di lintasan lima jalur dan jawab soal dengan melewati gerbang A–E.</div><div style='padding:8px 12px;border-radius:12px;background:rgba(127,127,160,.14)'><b>📝 Mode Soal</b><br>Tanpa game. Kunci dan pembahasan tiap pilihan langsung muncul setelah menjawab.</div><div style='padding:8px 12px;border-radius:12px;background:rgba(127,127,160,.14)'><b>🌿 Mode Santai</b><br>Seperti Mode Soal tetapi <b>tanpa timer</b>, boleh dilewati, dan tidak masuk leaderboard. Cocok untuk belajar pelan-pelan.</div><div style='padding:8px 12px;border-radius:12px;background:rgba(127,127,160,.14)'><b>🎓 Simulasi Ujian</b><br>Jawaban baru terbuka di akhir. Kamu tetap bisa kembali ke nomor sebelumnya, melompat ke nomor mana pun, dan menandai soal (flag).</div></div><p style='margin:10px 0 0;font-size:12.5px'>Skor: benar +1, salah/kosong 0 · Waktu dihitung per soal · Setelah selesai, kamu mendapat pembahasan semua soal.</p>" +
+      "<div class='rn-row'><a class='btn s' href='#/run/lb/global'>🌍 Leaderboard global</a><a class='btn s' href='#/run/coinlb'>🪙 Leaderboard koin</a><a class='btn s' href='#/run/hist'>🕘 Riwayat</a><a class='btn s' href='#/run/saved'>🔖 Soal tersimpan</a><a class='btn s' href='#/profil'>👤 Profil &amp; progres</a><a class='btn s' href='#/run/tutorial'>🎮 Tutorial</a>" + (S.admin ? "<a class='btn' href='#/run/admin'>⚙️ Panel Admin</a>" : "") + "</div></div>";
     RS.nick = r.j.nick; RS.prefs = r.j.prefs;
     if (!S.admin) h += "<div class='pn g rn-hd'><span><i style='display:inline-block;flex:none;width:14px;min-width:14px;height:14px;min-height:14px;border-radius:50%;background:radial-gradient(circle at 35% 30%,#fff3b0,#f5c04a 45%,#c98a10);box-shadow:inset 0 0 0 1.5px #a86f00;margin-right:5px;vertical-align:-2px'></i>Total koin terkumpul: <b>" + (r.j.coins || 0) + "</b></span><span class='sp'></span><a class='btn s sm' href='#/run/coinlb'>🏆 Leaderboard koin</a></div>";
-    h += nickBar() + prefsBar() + "<div class='sec'>PILIH KATEGORI</div>";
+    h += (S.admin ? "" : "<div id='rnMe'></div>") + nickBar() + prefsBar() + "<div id='rnDf'>" + diffBar() + "</div><div class='sec'>PILIH KATEGORI</div>";
     if (!RS.cats.length) h += "<div class='pn g empty'>Belum ada kategori." + (S.admin ? " Buat di Panel Admin." : "") + "</div>";
     RS.cats.forEach(function (c) {
-      var can = c.aq > 0 && (c.active || S.admin);
+      var can = c.aq > 0 && (c.active || S.admin), dsel = diffGet() ? diffGet().split(",") : [], dn = dsel.reduce(function (a, d) { return a + ((c.dc || {})[d] || 0); }, 0);
       h += "<div class='pn g rn-cat'><div class='rn-hd'><b>" + esc(c.name) + "</b>" + (c.active ? "" : tag("Nonaktif", "warn")) + "</div>" + (c.descr ? "<div class='hint' style='margin:4px 0'>" + esc(c.descr) + "</div>" : "") +
-        "<div class='mt'>" + tag("📝 " + c.aq + " soal aktif") + tag("🎯 " + c.play + " soal dimainkan") + tag("⏱ " + c.q_time + " dtk/soal") + tag("👥 " + c.players + " pemain") + "</div>" +
+        "<div class='mt'>" + tag("📝 " + c.aq + " soal aktif") + tag("🎯 " + c.play + " soal dimainkan") + (dsel.length ? tag("🎚️ " + dn + " soal sesuai filter") : "") + tag("⏱ " + c.q_time + " dtk/soal") + tag("👥 " + c.players + " pemain") + "</div>" +
         (c.me ? "<div class='rn-me'>Terbaikmu: <b>" + c.me.score + "/" + c.me.total + "</b> (" + pct(c.me.acc) + ") · peringkat <b>#" + c.me.rank + "</b></div>" : "<div class='rn-me' style='color:var(--mut)'>Kamu belum pernah bermain di kategori ini.</div>") +
         "<div class='rn-row'>" + (can ? modeBtns(c) : "<button class='btn' disabled style='opacity:.5'>Belum ada soal aktif</button>") +
         "<a class='btn s' href='#/run/lb/" + c.id + "'>🏆 Leaderboard</a></div></div>";
     });
     setRR(h);
+    if (!S.admin) meFill(k);
   }
 
-  // tiga mode per kategori: 🎮 game 3D, 📝 mode soal (pembahasan langsung), 🎓 simulasi ujian (jawaban muncul di akhir).
+  // tingkat kesulitan: pilih satu atau lebih (kosong = semua). Berlaku untuk sesi baru.
+  function diffBar() {
+    var cur = diffGet(), set = cur ? cur.split(",") : [];
+    var chip = function (v, t) { var on = v === "" ? !set.length : set.indexOf(v) >= 0; return "<a href='javascript:void 0' class='chip g" + (on ? " on" : "") + "' data-ra='diff' data-v2='" + v + "'>" + t + "</a>"; };
+    return "<div class='pn g'><div class='rn-hd'><b>🎚️ Tingkat kesulitan</b><span class='sp'></span><span class='hint' style='margin:0'>untuk sesi baru</span></div><div class='chips' style='margin:8px 0 0'>" + chip("", "Semua") + chip("1", "🟢 Mudah") + chip("2", "🟡 Sedang") + chip("3", "🔴 Sulit") + "</div></div>";
+  }
+  function diffToggle(v) {
+    var set = diffGet() ? diffGet().split(",") : [];
+    if (v === "") set = []; else { var i = set.indexOf(v); if (i >= 0) set.splice(i, 1); else set.push(v); }
+    if (set.length >= 3) set = [];
+    diffSet(set.sort().join(",")); route();
+  }
+
+  // ringkasan streak & target harian di atas daftar kategori
+  async function meFill(k) {
+    var r = await rapi("me"); if (!alive(k) || !r.ok || r.j.admin) return; var j = r.j, el = g("rnMe"); if (!el) return;
+    badgeToast(j);
+    var pg = j.goal > 0 ? Math.min(100, j.today / j.goal * 100) : 0;
+    var h = "<div class='pn g rn-me2'><div class='rn-hd'><span class='big'>" + (j.streak > 0 ? "🔥 " + j.streak + " hari" : "🔥 Belum ada streak") + "</span><span class='sp'></span><a class='btn s sm' href='#/profil' style='margin:0'>Profil ›</a></div>" +
+      (j.goal > 0 ? "<div class='rn-prog'><i style='width:" + pg + "%'></i></div><div class='hint' style='margin:0'>Target hari ini: <b>" + j.today + "/" + j.goal + "</b> soal" + (j.today >= j.goal ? " ✅ tercapai!" : "") + "</div>" : "<div class='hint' style='margin:4px 0 0'>Target harian dimatikan. Atur di Profil.</div>");
+    var weak = j.cats.filter(function (c) { return c.n >= 10; }).sort(function (a, b) { return a.acc - b.acc; })[0];
+    if (weak && weak.acc < 70) {
+      var cc = (RS.cats || []).filter(function (x) { return x.id === weak.id; })[0];
+      h += "<div class='rn-weak'>💡 Kamu lemah di <b>" + esc(weak.name) + "</b> (" + pct(weak.acc) + ")." + (cc && cc.wrong > 0 ? " <a href='#/run/relax/" + weak.id + "/wrong' style='color:var(--gold)'>Ulangi " + cc.wrong + " soal yang salah ›</a>" : "") + "</div>";
+    }
+    el.innerHTML = h + "</div>";
+  }
+
+  // empat mode per kategori + latihan ulang: 🎮 game 3D, 📝 mode soal (pembahasan langsung), 🎓 simulasi ujian (jawaban muncul di akhir).
   // Sesi yang tersimpan hanya bisa dilanjutkan pada mode yang sama.
   function modeBtns(c) {
-    var rs = c.resume, rm = rs ? rs.mode || "game" : "", prog = rs ? " (" + rs.cur + "/" + rs.total + ")" : "";
-    var NM = { game: "game", quiz: "Mode Soal", exam: "Simulasi Ujian" };
+    var rs = c.resume, rm = rs ? (rs.mode || "game") + (rs.kind ? ":" + rs.kind : "") : "", prog = rs ? " (" + rs.cur + "/" + rs.total + ")" : "";
+    var NM = { game: "game", quiz: "Mode Soal", exam: "Simulasi Ujian", relax: "Mode Santai", "relax:wrong": "Ulangi yang Salah", "relax:mark": "Latihan Soal Tersimpan" };
     var warn = function (m) { return rs && rm !== m ? " data-warn='Ada sesi " + (NM[rm] || rm) + " yang belum selesai" + prog + " di kategori ini. Mulai sesi baru dengan mode lain? Sesi lama akan dibatalkan.'" : ""; };
-    return "<button class='btn' data-ra='go-mode' data-href='#/run/play/" + c.id + "'" + warn("game") + ">" + (rm === "game" ? "▶ Lanjutkan game" + prog : "🎮 Main game") + "</button>" +
-      "<button class='btn s' data-ra='go-mode' data-href='#/run/quiz/" + c.id + "'" + warn("quiz") + ">" + (rm === "quiz" ? "▶ Lanjutkan soal" + prog : "📝 Mode Soal") + "</button>" +
-      "<button class='btn s' data-ra='go-mode' data-href='#/run/exam/" + c.id + "'" + warn("exam") + ">" + (rm === "exam" ? "▶ Lanjutkan ujian" + prog : "🎓 Simulasi Ujian") + "</button>" +
-      (rs ? "<button class='btn s' data-ra='cat-reset' data-cid='" + c.id + "' data-mode='" + rm + "' title='Ulang dari soal 1'>🔄 Reset" + prog + "</button>" : "");
+    var b = function (cls, key, href, on, off) { return "<button class='btn" + cls + "' data-ra='go-mode' data-href='" + href + "'" + warn(key) + ">" + (rm === key ? on + prog : off) + "</button>"; };
+    return b("", "game", "#/run/play/" + c.id, "▶ Lanjutkan game", "🎮 Main game") +
+      b(" s", "quiz", "#/run/quiz/" + c.id, "▶ Lanjutkan soal", "📝 Mode Soal") +
+      b(" s", "exam", "#/run/exam/" + c.id, "▶ Lanjutkan ujian", "🎓 Simulasi Ujian") +
+      b(" s", "relax", "#/run/relax/" + c.id, "▶ Lanjutkan santai", "🌿 Mode Santai") +
+      (c.wrong > 0 || rm === "relax:wrong" ? b(" s", "relax:wrong", "#/run/relax/" + c.id + "/wrong", "▶ Lanjutkan ulang soal salah", "🔁 Ulangi yang salah (" + c.wrong + ")") : "") +
+      (c.marks > 0 || rm === "relax:mark" ? b(" s", "relax:mark", "#/run/relax/" + c.id + "/mark", "▶ Lanjutkan latihan tersimpan", "🔖 Latih soal tersimpan (" + c.marks + ")") : "") +
+      (rs ? "<button class='btn s' data-ra='cat-reset' data-cid='" + c.id + "' data-mode='" + (rs.mode || "game") + "' data-kind='" + (rs.kind || "") + "' title='Ulang dari soal 1'>🔄 Reset" + prog + "</button>" : "");
   }
 
   /* ======================= PENGATURAN PRIBADI (jumlah soal) ======================= */
@@ -148,7 +203,7 @@
       await ensureSettings(); await loadGameLib();
       var done = false; try { done = localStorage.getItem("runTut:" + S.u) === "1"; } catch (e) {}
       if (!done) { await runTutorial(); if (RS.route !== k) return; }
-      var r = await rapi("start", { m: "POST", b: { cat: cid, mode: "game" } }); if (RS.route !== k) return;
+      var r = await rapi("start", { m: "POST", b: sb(cid, "game") }); if (RS.route !== k) return;
       if (!r.ok) { toast((r.j && r.j.err) || "Gagal memulai"); location.replace("#/run"); return; }
       var p = r.j;
       if (p.adjusted) toast("Soal aktif hanya " + p.total + " (target " + p.requested + "): sesi disesuaikan.");
@@ -194,20 +249,21 @@
      Memakai sesi, timer per soal, dan penilaian yang sama persis dengan game (server yang menilai), hanya tampilannya berupa halaman soal biasa.
      Skor ikut leaderboard. Setelah tiap soal dijawab, kunci & pembahasan langsung tampil; timer soal berikutnya mulai saat pemain menekan Lanjut. */
   function quizStop() { var Q = RS.quiz; if (!Q) return; clearInterval(Q.tm); clearTimeout(Q.fb); document.removeEventListener("keydown", Q.kd); RS.quiz = null; }
-  async function quizFlow(cid, k) {
+  async function quizFlow(cid, k, mode, src) {
+    mode = mode || "quiz"; src = src || "";
     quizStop(); destroyGame(); setRR("<div class='empty'>Menyiapkan soal…</div>");
     try {
       await ensureSettings();
-      var r = await rapi("start", { m: "POST", b: { cat: cid, mode: "quiz" } }); if (RS.route !== k) return;
+      var r = await rapi("start", { m: "POST", b: sb(cid, mode, src ? { src: src } : {}) }); if (RS.route !== k) return;
       if (!r.ok) { toast((r.j && r.j.err) || "Gagal memulai"); location.replace("#/run"); return; }
       var p = r.j;
       if (p.adjusted) toast("Soal aktif hanya " + p.total + " (target " + p.requested + "): sesi disesuaikan.");
-      var Q = RS.quiz = { k: k, cid: cid, sid: p.sid, name: "", qs: p.qs, total: p.total, qTime: p.q_time * 1000, cur: p.cur, score: p.score, hist: {}, view: null, dl: 0, busy: false, paused: false, tm: 0, fb: 0, kd: null };
+      var Q = RS.quiz = { mode: p.mode || mode, relax: (p.mode || mode) === "relax", src: src, strike: {}, k: k, cid: cid, sid: p.sid, name: "", qs: p.qs, total: p.total, qTime: p.q_time * 1000, cur: p.cur, score: p.score, hist: {}, view: null, dl: 0, busy: false, paused: false, tm: 0, fb: 0, kd: null };
       Q.kd = function (e) { if (!RS.quiz || RS.quiz !== Q || e.ctrlKey || e.metaKey || e.altKey) return; var t = e.target && e.target.tagName; if (t === "INPUT" || t === "TEXTAREA" || t === "SELECT") return; if (Q.review && (e.key === "Enter" || e.key === " ")) { e.preventDefault(); if (Q.view == null) quizNext(); return; } var L = String(e.key || "").toUpperCase(); if (LET.indexOf(L) >= 0 && !Q.review) quizAnswer(L); };
       document.addEventListener("keydown", Q.kd);
       var c = (RS.cats || []).filter(function (x) { return x.id === cid; })[0]; Q.name = c ? c.name : "";
       if (p.status === "ready") {
-        setRR("<div class='rn-hero g'><h1 style='font-size:clamp(22px,6vw,30px)'>📝 Mode Soal</h1><p>" + (Q.name ? "<b>" + esc(Q.name) + "</b><br>" : "") + p.total + " soal · <b>" + p.q_time + " detik</b> per soal · tanpa game.<br>Jawab dengan menekan pilihan A–E (di komputer bisa pakai tombol keyboard A–E). Setelah menjawab, kunci dan pembahasan langsung muncul; timer soal berikutnya mulai saat kamu menekan Lanjut.</p><div class='rn-row'><button class='btn' data-ra='qz-begin'>▶ Mulai</button><a class='btn s' href='#/run'>Kembali</a></div></div>");
+        setRR("<div class='rn-hero g'><h1 style='font-size:clamp(22px,6vw,30px)'>" + (Q.relax ? (src === "wrong" ? "🔁 Ulangi yang Salah" : src === "mark" ? "🔖 Latih Soal Tersimpan" : "🌿 Mode Santai") : "📝 Mode Soal") + "</h1><p>" + (Q.name ? "<b>" + esc(Q.name) + "</b><br>" : "") + p.total + " soal · " + (Q.relax ? "<b>tanpa timer</b>, boleh dilewati, tidak masuk leaderboard" : "<b>" + p.q_time + " detik</b> per soal") + " · tanpa game.<br>Jawab dengan menekan pilihan A–E (di komputer bisa pakai tombol keyboard A–E). Tombol ✕ di samping pilihan untuk mencoret opsi yang sudah kamu eliminasi. Setelah menjawab, kunci dan pembahasan langsung muncul" + (Q.relax ? "." : "; timer soal berikutnya mulai saat kamu menekan Lanjut.") + "</p><div class='rn-row'><button class='btn' data-ra='qz-begin'>▶ Mulai</button><a class='btn s' href='#/run'>Kembali</a></div></div>");
         return;
       }
       var rem = p.remaining;
@@ -222,7 +278,7 @@
     Q.dl = performance.now() + (r.j.remaining == null ? Q.qTime : r.j.remaining); quizDraw(); quizTick();
   }
   function quizTick() {
-    var Q = RS.quiz; if (!Q) return; clearInterval(Q.tm);
+    var Q = RS.quiz; if (!Q || Q.relax) return; clearInterval(Q.tm);
     Q.tm = setInterval(function () {
       if (RS.quiz !== Q || RS.route !== Q.k || !g("rr")) return quizStop();
       var rem = Q.dl - performance.now(), el = g("qzT"), bar = g("qzBar");
@@ -234,13 +290,18 @@
   function quizDraw() {
     var Q = RS.quiz; if (!Q || RS.route !== Q.k || !g("rr")) return quizStop();
     var q = Q.qs[Q.cur]; if (!q) return;
-    var h = "<div class='rn-qz'><div class='rn-hd'><b>Soal " + (Q.cur + 1) + "/" + Q.total + "</b><span class='tag'>Skor " + Q.score + "</span><span class='sp'></span><span class='rn-qt' id='qzT'></span></div>" +
-      "<div class='rn-prog'><i id='qzBar' style='width:100%;transition:none'></i></div>" +
+    var h = "<div class='rn-qz'><div class='rn-hd'><b>Soal " + (Q.cur + 1) + "/" + Q.total + "</b><span class='tag'>Skor " + Q.score + "</span><span class='sp'></span><span class='rn-qt' id='qzT'>" + (Q.relax ? "🌿 Santai" : "") + "</span></div>" +
+      "<div class='rn-prog'><i id='qzBar' style='width:" + (Q.relax ? Q.cur / Q.total * 100 : 100) + "%;transition:none'></i></div>" +
       "<div class='pn g' style='padding:14px'>" + String(q.img || "").split(",").filter(Boolean).map(function (id) { return "<img alt='Gambar soal' src='/api/run/img/" + encodeURIComponent(id) + "'>"; }).join("") + "<div class='q'>" + esc(q.q) + "</div>";
-    LET.forEach(function (L, i) { if (!q.o[L]) return; h += "<button class='rn-op rn-qo' data-ra='qz-ans' data-v2='" + L + "'><b style='background:" + CSSC[i] + "'>" + L + "</b><span>" + esc(q.o[L]) + "</span></button>"; });
-    h += "<div class='rn-qf' id='qzF'></div></div><div class='rn-row' style='margin-top:10px'>" + (RS.set && RS.set.pause ? "<button class='btn s sm' data-ra='qz-pause'>⏸ Jeda</button>" : "") + "<button class='btn s sm' data-ra='qz-reset'>🔄 Reset ujian</button><button class='btn s sm' data-ra='qz-exit'>✕ Keluar</button></div></div>";
+    var sk = Q.strike[Q.cur] || {};
+    LET.forEach(function (L, i) { if (!q.o[L]) return; h += "<button class='rn-op rn-qo" + (sk[L] ? " struck" : "") + "' data-ra='qz-ans' data-v2='" + L + "'><b style='background:" + CSSC[i] + "'>" + L + "</b><span>" + esc(q.o[L]) + "</span><span class='rn-x' data-ra='qz-x' data-v2='" + L + "' title='Coret / batal coret pilihan ini'>✕</span></button>"; });
+    h += "<div class='rn-qf' id='qzF'></div></div><div class='rn-row' style='margin-top:10px'>" + (Q.relax ? "<button class='btn s sm' data-ra='qz-skip'>⏭ Lewati</button>" : RS.set && RS.set.pause ? "<button class='btn s sm' data-ra='qz-pause'>⏸ Jeda</button>" : "") + "<button class='btn s sm' data-ra='qz-reset'>🔄 Reset ujian</button><button class='btn s sm' data-ra='qz-exit'>✕ Keluar</button></div></div>";
     setRR(h); window.scrollTo(0, 0);
-    var rem = Q.dl - performance.now(), el = g("qzT"); if (el) { el.textContent = "⏱ " + fdur(Math.max(0, rem)); el.className = "rn-qt" + (rem < 10000 ? " low" : ""); }
+    var rem = Q.dl - performance.now(), el = g("qzT"); if (el && !Q.relax) { el.textContent = "⏱ " + fdur(Math.max(0, rem)); el.className = "rn-qt" + (rem < 10000 ? " low" : ""); }
+  }
+  function quizStrike(L) { // coret / batal coret pilihan (hanya tampilan, tidak dikirim ke server)
+    var Q = RS.quiz; if (!Q || Q.review) return; var o = Q.strike[Q.cur] = Q.strike[Q.cur] || {}; o[L] = o[L] ? 0 : 1;
+    [].forEach.call(document.querySelectorAll("#rr .rn-qo"), function (b) { if (b.dataset.v2 === L) b.classList.toggle("struck", !!o[L]); });
   }
   async function quizAnswer(ans) {
     var Q = RS.quiz; if (!Q || Q.busy || Q.paused || !g("qzT")) return; Q.busy = true;
@@ -251,7 +312,7 @@
     if (!r) { toast("Koneksi terputus. Coba lagi."); Q.busy = false; btns.forEach(function (x) { x.disabled = false; }); return; }
     if (!r.ok) return quizResync(Q, r);
     var j = r.j, t0 = performance.now(); Q.score = j.score;
-    Q.hist[idx] = { q: Q.qs[idx], ans: ans, j: j }; Q.view = null;
+    Q.hist[idx] = { idx: idx, q: Q.qs[idx], ans: ans, j: j, bm: false, qid: 0 }; Q.view = null;
     Q.review = j; quizShowRev(Q, idx); // timer soal berikutnya baru berjalan setelah "Lanjut" ditekan (server menahan sesi sampai resume)
   }
   function quizRevTag(Lt, key, ans) { var isKey = !!key && Lt === key, isMine = Lt === ans; return { cls: isKey ? "key" : isMine ? "bad" : "", tg: (isKey ? "<i class='rn-s-ok'>✔ KUNCI</i>" : "") + (isMine && !isKey ? "<i class='rn-s-bad'>✘ jawabanmu</i>" : isMine ? "<i>jawabanmu</i>" : "") }; }
@@ -259,7 +320,8 @@
     var j = x.j, ans = x.ans, key = j.ans || "", stt = j.correct ? ["BENAR", "rn-s-ok", "+1"] : j.blank ? ["TIDAK DIJAWAB", "rn-s-warn", "0"] : ["SALAH", "rn-s-bad", "0"];
     var info = "<div class='hint' style='margin:8px 2px;text-align:left;font-weight:400'>Jawaban pemain: <b>" + (ans || "—") + "</b> · Kunci: <b class='rn-s-ok'>" + esc(key || "—") + "</b> · Status: <b class='" + stt[1] + "'>" + stt[0] + "</b> · Skor: <b>" + stt[2] + "</b></div>";
     var exH = j.explain ? (j.expl ? "<div class='rn-ex' style='text-align:left'><b>Pembahasan</b><br>" + esc(j.expl) + "</div>" : "<div class='rn-ex no' style='text-align:left'>Pembahasan belum tersedia untuk soal ini.</div>") : "";
-    return info + exH;
+    var bm = x.idx != null ? "<div class='rn-row' style='justify-content:center;margin:8px 0 0'><button class='btn s sm' data-ra='qz-bm' data-v2='" + x.idx + "' style='flex:none'>" + bmLabel(x.bm) + "</button></div>" : "";
+    return info + exH + bm;
   }
   function quizShowRev(Q, idx) { // tampilan setelah menjawab: opsi kunci hijau, jawaban salah merah
     var x = Q.hist[idx], j = x.j, key = j.ans || "", btns = [].slice.call(document.querySelectorAll("#rr .rn-qo")), f = g("qzF");
@@ -330,17 +392,36 @@
     quizStop(); location.hash = "#/run";
   }
 
+  /* ======================= SOAL TERSIMPAN ======================= */
+  async function savedPage(cid, k) {
+    var r = await rapi("bookmarks" + (cid ? "?cat=" + cid : "")); if (!alive(k)) return; if (!r.ok) return setRR(errBox(r));
+    var j = r.j, total = j.cats.reduce(function (a, c) { return a + c.n; }, 0);
+    var chips = "<a class='chip g" + (!cid ? " on" : "") + "' href='#/run/saved'>Semua (" + total + ")</a>" + j.cats.map(function (c) { return "<a class='chip g" + (cid === c.id ? " on" : "") + "' href='#/run/saved/" + c.id + "'>" + esc(c.name) + " (" + c.n + ")</a>"; }).join("");
+    var h = "<div class='sec'>SOAL TERSIMPAN (<span id='svCnt'>" + j.items.length + "</span>)</div><div class='hint'>Soal penting yang kamu simpan untuk dibaca ulang. Simpan dari layar pembahasan setelah menjawab.</div><div class='chips'>" + chips + "</div>";
+    if (cid && j.items.length) h += "<div class='rn-row' style='margin-bottom:10px'><a class='btn' href='#/run/relax/" + cid + "/mark'>🌿 Latih soal tersimpan kategori ini (mode santai)</a></div>";
+    if (!j.items.length) h += "<div class='pn g empty'>Belum ada soal tersimpan.</div>";
+    j.items.forEach(function (x) {
+      h += "<div class='rn-rv g'><div class='rn-hd'><b>" + (x.num ? "No. " + x.num : "Soal") + "</b><span class='tag'>" + esc(x.cat_name) + "</span><span class='sp'></span><button class='btn s sm' data-ra='sv-del' data-id='" + x.qid + "' style='margin:0'>🗑 Hapus</button></div>" + imgs(x) + "<div class='q'>" + esc(x.q) + "</div>";
+      LET.forEach(function (L, i) { if (!x.o[L]) return; var key = L === x.ans; h += "<div class='rn-op " + (key ? "key" : "") + "'><b style='background:" + CSSC[i] + "'>" + L + "</b><span>" + esc(x.o[L]) + "</span>" + (key ? "<i class='rn-s-ok'>✔ KUNCI</i>" : "") + optEx(x.ex, L) + "</div>"; });
+      h += j.explain ? (x.expl ? "<div class='rn-ex'><b>Pembahasan</b><br>" + esc(x.expl) + "</div>" : "<div class='rn-ex no'>Pembahasan belum tersedia.</div>") : "";
+      h += "</div>";
+    });
+    h += "<div class='rn-row'><a class='btn s' href='#/run'>🏠 GAME KUIS</a></div>";
+    setRR(h);
+  }
+
   /* ======================= HASIL & PEMBAHASAN ======================= */
   async function resultPage(sid, k) {
     var r = await rapi("result?sid=" + encodeURIComponent(sid)); if (!alive(k)) return; if (!r.ok) return setRR(errBox(r));
     var s = r.j.s, own = s.u === S.u && !S.admin; if (own) RS.nick = r.j.nick;
-    var h = "<div class='sec'>HASIL</div>" + (own ? nickBar(true) : "") + "<div class='pn g rn-big'><small>" + (s.mode === "quiz" ? "📝 " : "🎮 ") + esc(s.cat_name) + (s.u !== S.u ? " · " + esc(nmOf(s.u)) + " (" + esc(s.u) + ")" + (r.j.nick ? " · “" + esc(r.j.nick) + "”" : "") : "") + "</small><div class='sc'>" + s.score + "<span style='font-size:26px'>/" + s.total + "</span></div><small>Akurasi " + pct(s.acc) + "</small></div>" +
+    var h = "<div class='sec'>HASIL</div>" + (own ? nickBar(true) : "") + "<div class='pn g rn-big'><small>" + modeIco(s.mode, s.kind) + " " + esc(s.cat_name) + (s.u !== S.u ? " · " + esc(nmOf(s.u)) + " (" + esc(s.u) + ")" + (r.j.nick ? " · “" + esc(r.j.nick) + "”" : "") : "") + "</small><div class='sc'>" + s.score + "<span style='font-size:26px'>/" + s.total + "</span></div><small>Akurasi " + pct(s.acc) + "</small></div>" +
       "<div class='rn-grid'><div class='rn-st g'><b class='rn-s-ok'>" + s.correct + "</b><small>Benar</small></div><div class='rn-st g'><b class='rn-s-bad'>" + s.wrong + "</b><small>Salah</small></div><div class='rn-st g'><b>" + s.blank + "</b><small>Kosong</small></div>" +
       "<div class='rn-st g'><b>" + pct(s.acc) + "</b><small>Akurasi</small></div><div class='rn-st g'><b>" + fdur(s.dur) + "</b><small>Durasi</small></div><div class='rn-st g'><b>" + (s.rank ? "#" + s.rank : "—") + "</b><small>Peringkat kategori</small></div></div>" +
       "<a class='card g' href='#/run/review/" + esc(s.id) + "'><span class='i'>📖</span><span class='t'>Lihat pembahasan " + s.total + " soal<small>Semua soal: benar, salah, dan tidak dijawab</small></span><span class='a'>›</span></a>" +
       "<a class='card g' href='#/run/lb/" + s.cat_id + "'><span class='i'>🏆</span><span class='t'>Leaderboard kategori</span><span class='a'>›</span></a>" +
-      "<a class='card g' href='#/run/play/" + s.cat_id + "'><span class='i'>🔁</span><span class='t'>Main lagi</span><span class='a'>›</span></a><a class='card g' href='#/run'><span class='i'>🏠</span><span class='t'>Kembali ke GAME KUIS</span><span class='a'>›</span></a>";
+      "<a class='card g' href='#/run/" + (MODEPATH[s.mode] || "play") + "/" + s.cat_id + (s.kind ? "/" + s.kind : "") + "'><span class='i'>🔁</span><span class='t'>Main lagi</span><span class='a'>›</span></a><a class='card g' href='#/run'><span class='i'>🏠</span><span class='t'>Kembali ke GAME KUIS</span><span class='a'>›</span></a>";
     setRR(h);
+    if (own) rapi("me").then(function (m) { if (m.ok) badgeToast(m.j); });
   }
   /* ======================= MODE SIMULASI UJIAN =======================
      Saat memilih jawaban, kunci & pembahasan TIDAK muncul. Jawaban boleh diubah, dinilai hanya setelah "Kumpulkan".
@@ -352,13 +433,13 @@
     examStop(); quizStop(); destroyGame(); setRR("<div class='empty'>Menyiapkan simulasi ujian…</div>");
     try {
       await ensureSettings();
-      var r = await rapi("start", { m: "POST", b: { cat: cid, mode: "exam" } }); if (RS.route !== k) return;
+      var r = await rapi("start", { m: "POST", b: sb(cid, "exam") }); if (RS.route !== k) return;
       if (!r.ok) { toast((r.j && r.j.err) || "Gagal memulai"); location.replace("#/run"); return; }
       var p = r.j;
       if (p.adjusted) toast("Soal aktif hanya " + p.total + " (target " + p.requested + "): sesi disesuaikan.");
       if (p.cycle) toast("Bank soal kategori sudah habis dipakai — putaran baru dimulai.");
       var c = (RS.cats || []).filter(function (x) { return x.id === cid; })[0];
-      var E = RS.exam = { k: k, cid: cid, sid: p.sid, name: c ? c.name : "", total: p.total, limit: p.limit || p.q_time * 1000 * p.total, qTime: p.q_time * 1000, dl: 0, cur: p.cur || 0, qs: p.qs || [], ans: {}, flag: {}, busy: false, sent: false, tm: 0, kd: null };
+      var E = RS.exam = { strike: strikeLoad(p.sid), k: k, cid: cid, sid: p.sid, name: c ? c.name : "", total: p.total, limit: p.limit || p.q_time * 1000 * p.total, qTime: p.q_time * 1000, dl: 0, cur: p.cur || 0, qs: p.qs || [], ans: {}, flag: {}, busy: false, sent: false, tm: 0, kd: null };
       (p.qs || []).forEach(function (q) { if (q.chosen) E.ans[q.idx] = q.chosen; if (q.flag) E.flag[q.idx] = 1; });
       E.kd = function (e) {
         var X = RS.exam; if (!X || X !== E || X.sent || e.ctrlKey || e.metaKey || e.altKey) return;
@@ -404,7 +485,8 @@
     var h = "<div class='rn-qz'><div class='rn-hd'><b>Soal " + (E.cur + 1) + "/" + E.total + "</b><span class='tag'>✍️ " + answered + " dijawab</span>" + (flagged ? "<span class='tag' style='color:#f472b6'>🚩 " + flagged + "</span>" : "") + "<span class='sp'></span><span class='rn-qt' id='exT'></span></div>" +
       "<div class='rn-prog'><i style='width:" + (E.total ? answered / E.total * 100 : 0) + "%'></i></div>" +
       "<div class='pn g' style='padding:14px'>" + imgs(q) + "<div class='q'>" + esc(q.q) + "</div>";
-    LET.forEach(function (L, i) { if (!q.o[L]) return; h += "<button class='rn-op rn-qo" + (chosen === L ? " pick" : "") + "' data-ex-pick='" + L + "'><b style='background:" + CSSC[i] + "'>" + L + "</b><span>" + esc(q.o[L]) + "</span></button>"; });
+    var sk = E.strike[E.cur] || {};
+    LET.forEach(function (L, i) { if (!q.o[L]) return; h += "<button class='rn-op rn-qo" + (chosen === L ? " pick" : "") + (sk[L] ? " struck" : "") + "' data-ex-pick='" + L + "'><b style='background:" + CSSC[i] + "'>" + L + "</b><span>" + esc(q.o[L]) + "</span><span class='rn-x' data-ex-x='" + L + "' title='Coret / batal coret pilihan ini'>✕</span></button>"; });
     h += "</div>" +
       "<div class='ex-nums'>" + E.qs.map(function (x, i) { return "<button class='" + (E.ans[i] ? "ans " : "") + (E.flag[i] ? "flg " : "") + (i === E.cur ? "cur" : "") + "' data-ex-go='" + i + "'>" + (i + 1) + "</button>"; }).join("") + "</div>" +
       "<div class='rn-row'><button class='btn s' data-ex-nav='-1'" + (E.cur <= 0 ? " disabled" : "") + ">‹ Sebelumnya</button>" +
@@ -418,16 +500,23 @@
   }
   function examBindNav() {
     var rr = g("rr"); if (!rr) return;
-    [].forEach.call(rr.querySelectorAll("[data-ex-pick]"), function (b) { b.addEventListener("click", function () { examPick(b.dataset.exPick); }); });
+    [].forEach.call(rr.querySelectorAll("[data-ex-pick]"), function (b) { b.addEventListener("click", function (ev) { var x = ev.target.closest && ev.target.closest("[data-ex-x]"); if (x) { ev.stopPropagation(); examStrike(x.dataset.exX); return; } examPick(b.dataset.exPick); }); });
     [].forEach.call(rr.querySelectorAll("[data-ex-go]"), function (b) { b.addEventListener("click", function () { examGo(+b.dataset.exGo); }); });
     [].forEach.call(rr.querySelectorAll("[data-ex-nav]"), function (b) { b.addEventListener("click", function () { examGo(RS.exam.cur + (+b.dataset.exNav)); }); });
     var f = rr.querySelector("[data-ex-flag]"); if (f) f.addEventListener("click", examFlag);
     var s = rr.querySelector("[data-ex-submit]"); if (s) s.addEventListener("click", function () { examSubmit(false); });
     var j = g("exJump"); if (j) j.addEventListener("change", function () { examGo(+j.value); });
   }
+  // coretan pilihan disimpan di perangkat (per sesi) supaya tidak hilang saat halaman dimuat ulang
+  function strikeLoad(sid) { try { return JSON.parse(localStorage.getItem("run.strike:" + sid) || "{}") || {}; } catch (e) { return {}; } }
+  function strikeSave(sid, o) { try { localStorage.setItem("run.strike:" + sid, JSON.stringify(o)); } catch (e) {} }
+  function examStrike(L) {
+    var E = RS.exam; if (!E || E.sent) return; var o = E.strike[E.cur] = E.strike[E.cur] || {}; o[L] = o[L] ? 0 : 1; strikeSave(E.sid, E.strike);
+    [].forEach.call(document.querySelectorAll("#rr .rn-qo"), function (b) { if (b.dataset.exPick === L) b.classList.toggle("struck", !!o[L]); });
+  }
   async function examPick(L) {
     var E = RS.exam; if (!E || E.busy || E.sent) return;
-    var idx = E.cur; E.ans[idx] = L; examDraw();
+    var idx = E.cur; E.ans[idx] = L; if (E.strike[idx] && E.strike[idx][L]) { E.strike[idx][L] = 0; strikeSave(E.sid, E.strike); } examDraw();
     E.busy = true;
     var r; try { r = await rapi("exam/save", { m: "POST", b: { sid: E.sid, idx: idx, ans: L } }); } catch (e) { if (e === 0) return; r = null; }
     E.busy = false;
@@ -450,7 +539,7 @@
     E.sent = true; E.busy = true; clearInterval(E.tm);
     var r; try { r = await rapi("exam/submit", { m: "POST", b: { sid: E.sid } }); } catch (e) { if (e === 0) return; r = null; }
     if (!r || !r.ok) { E.sent = false; E.busy = false; toast((r && r.j && r.j.err) || "Gagal mengumpulkan"); examTick(); return; }
-    var sid = E.sid; examStop(); location.replace("#/run/result/" + sid);
+    var sid = E.sid; try { localStorage.removeItem("run.strike:" + sid); } catch (e) {} examStop(); location.replace("#/run/result/" + sid);
   }
 
   async function reviewPage(sid, k) {
@@ -474,6 +563,7 @@
         h += "<div class='rn-op " + cls + "'><b style='background:" + CSSC[i] + "'>" + Lt + "</b><span>" + esc(x.o[Lt]) + "</span>" + (isKey ? "<i class='rn-s-ok'>✔ KUNCI</i>" : "") + (isMine && !isKey ? "<i class='rn-s-bad'>✘ jawabanmu</i>" : isMine ? "<i>jawabanmu</i>" : "") + optEx(x.ex, Lt) + "</div>";
       });
       h += "<div class='hint' style='margin:8px 2px'>Jawaban pemain: <b>" + (x.chosen || "—") + "</b> · Kunci: <b class='rn-s-ok'>" + x.ans + "</b> · Status: <b>" + st[0] + "</b> · Skor: <b>" + st[2] + "</b></div>";
+      h += "<div class='rn-row' style='justify-content:flex-start;margin:4px 0'><button class='btn s sm' data-ra='rv-bm' data-v2='" + rv.i + "' style='flex:none'>" + bmLabel(x.bm) + "</button></div>";
       h += rv.ex ? (x.expl ? "<div class='rn-ex'><b>Pembahasan</b><br>" + esc(x.expl) + "</div>" : "<div class='rn-ex no'>Pembahasan belum tersedia.</div>") : "<div class='rn-ex no'>Pembahasan dinonaktifkan untuk kategori ini.</div>";
       h += "</div><div class='rn-row'><button class='btn s' data-ra='rv-p' " + (pos <= 0 ? "disabled style='opacity:.4'" : "") + ">‹ Sebelumnya</button><div class='hint' style='flex:.4;text-align:center;align-self:center;margin:0'>" + (rv.i + 1) + "/" + rv.items.length + "</div><button class='btn s' data-ra='rv-n' " + (pos >= L.length - 1 ? "disabled style='opacity:.4'" : "") + ">Berikutnya ›</button></div>" +
         "<div class='rn-row' style='margin-top:8px'><select id='rvJump' class='in' style='flex:1;min-width:150px;padding:9px;border-radius:10px;border:1px solid var(--line);background:rgba(10,6,28,.5);color:#fff;font:400 14px Inter,sans-serif'>" + L.map(function (i) { var it = rv.items[i]; return "<option value='" + i + "'" + (i === rv.i ? " selected" : "") + ">Ke nomor " + (i + 1) + (it.correct ? " ✔" : it.chosen ? " ✘" : " ○") + (it.flag ? " 🚩" : "") + "</option>"; }).join("") + "</select></div>";
@@ -488,7 +578,7 @@
     var h = "<div class='sec'>RIWAYAT PERMAINAN</div>";
     if (!r.j.rows.length) h += "<div class='pn g empty'>Belum ada permainan selesai.</div>";
     if (r.j.rows.length) h += "<div class='rn-hist'>";
-    r.j.rows.forEach(function (x) { h += "<a class='card g' href='#/run/result/" + esc(x.id) + "'><span class='i'>" + (x.mode === "quiz" ? "📝" : "🎮") + "</span><span class='t'>" + esc(x.cat_name) + "<small>" + fdate(x.fin) + " · ✔" + x.correct + " ✘" + x.wrong + " ○" + x.blank + " · " + fdur(x.dur) + (x.rank ? " · peringkat #" + x.rank : "") + "</small></span><span class='v' style='text-align:right;font-weight:700'>" + x.score + "/" + x.total + "<small style='display:block;color:var(--mut);font-weight:400'>" + pct(x.acc) + "</small></span></a>"; });
+    r.j.rows.forEach(function (x) { h += "<a class='card g' href='#/run/result/" + esc(x.id) + "'><span class='i'>" + modeIco(x.mode, x.kind) + "</span><span class='t'>" + esc(x.cat_name) + "<small>" + fdate(x.fin) + " · ✔" + x.correct + " ✘" + x.wrong + " ○" + x.blank + " · " + fdur(x.dur) + (x.rank ? " · peringkat #" + x.rank : "") + "</small></span><span class='v' style='text-align:right;font-weight:700'>" + x.score + "/" + x.total + "<small style='display:block;color:var(--mut);font-weight:400'>" + pct(x.acc) + "</small></span></a>"; });
     if (r.j.rows.length) h += "</div>";
     setRR(h);
   }
@@ -514,7 +604,7 @@
     if (!cat) cat = RS.cats.length ? String(RS.cats[0].id) : "global";
     var glob = cat === "global", opts = "<option value='global'" + (glob ? " selected" : "") + ">🌍 Global (semua kategori)</option>" + RS.cats.map(function (c) { return "<option value='" + c.id + "'" + (String(c.id) === cat ? " selected" : "") + ">" + esc(c.name) + "</option>"; }).join("");
     var chips = [["all", "Sepanjang waktu"], ["month", "Bulan ini"], ["week", "Minggu ini"]].map(function (p) { return "<a class='chip g" + (per === p[0] ? " on" : "") + "' href='#/run/lb/" + cat + "/" + p[0] + "'>" + p[1] + "</a>"; }).join("");
-    setRR("<div class='sec'>LEADERBOARD</div><div id='rnNkW'></div><select class='in' id='rnLbSel' data-per='" + per + "'>" + opts + "</select><div class='chips'>" + chips + "</div><div id='rnLbB'><div class='empty'>Memuat…</div></div>");
+    setRR("<div class='sec'>LEADERBOARD</div><div id='rnNkW'></div><select class='in' id='rnLbSel' data-per='" + per + "'>" + opts + "</select><div class='chips'>" + chips + "</div><div id='rnLbB'>" + skel(4) + "</div>");
     var b = await lbBody(cat, per, glob); if (alive(k) && g("rnLbB")) g("rnLbB").innerHTML = b;
     if (alive(k) && g("rnNkW")) g("rnNkW").innerHTML = nickBar();
   }
@@ -522,7 +612,7 @@
   /* ======================= LEADERBOARD KOIN (terpisah dari skor) ======================= */
   async function coinLbPage(per, k) {
     var chips = [["all", "Sepanjang waktu"], ["month", "Bulan ini"], ["week", "Minggu ini"]].map(function (p) { return "<a class='chip g" + (per === p[0] ? " on" : "") + "' href='#/run/coinlb/" + p[0] + "'>" + p[1] + "</a>"; }).join("");
-    setRR("<div class='sec'>LEADERBOARD KOIN</div><div id='rnNkW'></div><div class='chips'>" + chips + "</div><div id='rnLbB'><div class='empty'>Memuat…</div></div><div class='rn-row'><a class='btn s' href='#/run'>← Kembali</a><a class='btn s' href='#/run/lb/global'>🌍 Leaderboard skor</a></div>");
+    setRR("<div class='sec'>LEADERBOARD KOIN</div><div id='rnNkW'></div><div class='chips'>" + chips + "</div><div id='rnLbB'>" + skel(4) + "</div><div class='rn-row'><a class='btn s' href='#/run'>← Kembali</a><a class='btn s' href='#/run/lb/global'>🌍 Leaderboard skor</a></div>");
     var r = await rapi("coinlb?p=" + per); if (!alive(k)) return;
     var b;
     if (!r.ok) b = errBox(r);
@@ -751,7 +841,7 @@
   async function adminLb(cat, per, k) {
     var cats = await adminCats(); if (!alive(k)) return; var glob = cat === "global";
     var chips = [["all", "Sepanjang waktu"], ["month", "Bulan ini"], ["week", "Minggu ini"]].map(function (p) { return "<a class='chip g" + (per === p[0] ? " on" : "") + "' href='#/run/admin/lb/" + cat + "/" + p[0] + "'>" + p[1] + "</a>"; }).join("");
-    setRR("<div class='sec'>LEADERBOARD & PEMAIN</div>" + anav("lb") + "<select class='in' id='rnLbSel' data-adm='1' data-per='" + per + "'><option value='global'" + (glob ? " selected" : "") + ">🌍 Global</option>" + cats.map(function (c) { return "<option value='" + c.id + "'" + (String(c.id) === cat ? " selected" : "") + ">" + esc(c.name) + "</option>"; }).join("") + "</select><div class='chips'>" + chips + "</div><div id='rnLbB'><div class='empty'>Memuat…</div></div>" +
+    setRR("<div class='sec'>LEADERBOARD & PEMAIN</div>" + anav("lb") + "<select class='in' id='rnLbSel' data-adm='1' data-per='" + per + "'><option value='global'" + (glob ? " selected" : "") + ">🌍 Global</option>" + cats.map(function (c) { return "<option value='" + c.id + "'" + (String(c.id) === cat ? " selected" : "") + ">" + esc(c.name) + "</option>"; }).join("") + "</select><div class='chips'>" + chips + "</div><div id='rnLbB'>" + skel(4) + "</div>" +
       "<div class='pn g'><b>Detail performa mahasiswa</b><label>NIM / username</label><input id='rnUsr' placeholder='G0025001'><button class='btn sm' data-ra='usr'>Lihat riwayat</button><div id='rnUh'></div></div><div class='pn g'><b>Nama samaran pemain</b><div class='hint'>Siapa memakai nama apa. Hapus nama yang tidak pantas — pemain akan tampil sebagai Anonim sampai memilih nama baru.</div><div id='rnNicks' class='rn-sc'><div class='empty'>Memuat…</div></div></div><div class='hint'>Skor tidak dapat diubah dari panel. Semua tindakan admin tercatat di menu Audit.</div>");
     var b = await lbBody(cat, per, glob); if (alive(k) && g("rnLbB")) g("rnLbB").innerHTML = b;
     if (alive(k)) await adminNicks(k);
@@ -807,7 +897,7 @@
     try {
       if (a === "cat-reset") { // ulang dari awal: batalkan sesi yang sedang berjalan di kategori ini (mode game maupun mode soal)
         if (b.disabled) return; if (!(await Dlg.confirm("Reset ujian di kategori ini? Progres sesi yang sedang berjalan dihapus dan kamu bisa mulai lagi dari soal 1 (skor sesi itu tidak dihitung).", { title: "Reset sesi", icon: "♻️", okText: "Ya, reset", danger: true }))) return;
-        b.disabled = true; var rs0 = await rapi("start", { m: "POST", b: { cat: +b.dataset.cid, mode: b.dataset.mode } });
+        b.disabled = true; var rs0 = await rapi("start", { m: "POST", b: { cat: +b.dataset.cid, mode: b.dataset.mode, src: b.dataset.kind || "" } });
         var ok0 = rs0.ok && rs0.j && rs0.j.sid && rs0.j.status !== "done"; if (ok0) { var ra0 = await rapi("abandon", { m: "POST", b: { sid: rs0.j.sid } }); ok0 = ra0.ok; }
         toast(ok0 ? "Sesi direset ✓ — mulai lagi dari soal 1" : ((rs0.j && rs0.j.err) || "Gagal mereset. Coba lagi.")); RS.cats = null; route(); return;
       }
@@ -821,6 +911,23 @@
         RS.nick = rn.j.nick; toast("Nama tersimpan ✓"); route(); // muat ulang halaman: leaderboard & hasil langsung memakai nama baru
       }
       else if (a === "nick-reset") { if (!(await Dlg.confirm("Hapus nama samaran " + nmOf(b.dataset.u) + "?", { title: "Hapus nama samaran", icon: "🏷️", okText: "Hapus", danger: true }))) return; var rz = await rapi("admin/nick", { m: "POST", b: { u: b.dataset.u, nick: "" } }); toast(rz.ok ? "Nama dihapus" : "Gagal"); route(); }
+      else if (a === "diff") diffToggle(v);
+      else if (a === "qz-x") quizStrike(v);
+      else if (a === "qz-skip") quizAnswer(null);
+      else if (a === "qz-bm") {
+        var Qb = RS.quiz, xb = Qb && Qb.hist[+v]; if (!xb) return; b.disabled = true;
+        var rb = await bmToggle(Qb.sid, xb.idx, xb.bm, xb.qid); b.disabled = false;
+        if (rb) { xb.bm = !!rb.on; xb.qid = rb.qid; [].forEach.call(document.querySelectorAll("#rr [data-ra='qz-bm']"), function (e2) { if (e2.dataset.v2 === v) e2.textContent = bmLabel(xb.bm); }); }
+      }
+      else if (a === "rv-bm") {
+        var itb = rv && rv.items[+v]; if (!itb) return; b.disabled = true;
+        var rb2 = await bmToggle(rv.sid, itb.idx, itb.bm, itb.qid); b.disabled = false;
+        if (rb2) { itb.bm = !!rb2.on; itb.qid = rb2.qid || itb.qid; b.textContent = bmLabel(itb.bm); }
+      }
+      else if (a === "sv-del") {
+        var rd = await bmToggle(null, 0, true, +b.dataset.id); if (!rd) return;
+        var card = b.closest(".rn-rv"); if (card) card.remove(); var cn = g("svCnt"); if (cn) { var left = document.querySelectorAll("#rr .rn-rv").length; cn.textContent = left; if (!left) setRR("<div class='sec'>SOAL TERSIMPAN</div><div class='pn g empty'>Tidak ada soal tersimpan lagi.</div><a class='btn s' href='#/run'>← Kembali</a>"); }
+      }
       else if (a === "qz-begin") quizBegin();
       else if (a === "qz-ans") quizAnswer(b.dataset.v2);
       else if (a === "qz-next") quizNext();
