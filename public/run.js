@@ -224,6 +224,7 @@
         resync: function () { return rapi("session?sid=" + sid).then(function (r) { return r.ok ? r.j : null; }); },
         done: function () { destroyGame(); location.replace("#/run/result/" + sid); },
         exit: function () { destroyGame(); location.replace("#/run"); },
+        bookmark: function (idx, on, qid) { return bmToggle(sid, idx, on, qid); },
         toast: toast,
       },
     });
@@ -515,7 +516,7 @@
       "<div class='ex-nums'>" + E.qs.map(function (x, i) { return "<button class='" + (E.ans[i] ? "ans " : "") + (E.flag[i] ? "flg " : "") + (i === E.cur ? "cur" : "") + "' data-ex-go='" + i + "'>" + (i + 1) + "</button>"; }).join("") + "</div>" +
       "<div class='rn-row'><button class='btn s' data-ex-nav='-1'" + (E.cur <= 0 ? " disabled" : "") + ">‹ Sebelumnya</button>" +
       "<button class='btn s' data-ex-nav='1'" + (E.cur >= E.total - 1 ? " disabled" : "") + ">Berikutnya ›</button></div>" +
-      "<div class='rn-row'><select class='in' id='exJump' style='flex:1;min-width:140px;padding:9px;border-radius:10px;border:1px solid var(--line);background:rgba(10,6,28,.5);color:#fff;font:400 14px Inter,sans-serif'>" + E.qs.map(function (x, i) { return "<option value='" + i + "'" + (i === E.cur ? " selected" : "") + ">Ke nomor " + (i + 1) + (E.ans[i] ? " ✓" : "") + (E.flag[i] ? " 🚩" : "") + "</option>"; }).join("") + "</select>" +
+      "<div class='rn-row'>" +
       "<button class='btn s " + (fl ? "rn-flag" : "") + "' data-ex-flag>" + (fl ? "🚩 Ditandai" : "🚩 Tandai soal") + "</button></div>" +
       "<div class='rn-row'><button class='btn' data-ex-submit style='flex:1'>📤 Kumpulkan ujian</button><a class='btn s' href='#/run'>✕ Keluar</a></div>" +
       "<div class='hint' style='text-align:center;margin-top:8px'>Jawaban tersimpan otomatis. Kunci & pembahasan hanya muncul setelah ujian dikumpulkan.</div></div>";
@@ -590,7 +591,7 @@
       h += "<div class='rn-row' style='justify-content:flex-start;margin:4px 0'><button class='btn s sm' data-ra='rv-bm' data-v2='" + rv.i + "' style='flex:none'>" + bmLabel(x.bm) + "</button></div>";
       h += rv.ex ? (x.expl ? "<div class='rn-ex'><b>Pembahasan</b><br>" + esc(x.expl) + "</div>" : "<div class='rn-ex no'>Pembahasan belum tersedia.</div>") : "<div class='rn-ex no'>Pembahasan dinonaktifkan untuk kategori ini.</div>";
       h += "</div><div class='rn-row'><button class='btn s' data-ra='rv-p' " + (pos <= 0 ? "disabled style='opacity:.4'" : "") + ">‹ Sebelumnya</button><div class='hint' style='flex:.4;text-align:center;align-self:center;margin:0'>" + (rv.i + 1) + "/" + rv.items.length + "</div><button class='btn s' data-ra='rv-n' " + (pos >= L.length - 1 ? "disabled style='opacity:.4'" : "") + ">Berikutnya ›</button></div>" +
-        "<div class='rn-row' style='margin-top:8px'><select id='rvJump' class='in' style='flex:1;min-width:150px;padding:9px;border-radius:10px;border:1px solid var(--line);background:rgba(10,6,28,.5);color:#fff;font:400 14px Inter,sans-serif'>" + L.map(function (i) { var it = rv.items[i]; return "<option value='" + i + "'" + (i === rv.i ? " selected" : "") + ">Ke nomor " + (i + 1) + (it.correct ? " ✔" : it.chosen ? " ✘" : " ○") + (it.flag ? " 🚩" : "") + "</option>"; }).join("") + "</select></div>";
+        "";
     }
     h += "<div class='rn-row' style='margin-top:12px'><a class='btn s' href='#/run/result/" + esc(rv.sid) + "'>↩ Ringkasan hasil</a><a class='btn s' href='#/run'>🏠 Dashboard GAME KUIS</a></div>";
     setRR(h); window.scrollTo(0, 0);
