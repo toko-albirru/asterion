@@ -61,7 +61,7 @@
     ".ex-nums{display:flex;flex-wrap:wrap;gap:5px;margin:8px 0}.ex-nums button{width:34px;height:34px;border-radius:10px;border:1px solid var(--line);background:rgba(255,255,255,.08);color:#fff;font-size:12px;cursor:pointer;font-family:inherit}" +
     ".ex-nums .ans{background:rgba(74,222,128,.35);border-color:var(--ok)}.ex-nums .flg{background:rgba(250,204,21,.5);border-color:#facc15;color:#fff;font-weight:700;box-shadow:inset 0 0 0 2px #facc15}.ex-nums .flg.ans{background:linear-gradient(135deg,rgba(74,222,128,.5),rgba(250,204,21,.6))}.ex-nums .cur{outline:2px solid var(--gold)}" +
     ".rn-qo.pick{border-color:var(--gold);background:rgba(245,192,74,.18)}.rn-flag{border-color:#facc15;color:#fff;background:rgba(250,204,21,.35)}.rn-flag:hover{border-color:#fde047}" +
-    ".rn-cw,.rn-rv{position:relative}.rn-fab{position:absolute;top:10px;right:10px;z-index:3;width:42px;height:42px;padding:0;border-radius:50%;border:1.5px solid rgba(255,255,255,.4);background:rgba(20,12,44,.62);color:#fff;font:400 20px/1 Inter,sans-serif;cursor:pointer;display:flex;align-items:center;justify-content:center;box-shadow:0 3px 12px rgba(0,0,0,.35)}.rn-fab.lo{top:50px}.rn-fab.on.flag{background:#facc15;border-color:#eab308;color:#422006}.rn-fab.on.star{background:#f5c04a;border-color:#e0a82e;color:#422006}.rn-fab.pend{border-style:dashed}.rn-fab:active{transform:scale(.92)}";
+    ".rn-cw,.rn-rv{position:relative}.rn-fabs{position:absolute;top:12px;right:12px;z-index:3;display:flex;gap:2px;padding:4px;border-radius:999px;background:rgba(20,12,44,.55);border:1px solid rgba(255,255,255,.22);-webkit-backdrop-filter:blur(8px);backdrop-filter:blur(8px);box-shadow:0 4px 16px rgba(0,0,0,.28)}.rn-fabs.lo{top:50px}.rn-fab{width:36px;height:36px;padding:0;border:0;border-radius:50%;background:transparent;color:#fff;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:background .15s,transform .1s}.rn-fab svg{fill:none;stroke:currentColor;stroke-width:1.9;stroke-linecap:round;stroke-linejoin:round}.rn-fab.on svg{fill:currentColor}.rn-fab.on.flag{background:#facc15;color:#422006}.rn-fab.on.star{background:#f5c04a;color:#422006}.rn-fab.pend{outline:1.5px dashed rgba(66,32,6,.65);outline-offset:-4px}.rn-fab:active{transform:scale(.9)}";
   var CSS2 = ".rn-x{margin-left:auto;flex:none;align-self:center;width:26px;height:26px;border-radius:8px;display:grid;place-items:center;font-size:12px;color:var(--mut);border:1px solid var(--line);background:rgba(255,255,255,.06);cursor:pointer;font-weight:400}.rn-x:hover{color:#fff;border-color:var(--gold)}" +
     ".rn-qo.struck>span:not(.rn-x),.rn-qo.struck>b{opacity:.45}.rn-qo.struck>span:not(.rn-x){text-decoration:line-through}.rn-qo.struck .rn-x{color:var(--bad);border-color:var(--bad)}.rn-qo:disabled .rn-x{display:none}" +
     ".rn-me2{padding:12px 14px;margin:0 0 12px}.rn-me2 .big{font:800 20px Inter,sans-serif}.rn-me2 .rn-prog{margin:6px 0 4px}.rn-weak{margin-top:8px;padding:8px 10px;border-radius:12px;background:rgba(248,113,113,.12);border:1px solid rgba(248,113,113,.35);font-size:12.5px;line-height:1.45}" +
@@ -345,8 +345,8 @@
   }
   function quizStarOn(Q, i) { var x = Q.hist[i]; return x ? !!x.bm : !!Q.mark[i]; }
   function quizStarTitle(Q, i) { var x = Q.hist[i], on = quizStarOn(Q, i); return x ? (on ? "Tersimpan — ketuk untuk menghapus" : "Simpan soal ini") : on ? "Akan disimpan setelah soal dijawab" : "Tandai untuk disimpan (tersimpan setelah dijawab)"; }
-  function quizStarBtn(i) { var Q = RS.quiz, on = quizStarOn(Q, i); return "<button class='rn-fab star" + (on ? " on" : "") + (!Q.hist[i] && on ? " pend" : "") + "' data-ra='qz-star' data-v2='" + i + "' title='" + quizStarTitle(Q, i) + "' aria-label='Simpan soal'>" + (on ? "★" : "☆") + "</button>"; }
-  function quizStarUI(i) { var Q = RS.quiz; if (!Q) return; var b = document.querySelector("#rr .rn-fab.star"); if (!b) return; b.dataset.v2 = i; var on = quizStarOn(Q, i); b.textContent = on ? "★" : "☆"; b.classList.toggle("on", on); b.classList.toggle("pend", on && !Q.hist[i]); b.title = quizStarTitle(Q, i); }
+  function quizStarBtn(i) { var Q = RS.quiz, on = quizStarOn(Q, i); return "<div class='rn-fabs'>" + fab("star", on, "data-ra='qz-star' data-v2='" + i + "'", quizStarTitle(Q, i), !Q.hist[i] && on) + "</div>"; }
+  function quizStarUI(i) { var Q = RS.quiz; if (!Q) return; var b = document.querySelector("#rr .rn-fab.star"); if (!b) return; b.dataset.v2 = i; var on = quizStarOn(Q, i); b.classList.toggle("on", on); b.classList.toggle("pend", on && !Q.hist[i]); b.title = quizStarTitle(Q, i); }
   async function quizStar(i) {
     var Q = RS.quiz; if (!Q) return; var x = Q.hist[i];
     if (!x) { Q.mark[i] = !Q.mark[i]; quizStarUI(i); return; } // sebelum dijawab: hanya menandai
@@ -476,7 +476,7 @@
       if (p.adjusted) toast("Soal aktif hanya " + p.total + " (target " + p.requested + "): sesi disesuaikan.");
       if (p.cycle) toast("Bank soal kategori sudah habis dipakai — putaran baru dimulai.");
       var c = (RS.cats || []).filter(function (x) { return x.id === cid; })[0];
-      var E = RS.exam = { strike: strikeLoad(p.sid), k: k, cid: cid, sid: p.sid, name: c ? c.name : "", total: p.total, limit: p.limit || p.q_time * 1000 * p.total, qTime: p.q_time * 1000, dl: 0, cur: p.cur || 0, qs: p.qs || [], ans: {}, flag: {}, busy: false, sent: false, tm: 0, kd: null };
+      var E = RS.exam = { strike: strikeLoad(p.sid), mark: markLoad(p.sid), k: k, cid: cid, sid: p.sid, name: c ? c.name : "", total: p.total, limit: p.limit || p.q_time * 1000 * p.total, qTime: p.q_time * 1000, dl: 0, cur: p.cur || 0, qs: p.qs || [], ans: {}, flag: {}, busy: false, sent: false, tm: 0, kd: null };
       (p.qs || []).forEach(function (q) { if (q.chosen) E.ans[q.idx] = q.chosen; if (q.flag) E.flag[q.idx] = 1; });
       E.kd = function (e) {
         var X = RS.exam; if (!X || X !== E || X.sent || e.ctrlKey || e.metaKey || e.altKey) return;
@@ -521,7 +521,7 @@
     var chosen = E.ans[E.cur], fl = !!E.flag[E.cur], answered = Object.keys(E.ans).length, flagged = Object.keys(E.flag).length;
     var h = "<div class='rn-qz'><div class='rn-hd'><b>Soal " + (E.cur + 1) + "/" + E.total + "</b><span class='tag'>✍️ " + answered + " dijawab</span>" + (flagged ? "<span class='tag' style='color:#fbbf24'>🚩 " + flagged + "</span>" : "") + "<span class='sp'></span><span class='rn-qt' id='exT'></span></div>" +
       "<div class='rn-prog'><i style='width:" + (E.total ? answered / E.total * 100 : 0) + "%'></i></div>" +
-      "<div class='pn g rn-cw' style='padding:14px'><button class='rn-fab flag" + (fl ? " on" : "") + "' data-ex-flag title='" + (fl ? "Batalkan tanda ragu" : "Tandai ragu") + "' aria-label='Tandai ragu'>🚩</button>" + imgs(q) + "<div class='q'>" + esc(q.q) + "</div>";
+      "<div class='pn g rn-cw' style='padding:14px'><div class='rn-fabs'>" + fab("flag", fl, "data-ex-flag", fl ? "Batalkan tanda ragu" : "Tandai ragu") + fab("star", !!E.mark[E.cur], "data-ex-star", E.mark[E.cur] ? "Batal simpan soal" : "Simpan soal (tersimpan setelah ujian dikumpulkan)") + "</div>" + imgs(q) + "<div class='q'>" + esc(q.q) + "</div>";
     var sk = E.strike[E.cur] || {};
     LET.forEach(function (L, i) { if (!q.o[L]) return; h += "<button class='rn-op rn-qo" + (chosen === L ? " pick" : "") + (sk[L] ? " struck" : "") + "' data-ex-pick='" + L + "'><b style='background:" + CSSC[i] + "'>" + L + "</b><span>" + esc(q.o[L]) + "</span><span class='rn-x' data-ex-x='" + L + "' title='Coret / batal coret pilihan ini'>✕</span></button>"; });
     h += "</div>" +
@@ -539,10 +539,18 @@
     [].forEach.call(rr.querySelectorAll("[data-ex-go]"), function (b) { b.addEventListener("click", function () { examGo(+b.dataset.exGo); }); });
     [].forEach.call(rr.querySelectorAll("[data-ex-nav]"), function (b) { b.addEventListener("click", function () { examGo(RS.exam.cur + (+b.dataset.exNav)); }); });
     var f = rr.querySelector("[data-ex-flag]"); if (f) f.addEventListener("click", examFlag);
+    var st2 = rr.querySelector("[data-ex-star]"); if (st2) st2.addEventListener("click", examStar);
     var s = rr.querySelector("[data-ex-submit]"); if (s) s.addEventListener("click", function () { examSubmit(false); });
     var j = g("exJump"); if (j) j.addEventListener("change", function () { examGo(+j.value); });
   }
   // coretan pilihan disimpan di perangkat (per sesi) supaya tidak hilang saat halaman dimuat ulang
+  var ICO = {
+    star: "<svg viewBox='0 0 24 24' width='20' height='20' aria-hidden='true'><path d='M12 3.6l2.5 5.2 5.7.8-4.1 4 1 5.7-5.1-2.7-5.1 2.7 1-5.7-4.1-4 5.7-.8z'/></svg>",
+    flag: "<svg viewBox='0 0 24 24' width='20' height='20' aria-hidden='true'><path d='M6 21V4'/><path d='M6 4.5h11l-2.4 3.8L17 12H6'/></svg>"
+  };
+  function fab(kind, on, attrs, title, pend) { return "<button class='rn-fab " + kind + (on ? " on" : "") + (pend ? " pend" : "") + "' " + attrs + " title='" + title + "' aria-label='" + title + "'>" + ICO[kind] + "</button>"; }
+  function markLoad(sid) { try { return JSON.parse(localStorage.getItem("run.mark:" + sid) || "{}") || {}; } catch (e) { return {}; } }
+  function markSave(sid, o) { try { localStorage.setItem("run.mark:" + sid, JSON.stringify(o)); } catch (e) {} }
   function strikeLoad(sid) { try { return JSON.parse(localStorage.getItem("run.strike:" + sid) || "{}") || {}; } catch (e) { return {}; } }
   function strikeSave(sid, o) { try { localStorage.setItem("run.strike:" + sid, JSON.stringify(o)); } catch (e) {} }
   function examStrike(L) {
@@ -557,6 +565,11 @@
     E.busy = false;
     if (!RS.exam || RS.exam !== E) return;
     if (!r || !r.ok) toast((r && r.j && r.j.err) || "Gagal menyimpan jawaban");
+  }
+  function examStar() { // soal ditandai untuk disimpan; benar-benar tersimpan setelah ujian dikumpulkan (kunci baru terbuka saat itu)
+    var E = RS.exam; if (!E || E.sent) return; if (E.mark[E.cur]) delete E.mark[E.cur]; else E.mark[E.cur] = 1;
+    markSave(E.sid, E.mark); var y0 = window.scrollY; examDraw(); window.scrollTo(0, y0);
+    toast(E.mark[E.cur] ? "Soal akan disimpan setelah ujian dikumpulkan 🔖" : "Tanda simpan dibatalkan");
   }
   async function examFlag() {
     var E = RS.exam; if (!E || E.sent) return;
@@ -574,7 +587,10 @@
     E.sent = true; E.busy = true; clearInterval(E.tm);
     var r; try { r = await rapi("exam/submit", { m: "POST", b: { sid: E.sid } }); } catch (e) { if (e === 0) return; r = null; }
     if (!r || !r.ok) { E.sent = false; E.busy = false; toast((r && r.j && r.j.err) || "Gagal mengumpulkan"); examTick(); return; }
-    var sid = E.sid; try { localStorage.removeItem("run.strike:" + sid); } catch (e) {} examStop(); location.replace("#/run/result/" + sid);
+    var sid = E.sid, mk = Object.keys(E.mark || {}), nsv = 0;
+    for (var mi = 0; mi < mk.length; mi++) { try { var rbk = await rapi("bookmark", { m: "POST", b: { sid: sid, idx: +mk[mi], on: 1 } }); if (rbk.ok) nsv++; } catch (e) {} }
+    if (nsv) toast(nsv + " soal disimpan 🔖 (lihat di GAME KUIS → Soal tersimpan)");
+    try { localStorage.removeItem("run.strike:" + sid); localStorage.removeItem("run.mark:" + sid); } catch (e) {} examStop(); location.replace("#/run/result/" + sid);
   }
 
   async function reviewPage(sid, k) {
@@ -591,7 +607,7 @@
     if (!x) h += "<div class='pn g empty'>Tidak ada soal pada filter ini.</div>";
     else {
       var st = x.correct ? ["BENAR", "ok", "+1"] : x.chosen ? ["SALAH", "bad", "0"] : ["TIDAK DIJAWAB", "bl", "0"];
-      h += "<div class='rn-rv g'><button class='rn-fab star lo" + (x.bm ? " on" : "") + "' data-ra='rv-bm' data-v2='" + rv.i + "' title='" + (x.bm ? "Tersimpan — ketuk untuk menghapus" : "Simpan soal ini") + "' aria-label='Simpan soal'>" + (x.bm ? "★" : "☆") + "</button><div class='rn-hd'><b>SOAL " + (rv.i + 1) + "</b><span class='sp'></span><span class='tag " + (st[1] === "ok" ? "ok" : st[1] === "bad" ? "" : "warn") + "' style='" + (st[1] === "bad" ? "background:rgba(248,113,113,.25);color:var(--bad)" : "") + "'>" + st[0] + " · skor " + st[2] + "</span></div>" +
+      h += "<div class='rn-rv g'><div class='rn-fabs lo'>" + fab("star", !!x.bm, "data-ra='rv-bm' data-v2='" + rv.i + "'", x.bm ? "Tersimpan — ketuk untuk menghapus" : "Simpan soal ini") + "</div><div class='rn-hd'><b>SOAL " + (rv.i + 1) + "</b><span class='sp'></span><span class='tag " + (st[1] === "ok" ? "ok" : st[1] === "bad" ? "" : "warn") + "' style='" + (st[1] === "bad" ? "background:rgba(248,113,113,.25);color:var(--bad)" : "") + "'>" + st[0] + " · skor " + st[2] + "</span></div>" +
         String(x.img || "").split(",").filter(Boolean).map(function (id) { return "<img alt='Gambar soal' loading='lazy' src='/api/run/img/" + encodeURIComponent(id) + "'>"; }).join("") + "<div class='q'>" + esc(x.q) + "</div>";
       LET.forEach(function (Lt, i) {
         if (!x.o[Lt]) return; var isKey = Lt === x.ans, isMine = Lt === x.chosen, cls = isKey ? "key" : isMine ? "bad" : "";
@@ -956,7 +972,7 @@
       else if (a === "rv-bm") {
         var itb = rv && rv.items[+v]; if (!itb) return; b.disabled = true;
         var rb2 = await bmToggle(rv.sid, itb.idx, itb.bm, itb.qid); b.disabled = false;
-        if (rb2) { itb.bm = !!rb2.on; itb.qid = rb2.qid || itb.qid; b.textContent = itb.bm ? "★" : "☆"; b.classList.toggle("on", itb.bm); b.title = itb.bm ? "Tersimpan — ketuk untuk menghapus" : "Simpan soal ini"; }
+        if (rb2) { itb.bm = !!rb2.on; itb.qid = rb2.qid || itb.qid; b.classList.toggle("on", itb.bm); b.title = itb.bm ? "Tersimpan — ketuk untuk menghapus" : "Simpan soal ini"; }
       }
       else if (a === "sv-del") {
         var rd = await bmToggle(null, 0, true, +b.dataset.id); if (!rd) return;
