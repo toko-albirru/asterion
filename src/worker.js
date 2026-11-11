@@ -846,6 +846,20 @@ async function runApi(request, env, a, path, url, body, M) {
   }
 
   // ---------- hasil, riwayat, leaderboard ----------
+  // riwayat jawaban sesi yang MASIH BERJALAN (mode soal & santai): dipakai tombol nomor soal agar soal yang sudah dijawab
+  // bisa ditinjau lagi (juga setelah halaman dimuat ulang / sesi dilanjutkan). Hanya soal yang sudah dijawab yang dibuka kuncinya.
+  if (path === "past" && M === "GET") {
+    const s = await runGet(db, qp("sid"));
+    if (!s || s.u !== a.u) return runErr("Sesi tidak ditemukan.", 404);
+    if (!runQuizLike(s)) return runErr("Hanya untuk mode soal dan mode santai.", 403);
+    const ex = (await runSettings(db)).explain && s.show_explain ? true : false;
+    const bms = new Set((await db.prepare("SELECT qid FROM run_bookmarks WHERE u = ?").bind(a.u).all()).results.map((r) => r.qid));
+    const items = (await db.prepare("SELECT idx, qid, snap, chosen, correct FROM run_answers WHERE sid = ? AND answered = 1 ORDER BY idx").bind(s.id).all()).results.map((r) => {
+      const q = JSON.parse(r.snap);
+      return { idx: r.idx, qid: r.qid, bm: bms.has(r.qid), chosen: r.chosen, correct: !!r.correct, blank: !r.chosen, ans: q.ans, expl: ex ? q.expl || "" : null, ex: ex ? q.ex || null : null };
+    });
+    return J({ explain: ex, items });
+  }
   if (path === "result" && M === "GET") {
     const s = await runGet(db, qp("sid"));
     if (!s || (s.u !== a.u && !a.admin)) return runErr("Sesi tidak ditemukan.", 404);
