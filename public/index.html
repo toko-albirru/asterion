@@ -130,6 +130,18 @@ a.tag{text-decoration:none}
 .tag.ok{background:rgba(74,222,128,.2);color:var(--ok)}.tag.warn{background:rgba(251,191,36,.2);color:var(--warn)}
 .note{font-size:12px;color:var(--warn);padding:8px 0 10px;border-top:1px solid rgba(255,255,255,.12)}
 .empty{text-align:center;color:var(--mut);padding:26px 10px;font-size:14px}
+.sk{border-radius:16px;background:linear-gradient(90deg,rgba(127,127,160,.12) 25%,rgba(127,127,160,.26) 37%,rgba(127,127,160,.12) 63%);background-size:400% 100%;animation:skm 1.3s ease infinite}
+@keyframes skm{0%{background-position:100% 50%}100%{background-position:0 50%}}
+.skc{height:64px;margin-bottom:10px}.skl{height:12px;margin:8px 0;border-radius:8px}
+@media (prefers-reduced-motion:reduce){.sk{animation:none}}
+#main{zoom:var(--fz,1)}
+.fxm{display:flex;gap:6px;margin:0 0 10px}.fxm button{flex:1;padding:8px 0;border-radius:10px;border:1px solid var(--line);background:rgba(255,255,255,.08);color:inherit;font:600 12px Inter,sans-serif;cursor:pointer}
+.fxm button.on{background:linear-gradient(135deg,rgba(245,192,74,.4),rgba(245,192,74,.12));border-color:rgba(245,192,74,.6)}
+:root[data-theme="light"] .fxm button{background:rgba(48,28,88,.08)}
+.fxg{display:grid;grid-template-columns:1fr 1fr;gap:6px 8px;margin:6px 0 10px}.fxg label{font-size:11px;display:block}
+.fxg input{width:100%;padding:8px;border-radius:10px;border:1px solid var(--line);background:rgba(10,6,28,.5);color:#fff;font:400 14px Inter,sans-serif}
+:root[data-theme="light"] .fxg input{background:#fff;color:#241a3f;border-color:rgba(48,28,88,.22)}
+.fxo.brk{border-color:rgba(74,222,128,.7)}
 #toast{position:fixed;left:50%;top:calc(16px + env(safe-area-inset-top,0));transform:translate(-50%,-90px);z-index:10001;display:flex;align-items:center;gap:8px;max-width:min(440px,calc(100vw - 28px));padding:11px 18px;border-radius:999px;background:rgba(30,22,56,.97);border:1px solid rgba(245,192,74,.34);color:#fff;font:600 13px Inter,sans-serif;box-shadow:0 12px 34px rgba(6,3,18,.5);opacity:0;transition:transform .28s cubic-bezier(.2,.9,.3,1.2),opacity .2s}
 #toast.on{transform:translate(-50%,0);opacity:1}
 #toast .ti{font-size:15px;flex:none;line-height:1}
@@ -377,7 +389,7 @@ select.in option{background:#241a3f;color:#fff}
 </style>
 </head>
 <body>
-<script>try{if(localStorage.getItem("theme")==="light")document.documentElement.setAttribute("data-theme","light")}catch(e){}</script>
+<script>try{if(localStorage.getItem("theme")==="light")document.documentElement.setAttribute("data-theme","light");var fz=+localStorage.getItem("ast.fz");if(fz>=.8&&fz<=1.5)document.documentElement.style.setProperty("--fz",fz)}catch(e){}</script>
 <div id="toast"></div>
 
 <div id="gate" class="gate" hidden>
@@ -402,7 +414,7 @@ select.in option{background:#241a3f;color:#fff}
 </div>
 
 <div id="shell" hidden>
-  <div class="top"><a class="ib g" id="back" href="#/" hidden>‹</a><h2 id="ttl"></h2><div class="topr"><button class="ib g" id="out" title="Keluar">⎋</button></div></div>
+  <div class="top"><a class="ib g" id="back" href="#/" hidden>‹</a><h2 id="ttl"></h2><div class="topr"><a class="ib g" id="prof" href="#/profil" title="Profil &amp; progres" aria-label="Profil">👤</a><button class="ib g" id="out" title="Keluar">⎋</button></div></div>
   <div class="wrap" id="main"></div>
   <nav class="nav g" id="nav"></nav>
   <button class="ib g thmf" id="thm" title="Ganti tema" aria-label="Ganti tema">🌙</button>
@@ -410,22 +422,31 @@ select.in option{background:#241a3f;color:#fff}
   <div class="fxp g" id="fxP" hidden>
     <b class="fxgrip" title="Geser panel">🎯 Mode fokus</b>
     <div class="hint" style="margin:0 0 8px">Web masuk layar penuh dan terkunci sampai waktu habis. Kalau keluar sebelum waktunya, muncul peringatan.</div>
+    <div class="fxm"><button class="on" data-fxm="mode-n">Fokus biasa</button><button data-fxm="mode-p">🍅 Pomodoro</button></div>
+    <div id="fxPo" hidden>
+      <div class="hint" style="margin:0 0 6px">Fokus terkunci seperti biasa, lalu istirahat (kunci terbuka). Berulang sampai kamu menekan Selesai; istirahat panjang setiap 4 siklus. Waktu fokus tercatat di Profil.</div>
+      <div class="fxg"><div><label for="fxPW">Fokus (mnt)</label><input id="fxPW" type="number" min="1" max="120" value="25"></div><div><label for="fxPB">Istirahat (mnt)</label><input id="fxPB" type="number" min="1" max="60" value="5"></div><div><label for="fxPL">Istirahat panjang</label><input id="fxPL" type="number" min="1" max="60" value="15"></div></div>
+      <button class="btn w" data-fxm="pstart">🍅 Mulai Pomodoro</button>
+    </div>
+    <div id="fxNo">
     <label for="fxMin" style="font-size:12px">Durasi (menit)</label>
     <input id="fxMin" type="number" min="1" max="240" value="25" class="in" style="width:100%;padding:9px;border-radius:10px;border:1px solid var(--line);background:rgba(10,6,28,.5);color:#fff">
     <div class="fxr"><button data-fxm="15">15</button><button data-fxm="25">25</button><button data-fxm="45">45</button><button data-fxm="60">60</button><button data-fxm="90">90</button></div>
     <button class="btn w" data-fxm="start">Mulai fokus</button>
+    </div>
     <div class="hint" style="margin-top:8px">Tips: selesaikan latihan soal di mode ini supaya tidak terganggu.</div>
   </div>
   <div class="fxo" id="fxOver" hidden>
-    <h2>MODE FOKUS</h2>
+    <h2 id="fxH">MODE FOKUS</h2>
     <div class="fxT" id="fxT">25:00</div>
     <div class="hint">Jangan tinggalkan halaman ini. Kalau kamu keluar, peringatan akan muncul sampai waktu habis.</div>
-    <div class="fxb"><button class="btn s" id="fxEarly" data-fxo="early">⏹ Akhiri lebih awal</button></div>
+    <div class="fxb"><button class="btn s" id="fxEarly" data-fxo="early">⏹ Akhiri lebih awal</button><button class="btn s" id="fxStop" data-fxo="stop" hidden>⏹ Selesai pomodoro</button></div>
   </div>
 </div>
 
 <script src="mahasiswa.js"></script>
 <script src="run.js"></script>
+<script src="profil.js"></script>
 <script>
 var $=function(i){return document.getElementById(i)};
 var esc=function(s){return String(s==null?"":s).replace(/[&<>"']/g,function(c){return{"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]})};
@@ -543,7 +564,7 @@ function viewer(x,ex){
   if(x.h)h+="<div class='vw tall g'><iframe sandbox='allow-scripts' srcdoc=\""+esc(x.h)+"\"></iframe></div>";
   else if(x.hid){h+="<div class='vw tall g'><iframe id='hf' sandbox='allow-scripts'></iframe></div>";setTimeout(function(){hFill(x.hid)},0)}
   else if(pl&&e){h=h.replace("class='sec' id='ft'","class='sec' id='ft' style='margin:8px 2px 10px'");h+="<div class='pw'><div class='vw' id='pv'><iframe id='pf' src=\""+esc(e.s)+"\" allowfullscreen allow='fullscreen; autoplay; encrypted-media; picture-in-picture'></iframe></div><div class='plw'><button class='pa l g' data-pa='-1' disabled aria-label='Sebelumnya'>‹</button><div id='pl'><div class='empty'>Memuat daftar video…</div></div><button class='pa r g' data-pa='1' aria-label='Berikutnya'>›</button></div></div>";setTimeout(function(){plFill(pl,x.u)},0)}
-  else if(fr){if(sub)ou="https://drive.google.com/drive/folders/"+sub;h+="<div id='fd' data-q='"+esc(sub?"id="+sub:fr)+"'><div class='empty'>Memuat isi folder…</div></div>";setTimeout(fdFill,0)}
+  else if(fr){if(sub)ou="https://drive.google.com/drive/folders/"+sub;h+="<div id='fd' data-q='"+esc(sub?"id="+sub:fr)+"'>"+skel(3)+"</div>";setTimeout(fdFill,0)}
   else if(e&&e.img)h+="<div class='vw tall g'><img class='pi' alt='' src=\""+esc(e.s)+"\"></div>";
   else if(e)h+="<div class='vw"+(e.tall?" tall":"")+"'><iframe src=\""+esc(e.s)+"\" allowfullscreen loading='lazy' allow='fullscreen; autoplay; encrypted-media; picture-in-picture'></iframe></div>";
   else h+="<div class='pn g empty'>Tautan ini tidak bisa dibuka langsung di dalam web.</div>";
@@ -1352,9 +1373,10 @@ function pHome(){
   setTimeout(todayFill,0);
   return "<div class='hband'><div class='hero'><img class='mark mk-d' alt='' src='logo.webp'><img class='mark mk-l' alt='' src='logo-light.webp'></div><div class='ttl'><h1>ASTERION</h1><div class='yr'>MMXXV</div></div></div>"+
   "<p class='hint' style='text-align:center;font-size:14px'>Halo, <b>"+esc(myName())+"</b> 👋<br>Seluruh rekaman, rangkuman, soal, dan materi kuliah ada disini, semangat belajarnya 🤩✨</p>"+
-  "<div class='sec'>HARI INI</div><div id='today' class='pn g empty'>Memuat jadwal…</div><div id='next'></div>"+
+  "<div id='cd'></div><div class='sec'>HARI INI</div><div id='today'>"+skel(2)+"</div><div id='next'></div>"+
   "<div class='sec'>MENU</div>"+cards(uiList("menu").filter(function(x){return !x.h}).map(function(x){return["#/"+x.id,x.i,x.n,x.s]}))+
   (S.admin?"<div class='sec'>ADMIN</div>"+cards([["#/atur","🧭","Atur Menu, Navbar & Kategori","Ubah urutan, nama, dan ikon"],["#/run/admin","🛠️","Kelola GAME KUIS","Kategori · soal & PDF · leaderboard"],["#/dokter/admin","📋","Pengajuan Dokter","Cek, edit, lalu setujui usulan"],["#/akun","👥","Status Akun Mahasiswa","Siapa yang online, sudah buka web & ganti password"]])+"<div class='pn g'><b>Reset password mahasiswa</b><div class='hint'>Mengembalikan password ke username (mahasiswa wajib membuat password baru saat login).</div><input id='rU' class='in' placeholder='G0025001'><button class='btn' data-a='reset'>Reset</button></div>":"")}
+function skel(n){n=n||3;var h="";for(var i=0;i<n;i++)h+="<div class='sk skc'></div>";return h}
 function jkt(){return new Date().toLocaleDateString("en-CA",{timeZone:"Asia/Jakarta"})}
 function pickTab(tabs){return tabs[Math.min(S.def||0,tabs.length-1)]||tabs[0]}
 async function todayFill(){
@@ -1363,6 +1385,10 @@ async function todayFill(){
     if(!r.ok){el.textContent="Jadwal belum bisa dimuat.";return}
     var iso=jkt(),d=r.j.filter(function(x){return x.iso===iso})[0];
     el.className="day g";el.innerHTML=d&&d.items.length?"<h3>"+esc(d.d)+"</h3>"+d.items.map(slot).join(""):"<div class='empty'>Tidak ada jadwal hari ini 🎉</div>";
+    var cdE=$("cd");
+    if(cdE){var ub=r.j.filter(function(x){return x.iso>=iso&&x.items.some(function(i){return /ujian\s*blok/i.test(i.k||"")})}).sort(function(a,b){return a.iso<b.iso?-1:1})[0];
+      if(ub){var cn=Math.round((Date.parse(ub.iso)-Date.parse(iso))/864e5),ci=ub.items.filter(function(i){return /ujian\s*blok/i.test(i.k||"")})[0];
+        cdE.innerHTML="<div class='pn g' style='text-align:center'><div class='hint' style='margin:0'>⏳ "+esc(ci.k||"Ujian Blok")+"</div><div style='font:800 34px Inter,sans-serif;color:var(--gold);margin:2px 0'>"+(cn===0?"Hari ini!":cn+" hari lagi")+"</div><div class='hint' style='margin:0'>"+esc(ub.d)+(ci.j?" · "+esc(ci.j):"")+"</div></div>"}else cdE.innerHTML=""}
     var nx=$("next");if(!nx)return;
     var up=r.j.filter(function(x){return x.iso>iso&&x.items.length}).sort(function(a,b){return a.iso<b.iso?-1:1}).slice(0,2);
     nx.innerHTML=up.length?"<div class='sec'>JADWAL TERDEKAT</div>"+up.map(function(x){
@@ -1525,16 +1551,37 @@ function themeSet(t,save){
 function themeToggle(){var n=themeNow()==="light"?"dark":"light";themeSet(n,1);toast(n==="light"?"☀️ Mode terang aktif":"🌙 Mode gelap aktif")}
 
 /* ---------- MODE FOKUS MENGAMBANG ---------- */
-var FX={on:false,end:0,iv:0,min:25,left:false};
+var FX={on:false,end:0,iv:0,min:25,left:false,dur:25,pomo:null,bk:null,bkIv:0};
 function fxFmt(ms){var s=Math.max(0,Math.ceil(ms/1000)),m=Math.floor(s/60);s=s%60;return p2(m)+":"+p2(s)}
 function fxLeft(){return Math.max(0,FX.end-Date.now())}
 function fxFs(){try{var el=document.documentElement;if(el.requestFullscreen)return el.requestFullscreen({navigationUI:"hide"});if(el.webkitRequestFullscreen)return el.webkitRequestFullscreen()}catch(e){}return Promise.reject()}
 function fxPanel(){var p=$("fxP");if(!p)return;p.hidden=!p.hidden;if(!p.hidden&&$("fxMin"))$("fxMin").value=FX.min}
 function fxOpen(){if(FX.on){var o=$("fxOver");if(o)o.hidden=false;fxFs().catch(function(){});return}fxPanel()}
-function fxStart(n){
+function fxLog(min,kind){if(S.admin||!(min>=1))return;try{api("run/focus",{m:"POST",b:{min:Math.min(240,Math.floor(min)),kind:kind}}).catch(function(){})}catch(e){}}
+function fxBkClear(){clearInterval(FX.bkIv);FX.bkIv=0;FX.bk=null;var o=$("fxOver"),s=$("fxStop"),e=$("fxEarly");if(o)o.classList.remove("brk");if(s)s.hidden=true;if(e)e.disabled=false}
+function fxHead(){var h=$("fxH");if(h)h.textContent=FX.pomo?"🍅 POMODORO #"+FX.pomo.i+" · FOKUS":"MODE FOKUS"}
+function fxPoStart(){
+  var v=function(id,lo,hi,d){var n=parseInt(($(id)||{}).value,10);return isFinite(n)&&n>=lo&&n<=hi?n:d};
+  var w=v("fxPW",1,120,25),b=v("fxPB",1,60,5),l=v("fxPL",1,60,15);
+  try{localStorage.setItem("fxPo",JSON.stringify({w:w,b:b,l:l}))}catch(e){}
+  FX.pomo={w:w,b:b,l:l,i:1};fxStart(w,1)}
+function fxBreakStart(){
+  var P=FX.pomo;if(!P)return;var lg=P.i%4===0,min=lg?P.l:P.b;
+  FX.bk={end:Date.now()+min*6e4,ready:false};
+  var o=$("fxOver"),h=$("fxH"),e=$("fxEarly"),s=$("fxStop");
+  if(o){o.hidden=false;o.classList.add("brk")}if(h)h.textContent=(lg?"☕ ISTIRAHAT PANJANG":"☕ ISTIRAHAT")+" · setelah #"+P.i;
+  if(e){e.textContent="⏭ Lewati istirahat";e.disabled=false}if(s)s.hidden=false;
+  clearInterval(FX.bkIv);FX.bkIv=setInterval(fxBkTick,500);fxBkTick()}
+function fxBkTick(){
+  if(!FX.bk)return;var rem=Math.max(0,FX.bk.end-Date.now()),t=$("fxT");if(t)t.textContent=fxFmt(rem);
+  if(rem<=0&&!FX.bk.ready){FX.bk.ready=true;var e=$("fxEarly");if(e)e.textContent="▶ Mulai fokus #"+(FX.pomo.i+1);try{if(navigator.vibrate)navigator.vibrate([200,100,200])}catch(x){}toast("Istirahat selesai ☕ — siap lanjut fokus?")}}
+function fxBkNext(){var P=FX.pomo;if(!P){fxBkClear();return}fxBkClear();P.i++;fxStart(P.w,1)}
+function fxPoStop(){FX.pomo=null;fxBkClear();var o=$("fxOver");if(o)o.hidden=true;toast("Pomodoro selesai. Kerja bagus! 🎉")}
+function fxStart(n,po){
   n=+n||0;if(!isFinite(n)||n<1||n>240)return toast("Durasi 1–240 menit ya.");
-  FX.min=n;try{localStorage.setItem("fxMin",n)}catch(e){}
-  FX.on=true;FX.end=Date.now()+n*6e4;FX.left=false;
+  fxBkClear();
+  if(!po){FX.pomo=null;FX.min=n;try{localStorage.setItem("fxMin",n)}catch(e){}}
+  FX.dur=n;FX.on=true;FX.end=Date.now()+n*6e4;FX.left=false;fxHead();
   $("fxP").hidden=true;document.body.classList.add("fxon");
   var o=$("fxOver");if(o)o.hidden=false;var b=$("fxBtn");if(b)b.classList.add("on");
   fxTick();clearInterval(FX.iv);FX.iv=setInterval(fxTick,250);
@@ -1548,11 +1595,16 @@ function fxRefs(){if(FX.on&&!document.fullscreenElement)fxFs().catch(function(){
 function fxWarn(m){return Dlg.alert(m+"\n\nMode fokus masih berjalan.\nSisa waktu: "+fxFmt(fxLeft())+"\nKamu baru bisa keluar setelah waktu habis.",{title:"Mode fokus aktif",icon:"🎯",okText:"Mengerti"}).then(fxRefs)}
 async function fxEnd(early){
   if(!FX.on)return;
-  if(early&&!(await Dlg.confirm("Akhiri mode fokus sebelum waktunya? Progres fokusmu akan hilang.",{title:"Akhiri mode fokus",icon:"⏹",okText:"Akhiri",danger:true})))return;
+  if(early&&!(await Dlg.confirm("Akhiri mode fokus sebelum waktunya? Waktu fokus yang sudah berjalan tetap tercatat.",{title:"Akhiri mode fokus",icon:"⏹",okText:"Akhiri",danger:true})))return;
+  if(!FX.on)return;
+  var elapsed=early?Math.floor((Date.now()-(FX.end-FX.dur*6e4))/6e4):FX.dur,kind=FX.pomo?"pomodoro":"fokus",wasPo=!!FX.pomo;
   FX.on=false;clearInterval(FX.iv);FX.iv=0;
   document.body.classList.remove("fxon");
   var o=$("fxOver");if(o)o.hidden=true;var b=$("fxBtn");if(b)b.classList.remove("on");
   try{if(document.fullscreenElement&&document.exitFullscreen)document.exitFullscreen()}catch(e){}
+  fxLog(elapsed,kind);
+  if(wasPo&&!early){toast("Fokus selesai 🍅 — waktunya istirahat!");fxBreakStart();return}
+  if(early)FX.pomo=null;
   toast(early?"Mode fokus diakhiri.":"Mode fokus selesai. Kerja bagus! 🎉")}
 document.addEventListener("fullscreenchange",function(){
   if(!FX.on)return;
@@ -1566,7 +1618,7 @@ document.addEventListener("visibilitychange",function(){
 window.addEventListener("focus",fxRefs);
 window.addEventListener("beforeunload",function(e){if(FX.on){e.preventDefault();e.returnValue="Mode fokus masih berjalan.";return e.returnValue}});
 (function fxInit(){
-  try{FX.min=+localStorage.getItem("fxMin")||25}catch(e){}
+  try{FX.min=+localStorage.getItem("fxMin")||25;var po=JSON.parse(localStorage.getItem("fxPo")||"null");if(po){$("fxPW").value=po.w;$("fxPB").value=po.b;$("fxPL").value=po.l}}catch(e){}
   themeSet(themeNow(),0);
   var b=$("fxBtn");if(b)b.addEventListener("click",fxOpen);
   var t=$("thm");if(t)t.addEventListener("click",themeToggle);
@@ -1576,12 +1628,16 @@ window.addEventListener("beforeunload",function(e){if(FX.on){e.preventDefault();
     var x=e.target.closest?e.target.closest("[data-fxm]"):null;if(!x)return;
     var v=x.getAttribute("data-fxm"),i=$("fxMin");
     if(v==="start")fxStart(i?i.value:25);
+    else if(v==="pstart")fxPoStart();
+    else if(v==="mode-n"||v==="mode-p"){var pm=v==="mode-p";$("fxPo").hidden=!pm;$("fxNo").hidden=pm;[].forEach.call(p.querySelectorAll(".fxm button"),function(bb){bb.classList.toggle("on",bb.getAttribute("data-fxm")===v)})}
     else if(v==="close")p.hidden=true;
     else if(i)i.value=+v});
   var o=$("fxOver");
   if(o)o.addEventListener("click",function(e){
     var x=e.target.closest?e.target.closest("[data-fxo]"):null;
-    if(x&&x.getAttribute("data-fxo")==="early")fxEnd(1)});
+    if(!x)return;var k=x.getAttribute("data-fxo");
+    if(FX.bk){if(k==="early")fxBkNext();else if(k==="stop")fxPoStop();return}
+    if(k==="early")fxEnd(1)});
 })();
 
 /* ---------- GESER TOMBOL TEMA, FOKUS, TIMER & PANEL (posisi diingat) ---------- */
@@ -1666,7 +1722,7 @@ function dkItem(d){
   var p=[d.h1,d.h2].filter(Boolean).map(function(x){x=ph(x);return"<div class='mt'><a class='tag ok' href='tel:"+x+"'>📞 "+x+"</a><a class='tag' href='https://wa.me/62"+x.slice(1)+"' data-dk='wa' data-id=\""+esc(d.id)+"\" data-h='"+x+"'>Konfirmasi Kehadiran (WA)</a></div>"}).join("");
   return"<div class='day g dk' data-n=\""+esc(String(d.n).toLowerCase())+"\"><div class='row'><b style='flex:1'>"+esc(d.n)+"</b><button class='ib g' style='height:34px' data-dk='edit' data-id=\""+esc(d.id)+"\" title='"+(S.admin?"Ubah":"Usul ubah")+"'>✎</button><button class='ib g' style='height:34px' data-dk='del' data-id=\""+esc(d.id)+"\" title='"+(S.admin?"Hapus":"Usul hapus")+"'>🗑</button></div>"+(p||"<div class='hint'>Belum ada nomor</div>")+"</div>"}
 function pDokter(P){
-  if(P[1]==="admin"&&S.admin){setTimeout(dkAdmin,0);return"<div class='sec'>PENGAJUAN DOKTER</div><div id='dka'><div class='empty'>Memuat…</div></div>"}
+  if(P[1]==="admin"&&S.admin){setTimeout(dkAdmin,0);return"<div class='sec'>PENGAJUAN DOKTER</div><div id='dka'>"+skel(3)+"</div>"}
   setTimeout(dkInit,0);
   return"<input id='dq' class='in' placeholder='🔍 Cari nama dokter…' autocomplete='off' style='margin-bottom:10px'><button class='btn s w' style='margin:0 0 12px' data-dk='new'>＋ "+(S.admin?"Tambah dokter":"Usulkan dokter baru")+"</button>"+(S.admin?"<a class='btn s w' style='margin:0 0 12px;display:block;text-align:center' href='#/dokter/admin'>📥 Lihat pengajuan dari pengguna</a>":"")+"<div id='dkf'></div><div id='dkl'><div class='empty'>Memuat daftar dokter…</div></div>"}
 async function dkInit(){
@@ -1810,11 +1866,11 @@ $("main").addEventListener("click",function(e){var b=e.target.closest("[data-ak]
 $("main").addEventListener("input",function(e){if(e.target.id!=="akQ")return;S.akq=e.target.value;akDraw()});
 
 /* ---------- router ---------- */
-var TT={atur:"ATUR MENU",home:"ASTERION",materi:"MATERI & RANGKUMAN",rekaman:"REKAMAN KULIAH",jadwal:"JADWAL KULIAH",tutor:"JADWAL TUTORIAL",run:"GAME KUIS",dokter:"KONTAK DOKTER",akun:"STATUS AKUN"};
+var TT={atur:"ATUR MENU",home:"ASTERION",materi:"MATERI & RANGKUMAN",rekaman:"REKAMAN KULIAH",jadwal:"JADWAL KULIAH",tutor:"JADWAL TUTORIAL",run:"GAME KUIS",dokter:"KONTAK DOKTER",akun:"STATUS AKUN",profil:"PROFIL & PROGRES"};
 function route(){
   if(!S.data)return;
   var P=location.hash.replace(/^#\/?/,"").split("/").filter(Boolean),tab=P[0]||"home",v;
-  if(tab==="materi")v=pMateri(P);else if(tab==="rekaman")v=pRekaman(P);else if(tab==="jadwal")v=pJadwal(P);else if(tab==="tutor")v=pTutor(P);else if(tab==="run"&&window.pRun)v=window.pRun(P);else if(tab==="dokter")v=pDokter(P);else if(tab==="atur")v=pAtur();else if(tab==="akun")v=pAkun();else{tab="home";v=pHome()}
+  if(tab==="materi")v=pMateri(P);else if(tab==="rekaman")v=pRekaman(P);else if(tab==="jadwal")v=pJadwal(P);else if(tab==="tutor")v=pTutor(P);else if(tab==="run"&&window.pRun)v=window.pRun(P);else if(tab==="dokter")v=pDokter(P);else if(tab==="atur")v=pAtur();else if(tab==="akun")v=pAkun();else if(tab==="profil"&&window.pProfil)v=window.pProfil(P);else{tab="home";v=pHome()}
   document.body.dataset.r=tab;renderNav();$("main").innerHTML=v;$("ttl").textContent=(tab!=="home"&&tab!=="atur"&&uiName(tab)?uiName(tab).toUpperCase():TT[tab]);
   $("back").hidden=P.length<2;$("back").href="#/"+P.slice(0,-1).join("/");
   [].forEach.call(document.querySelectorAll(".nav a"),function(a){a.classList.toggle("on",a.dataset.t===tab)});
