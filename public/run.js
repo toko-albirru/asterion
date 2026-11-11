@@ -59,8 +59,9 @@
     ".rn-op,.rn-qo{flex-wrap:wrap}.rn-pf input.in{margin:6px 0;padding:9px;border-radius:10px;border:1px solid var(--line);background:rgba(10,6,28,.5);color:#fff;font:400 15px Inter,sans-serif}" +
     ".ex-hd{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:8px}.ex-hd .sp{flex:1}" +
     ".ex-nums{display:flex;flex-wrap:wrap;gap:5px;margin:8px 0}.ex-nums button{width:34px;height:34px;border-radius:10px;border:1px solid var(--line);background:rgba(255,255,255,.08);color:#fff;font-size:12px;cursor:pointer;font-family:inherit}" +
-    ".ex-nums .ans{background:rgba(74,222,128,.35);border-color:var(--ok)}.ex-nums .flg{background:rgba(236,72,153,.55);border-color:#f472b6;color:#fff;font-weight:700;box-shadow:inset 0 0 0 2px #f472b6}.ex-nums .flg.ans{background:linear-gradient(135deg,rgba(74,222,128,.45),rgba(236,72,153,.6))}.ex-nums .cur{outline:2px solid var(--gold)}" +
-    ".rn-qo.pick{border-color:var(--gold);background:rgba(245,192,74,.18)}.rn-flag{border-color:#f472b6;color:#fff;background:rgba(236,72,153,.35)}.rn-flag:hover{border-color:#fb7fb8}";
+    ".ex-nums .ans{background:rgba(74,222,128,.35);border-color:var(--ok)}.ex-nums .flg{background:rgba(250,204,21,.5);border-color:#facc15;color:#fff;font-weight:700;box-shadow:inset 0 0 0 2px #facc15}.ex-nums .flg.ans{background:linear-gradient(135deg,rgba(74,222,128,.5),rgba(250,204,21,.6))}.ex-nums .cur{outline:2px solid var(--gold)}" +
+    ".rn-qo.pick{border-color:var(--gold);background:rgba(245,192,74,.18)}.rn-flag{border-color:#facc15;color:#fff;background:rgba(250,204,21,.35)}.rn-flag:hover{border-color:#fde047}" +
+    ".rn-cw,.rn-rv{position:relative}.rn-fab{position:absolute;top:10px;right:10px;z-index:3;width:42px;height:42px;padding:0;border-radius:50%;border:1.5px solid rgba(255,255,255,.4);background:rgba(20,12,44,.62);color:#fff;font:400 20px/1 Inter,sans-serif;cursor:pointer;display:flex;align-items:center;justify-content:center;box-shadow:0 3px 12px rgba(0,0,0,.35)}.rn-fab.lo{top:50px}.rn-fab.on.flag{background:#facc15;border-color:#eab308;color:#422006}.rn-fab.on.star{background:#f5c04a;border-color:#e0a82e;color:#422006}.rn-fab.pend{border-style:dashed}.rn-fab:active{transform:scale(.92)}";
   var CSS2 = ".rn-x{margin-left:auto;flex:none;align-self:center;width:26px;height:26px;border-radius:8px;display:grid;place-items:center;font-size:12px;color:var(--mut);border:1px solid var(--line);background:rgba(255,255,255,.06);cursor:pointer;font-weight:400}.rn-x:hover{color:#fff;border-color:var(--gold)}" +
     ".rn-qo.struck>span:not(.rn-x),.rn-qo.struck>b{opacity:.45}.rn-qo.struck>span:not(.rn-x){text-decoration:line-through}.rn-qo.struck .rn-x{color:var(--bad);border-color:var(--bad)}.rn-qo:disabled .rn-x{display:none}" +
     ".rn-me2{padding:12px 14px;margin:0 0 12px}.rn-me2 .big{font:800 20px Inter,sans-serif}.rn-me2 .rn-prog{margin:6px 0 4px}.rn-weak{margin-top:8px;padding:8px 10px;border-radius:12px;background:rgba(248,113,113,.12);border:1px solid rgba(248,113,113,.35);font-size:12.5px;line-height:1.45}" +
@@ -259,7 +260,7 @@
       if (!r.ok) { toast((r.j && r.j.err) || "Gagal memulai"); location.replace("#/run"); return; }
       var p = r.j;
       if (p.adjusted) toast("Soal aktif hanya " + p.total + " (target " + p.requested + "): sesi disesuaikan.");
-      var Q = RS.quiz = { mode: p.mode || mode, relax: (p.mode || mode) === "relax", src: src, strike: {}, k: k, cid: cid, sid: p.sid, name: "", qs: p.qs, total: p.total, qTime: p.q_time * 1000, cur: p.cur, score: p.score, hist: {}, view: null, dl: 0, busy: false, paused: false, tm: 0, fb: 0, kd: null };
+      var Q = RS.quiz = { mode: p.mode || mode, relax: (p.mode || mode) === "relax", src: src, strike: {}, k: k, cid: cid, sid: p.sid, name: "", qs: p.qs, total: p.total, qTime: p.q_time * 1000, cur: p.cur, score: p.score, hist: {}, mark: {}, view: null, dl: 0, busy: false, paused: false, tm: 0, fb: 0, kd: null };
       Q.kd = function (e) { if (!RS.quiz || RS.quiz !== Q || e.ctrlKey || e.metaKey || e.altKey) return; var t = e.target && e.target.tagName; if (t === "INPUT" || t === "TEXTAREA" || t === "SELECT") return; if (Q.review && (e.key === "Enter" || e.key === " ")) { e.preventDefault(); if (Q.view == null) quizNext(); return; } var L = String(e.key || "").toUpperCase(); if (LET.indexOf(L) >= 0 && !Q.review) quizAnswer(L); };
       document.addEventListener("keydown", Q.kd);
       var c = (RS.cats || []).filter(function (x) { return x.id === cid; })[0]; Q.name = c ? c.name : "";
@@ -317,7 +318,7 @@
     var q = Q.qs[Q.cur]; if (!q) return;
     var h = "<div class='rn-qz'><div class='rn-hd'><b>Soal " + (Q.cur + 1) + "/" + Q.total + "</b><span class='tag'>Skor " + Q.score + "</span><span class='sp'></span><span class='rn-qt' id='qzT'>" + (Q.relax ? "🌿 Santai" : "") + "</span></div>" +
       "<div class='rn-prog'><i id='qzBar' style='width:" + (Q.relax ? Q.cur / Q.total * 100 : 100) + "%;transition:none'></i></div>" +
-      "<div class='pn g' style='padding:14px'>" + String(q.img || "").split(",").filter(Boolean).map(function (id) { return "<img alt='Gambar soal' src='/api/run/img/" + encodeURIComponent(id) + "'>"; }).join("") + "<div class='q'>" + esc(q.q) + "</div>";
+      "<div class='pn g rn-cw' style='padding:14px'>" + quizStarBtn(Q.cur) + String(q.img || "").split(",").filter(Boolean).map(function (id) { return "<img alt='Gambar soal' src='/api/run/img/" + encodeURIComponent(id) + "'>"; }).join("") + "<div class='q'>" + esc(q.q) + "</div>";
     var sk = Q.strike[Q.cur] || {};
     LET.forEach(function (L, i) { if (!q.o[L]) return; h += "<button class='rn-op rn-qo" + (sk[L] ? " struck" : "") + "' data-ra='qz-ans' data-v2='" + L + "'><b style='background:" + CSSC[i] + "'>" + L + "</b><span>" + esc(q.o[L]) + "</span><span class='rn-x' data-ra='qz-x' data-v2='" + L + "' title='Coret / batal coret pilihan ini'>✕</span></button>"; });
     var hasPrev = false; for (var pi = Q.cur - 1; pi >= 0; pi--) if (Q.hist[pi]) { hasPrev = true; break; }
@@ -339,15 +340,26 @@
     if (!r.ok) return quizResync(Q, r);
     var j = r.j, t0 = performance.now(); Q.score = j.score;
     Q.hist[idx] = { idx: idx, q: Q.qs[idx], ans: ans, j: j, bm: false, qid: 0 }; Q.view = null;
-    Q.review = j; quizShowRev(Q, idx); // timer soal berikutnya baru berjalan setelah "Lanjut" ditekan (server menahan sesi sampai resume)
+    Q.review = j; quizShowRev(Q, idx);
+    if (Q.mark[idx]) { Q.mark[idx] = false; var hx = Q.hist[idx]; bmToggle(Q.sid, idx, false, 0).then(function (rb) { if (rb && hx) { hx.bm = !!rb.on; hx.qid = rb.qid || 0; } if (RS.quiz === Q && (Q.view == null ? Q.cur : Q.view) === idx) quizStarUI(idx); }); } else quizStarUI(idx); // timer soal berikutnya baru berjalan setelah "Lanjut" ditekan (server menahan sesi sampai resume)
+  }
+  function quizStarOn(Q, i) { var x = Q.hist[i]; return x ? !!x.bm : !!Q.mark[i]; }
+  function quizStarTitle(Q, i) { var x = Q.hist[i], on = quizStarOn(Q, i); return x ? (on ? "Tersimpan — ketuk untuk menghapus" : "Simpan soal ini") : on ? "Akan disimpan setelah soal dijawab" : "Tandai untuk disimpan (tersimpan setelah dijawab)"; }
+  function quizStarBtn(i) { var Q = RS.quiz, on = quizStarOn(Q, i); return "<button class='rn-fab star" + (on ? " on" : "") + (!Q.hist[i] && on ? " pend" : "") + "' data-ra='qz-star' data-v2='" + i + "' title='" + quizStarTitle(Q, i) + "' aria-label='Simpan soal'>" + (on ? "★" : "☆") + "</button>"; }
+  function quizStarUI(i) { var Q = RS.quiz; if (!Q) return; var b = document.querySelector("#rr .rn-fab.star"); if (!b) return; b.dataset.v2 = i; var on = quizStarOn(Q, i); b.textContent = on ? "★" : "☆"; b.classList.toggle("on", on); b.classList.toggle("pend", on && !Q.hist[i]); b.title = quizStarTitle(Q, i); }
+  async function quizStar(i) {
+    var Q = RS.quiz; if (!Q) return; var x = Q.hist[i];
+    if (!x) { Q.mark[i] = !Q.mark[i]; quizStarUI(i); return; } // sebelum dijawab: hanya menandai
+    var r = await bmToggle(Q.sid, x.idx, x.bm, x.qid); if (!RS.quiz || RS.quiz !== Q) return;
+    if (r) { x.bm = !!r.on; x.qid = r.qid || x.qid; }
+    quizStarUI(i);
   }
   function quizRevTag(Lt, key, ans) { var isKey = !!key && Lt === key, isMine = Lt === ans; return { cls: isKey ? "key" : isMine ? "bad" : "", tg: (isKey ? "<i class='rn-s-ok'>✔ KUNCI</i>" : "") + (isMine && !isKey ? "<i class='rn-s-bad'>✘ jawabanmu</i>" : isMine ? "<i>jawabanmu</i>" : "") }; }
   function quizRevInfo(x) { // kunci + status + pembahasan (sama dengan halaman pembahasan)
     var j = x.j, ans = x.ans, key = j.ans || "", stt = j.correct ? ["BENAR", "rn-s-ok", "+1"] : j.blank ? ["TIDAK DIJAWAB", "rn-s-warn", "0"] : ["SALAH", "rn-s-bad", "0"];
     var info = "<div class='hint' style='margin:8px 2px;text-align:left;font-weight:400'>Jawaban pemain: <b>" + (ans || "—") + "</b> · Kunci: <b class='rn-s-ok'>" + esc(key || "—") + "</b> · Status: <b class='" + stt[1] + "'>" + stt[0] + "</b> · Skor: <b>" + stt[2] + "</b></div>";
     var exH = j.explain ? (j.expl ? "<div class='rn-ex' style='text-align:left'><b>Pembahasan</b><br>" + esc(j.expl) + "</div>" : "<div class='rn-ex no' style='text-align:left'>Pembahasan belum tersedia untuk soal ini.</div>") : "";
-    var bm = x.idx != null ? "<div class='rn-row' style='justify-content:center;margin:8px 0 0'><button class='btn s sm' data-ra='qz-bm' data-v2='" + x.idx + "' style='flex:none'>" + bmLabel(x.bm) + "</button></div>" : "";
-    return info + exH + bm;
+    return info + exH;
   }
   function quizShowRev(Q, idx) { // tampilan setelah menjawab: opsi kunci hijau, jawaban salah merah
     var x = Q.hist[idx], j = x.j, key = j.ans || "", btns = [].slice.call(document.querySelectorAll("#rr .rn-qo")), f = g("qzF");
@@ -361,7 +373,7 @@
   }
   function quizHist(i) { // lihat soal yang sudah dijawab (hanya baca). Boleh juga sebelum soal sekarang dijawab.
     var Q = RS.quiz; if (!Q || Q.nexting || (Q.busy && !Q.review) || Q.paused) return; var x = Q.hist[i]; if (!x) return; Q.view = i; var q = x.q, key = x.j.ans || "";
-    var h = "<div class='rn-qz'><div class='rn-hd'><b>Tinjau soal " + (i + 1) + "/" + Q.total + "</b><span class='sp'></span><span class='tag'>Skor " + Q.score + "</span>" + (!Q.review && !Q.relax ? "<span class='rn-qt' id='qzT2'></span>" : "") + "</div><div class='pn g' style='padding:14px'>" + String(q.img || "").split(",").filter(Boolean).map(function (id) { return "<img alt='Gambar soal' src='/api/run/img/" + encodeURIComponent(id) + "'>"; }).join("") + "<div class='q'>" + esc(q.q) + "</div>";
+    var h = "<div class='rn-qz'><div class='rn-hd'><b>Tinjau soal " + (i + 1) + "/" + Q.total + "</b><span class='sp'></span><span class='tag'>Skor " + Q.score + "</span>" + (!Q.review && !Q.relax ? "<span class='rn-qt' id='qzT2'></span>" : "") + "</div><div class='pn g rn-cw' style='padding:14px'>" + quizStarBtn(i) + String(q.img || "").split(",").filter(Boolean).map(function (id) { return "<img alt='Gambar soal' src='/api/run/img/" + encodeURIComponent(id) + "'>"; }).join("") + "<div class='q'>" + esc(q.q) + "</div>";
     LET.forEach(function (L, k) { if (!q.o[L]) return; var t = quizRevTag(L, key, x.ans); h += "<div class='rn-op " + t.cls + "'><b style='background:" + CSSC[k] + "'>" + L + "</b><span>" + esc(q.o[L]) + "</span>" + t.tg + optEx(x.j.ex, L) + "</div>"; });
     var hp = false; for (var pk = i - 1; pk >= 0; pk--) if (Q.hist[pk]) { hp = true; break; }
     var nx = -1; for (var nk = i + 1; nk < Q.total; nk++) if (Q.hist[nk]) { nx = nk; break; }
@@ -507,17 +519,15 @@
     var E = RS.exam; if (!E || RS.route !== E.k || !g("rr")) return examStop();
     var q = E.qs[E.cur]; if (!q) return;
     var chosen = E.ans[E.cur], fl = !!E.flag[E.cur], answered = Object.keys(E.ans).length, flagged = Object.keys(E.flag).length;
-    var h = "<div class='rn-qz'><div class='rn-hd'><b>Soal " + (E.cur + 1) + "/" + E.total + "</b><span class='tag'>✍️ " + answered + " dijawab</span>" + (flagged ? "<span class='tag' style='color:#f472b6'>🚩 " + flagged + "</span>" : "") + "<span class='sp'></span><span class='rn-qt' id='exT'></span></div>" +
+    var h = "<div class='rn-qz'><div class='rn-hd'><b>Soal " + (E.cur + 1) + "/" + E.total + "</b><span class='tag'>✍️ " + answered + " dijawab</span>" + (flagged ? "<span class='tag' style='color:#fbbf24'>🚩 " + flagged + "</span>" : "") + "<span class='sp'></span><span class='rn-qt' id='exT'></span></div>" +
       "<div class='rn-prog'><i style='width:" + (E.total ? answered / E.total * 100 : 0) + "%'></i></div>" +
-      "<div class='pn g' style='padding:14px'>" + imgs(q) + "<div class='q'>" + esc(q.q) + "</div>";
+      "<div class='pn g rn-cw' style='padding:14px'><button class='rn-fab flag" + (fl ? " on" : "") + "' data-ex-flag title='" + (fl ? "Batalkan tanda ragu" : "Tandai ragu") + "' aria-label='Tandai ragu'>🚩</button>" + imgs(q) + "<div class='q'>" + esc(q.q) + "</div>";
     var sk = E.strike[E.cur] || {};
     LET.forEach(function (L, i) { if (!q.o[L]) return; h += "<button class='rn-op rn-qo" + (chosen === L ? " pick" : "") + (sk[L] ? " struck" : "") + "' data-ex-pick='" + L + "'><b style='background:" + CSSC[i] + "'>" + L + "</b><span>" + esc(q.o[L]) + "</span><span class='rn-x' data-ex-x='" + L + "' title='Coret / batal coret pilihan ini'>✕</span></button>"; });
     h += "</div>" +
       "<div class='ex-nums'>" + E.qs.map(function (x, i) { return "<button class='" + (E.ans[i] ? "ans " : "") + (E.flag[i] ? "flg " : "") + (i === E.cur ? "cur" : "") + "' data-ex-go='" + i + "'>" + (i + 1) + "</button>"; }).join("") + "</div>" +
       "<div class='rn-row'><button class='btn s' data-ex-nav='-1'" + (E.cur <= 0 ? " disabled" : "") + ">‹ Sebelumnya</button>" +
       "<button class='btn s' data-ex-nav='1'" + (E.cur >= E.total - 1 ? " disabled" : "") + ">Berikutnya ›</button></div>" +
-      "<div class='rn-row'>" +
-      "<button class='btn s " + (fl ? "rn-flag" : "") + "' data-ex-flag>" + (fl ? "🚩 Ditandai" : "🚩 Tandai soal") + "</button></div>" +
       "<div class='rn-row'><button class='btn' data-ex-submit style='flex:1'>📤 Kumpulkan ujian</button><a class='btn s' href='#/run'>✕ Keluar</a></div>" +
       "<div class='hint' style='text-align:center;margin-top:8px'>Jawaban tersimpan otomatis. Kunci & pembahasan hanya muncul setelah ujian dikumpulkan.</div></div>";
     setRR(h); window.scrollTo(0, 0); examBindNav();
@@ -551,7 +561,7 @@
   async function examFlag() {
     var E = RS.exam; if (!E || E.sent) return;
     var idx = E.cur, on = E.flag[idx] ? 0 : 1; if (on) E.flag[idx] = 1; else delete E.flag[idx];
-    examDraw();
+    var y0 = window.scrollY; examDraw(); window.scrollTo(0, y0);
     var r; try { r = await rapi("exam/save", { m: "POST", b: { sid: E.sid, idx: idx, flag: on } }); } catch (e) { return; }
     if (!RS.exam || RS.exam !== E) return;
     if (!r.ok) toast((r.j && r.j.err) || "Gagal menyimpan tanda");
@@ -581,14 +591,13 @@
     if (!x) h += "<div class='pn g empty'>Tidak ada soal pada filter ini.</div>";
     else {
       var st = x.correct ? ["BENAR", "ok", "+1"] : x.chosen ? ["SALAH", "bad", "0"] : ["TIDAK DIJAWAB", "bl", "0"];
-      h += "<div class='rn-rv g'><div class='rn-hd'><b>SOAL " + (rv.i + 1) + "</b><span class='sp'></span><span class='tag " + (st[1] === "ok" ? "ok" : st[1] === "bad" ? "" : "warn") + "' style='" + (st[1] === "bad" ? "background:rgba(248,113,113,.25);color:var(--bad)" : "") + "'>" + st[0] + " · skor " + st[2] + "</span></div>" +
+      h += "<div class='rn-rv g'><button class='rn-fab star lo" + (x.bm ? " on" : "") + "' data-ra='rv-bm' data-v2='" + rv.i + "' title='" + (x.bm ? "Tersimpan — ketuk untuk menghapus" : "Simpan soal ini") + "' aria-label='Simpan soal'>" + (x.bm ? "★" : "☆") + "</button><div class='rn-hd'><b>SOAL " + (rv.i + 1) + "</b><span class='sp'></span><span class='tag " + (st[1] === "ok" ? "ok" : st[1] === "bad" ? "" : "warn") + "' style='" + (st[1] === "bad" ? "background:rgba(248,113,113,.25);color:var(--bad)" : "") + "'>" + st[0] + " · skor " + st[2] + "</span></div>" +
         String(x.img || "").split(",").filter(Boolean).map(function (id) { return "<img alt='Gambar soal' loading='lazy' src='/api/run/img/" + encodeURIComponent(id) + "'>"; }).join("") + "<div class='q'>" + esc(x.q) + "</div>";
       LET.forEach(function (Lt, i) {
         if (!x.o[Lt]) return; var isKey = Lt === x.ans, isMine = Lt === x.chosen, cls = isKey ? "key" : isMine ? "bad" : "";
         h += "<div class='rn-op " + cls + "'><b style='background:" + CSSC[i] + "'>" + Lt + "</b><span>" + esc(x.o[Lt]) + "</span>" + (isKey ? "<i class='rn-s-ok'>✔ KUNCI</i>" : "") + (isMine && !isKey ? "<i class='rn-s-bad'>✘ jawabanmu</i>" : isMine ? "<i>jawabanmu</i>" : "") + optEx(x.ex, Lt) + "</div>";
       });
       h += "<div class='hint' style='margin:8px 2px'>Jawaban pemain: <b>" + (x.chosen || "—") + "</b> · Kunci: <b class='rn-s-ok'>" + x.ans + "</b> · Status: <b>" + st[0] + "</b> · Skor: <b>" + st[2] + "</b></div>";
-      h += "<div class='rn-row' style='justify-content:flex-start;margin:4px 0'><button class='btn s sm' data-ra='rv-bm' data-v2='" + rv.i + "' style='flex:none'>" + bmLabel(x.bm) + "</button></div>";
       h += rv.ex ? (x.expl ? "<div class='rn-ex'><b>Pembahasan</b><br>" + esc(x.expl) + "</div>" : "<div class='rn-ex no'>Pembahasan belum tersedia.</div>") : "<div class='rn-ex no'>Pembahasan dinonaktifkan untuk kategori ini.</div>";
       h += "</div><div class='rn-row'><button class='btn s' data-ra='rv-p' " + (pos <= 0 ? "disabled style='opacity:.4'" : "") + ">‹ Sebelumnya</button><div class='hint' style='flex:.4;text-align:center;align-self:center;margin:0'>" + (rv.i + 1) + "/" + rv.items.length + "</div><button class='btn s' data-ra='rv-n' " + (pos >= L.length - 1 ? "disabled style='opacity:.4'" : "") + ">Berikutnya ›</button></div>" +
         "";
@@ -947,7 +956,7 @@
       else if (a === "rv-bm") {
         var itb = rv && rv.items[+v]; if (!itb) return; b.disabled = true;
         var rb2 = await bmToggle(rv.sid, itb.idx, itb.bm, itb.qid); b.disabled = false;
-        if (rb2) { itb.bm = !!rb2.on; itb.qid = rb2.qid || itb.qid; b.textContent = bmLabel(itb.bm); }
+        if (rb2) { itb.bm = !!rb2.on; itb.qid = rb2.qid || itb.qid; b.textContent = itb.bm ? "★" : "☆"; b.classList.toggle("on", itb.bm); b.title = itb.bm ? "Tersimpan — ketuk untuk menghapus" : "Simpan soal ini"; }
       }
       else if (a === "sv-del") {
         var rd = await bmToggle(null, 0, true, +b.dataset.id); if (!rd) return;
@@ -958,6 +967,7 @@
       else if (a === "qz-next") quizNext();
       else if (a === "qz-hp") { if (b.dataset.dir) quizHist(+b.dataset.v2); else quizPrev(+b.dataset.v2); }
       else if (a === "qz-go") quizGo(+b.dataset.v2);
+      else if (a === "qz-star") quizStar(+b.dataset.v2);
       else if (a === "qz-hb") quizBack();
       else if (a === "qz-pause") quizPause();
       else if (a === "qz-resume") quizResume();
