@@ -68,6 +68,8 @@
     ".rg-foot{position:relative;flex:none;padding:6px 10px calc(8px + env(safe-area-inset-bottom,0px));display:flex;justify-content:center;align-items:center;gap:10px;min-height:54px;background:linear-gradient(#150e2c,#0f0a1f);border-top:1px solid rgba(245,192,74,.2);z-index:2}" +
     ".rg-ready{pointer-events:auto;padding:12px 18px;border-radius:999px;border:0;background:linear-gradient(135deg,#f5c04a,#e08a2e);color:#241a3f;font:700 14px Inter,sans-serif;cursor:pointer;box-shadow:0 6px 20px rgba(0,0,0,.4)}" +
     ".rg-ready.pulse{animation:rgp .6s infinite alternate}" +
+    ".rg-bm{pointer-events:auto;flex:none;width:30px;height:30px;padding:0;border-radius:9px;border:1px solid rgba(245,192,74,.5);background:rgba(20,12,44,.55);color:#f5c04a;font:400 17px/1 Inter,sans-serif;cursor:pointer}.rg-bm.on{background:rgba(245,192,74,.25)}.rg-bm.pend{border-style:dashed}.rg-bm[hidden]{display:none}" +
+    ":root[data-theme=\"light\"] .rg-bm{background:rgba(255,255,255,.9);color:#8a5a00;border-color:#b7791f}" +
     ".rg-lane{padding:8px 14px;border-radius:999px;font-weight:700;background:rgba(20,12,44,.78);border:2px solid #fff;color:#fff}" +
     ".rg-msg{position:absolute;left:0;right:0;top:38%;text-align:center;pointer-events:none;font:900 clamp(34px,10vw,64px) Cinzel,Georgia,serif;color:#fff;text-shadow:0 4px 24px rgba(0,0,0,.7)}" +
     ".rg-msg.pop{animation:rgpop .9s ease-out both}.rg-msg.pop.long{animation-duration:2.3s}.rg-msg.ok{color:#4ade80}.rg-msg.bad{color:#f87171}.rg-msg.blank{color:#cbd5e1}.rg-msg small.rg-key{color:#fde68a;font-size:18px;margin-top:8px}.rg-msg small.rg-key b{color:#4ade80;font-size:24px}.rg-msg small{display:block;font:600 15px Inter,sans-serif;margin-top:4px;color:#e9ddff}" +
@@ -132,7 +134,7 @@
     var root = el("div", "rg"); root.id = "rg";
     root.innerHTML = '<div class="rg-hud"><div class="rg-bar"><span class="rg-pill" id="rgN">Soal 1/1</span><div class="rg-prog"><i id="rgP"></i></div><span class="rg-pill ok" id="rgS" title="Skor akademik">✔ 0</span><span class="rg-pill en" id="rgE" title="Koin terkumpul (masuk leaderboard koin, terpisah dari skor)"><i class="rg-ci"></i>0</span>' +
       '<button class="rg-btn" id="rgSnd" aria-label="Suara">🔊</button><button class="rg-btn" id="rgPause" aria-label="Jeda">⏸</button></div>' +
-      '<div class="rg-card" id="rgCard"><div class="rg-tm" id="rgTm"><span class="rg-tmv" id="rgTv">60</span><div class="rg-tmb"><i id="rgTb"></i></div></div><div class="rg-q" id="rgQ"></div><div class="rg-imgs" id="rgI" hidden></div><ul class="rg-opts" id="rgO"></ul></div>' +
+      '<div class="rg-card" id="rgCard"><div class="rg-tm" id="rgTm"><span class="rg-tmv" id="rgTv">60</span><div class="rg-tmb"><i id="rgTb"></i></div><button class="rg-bm" id="rgBm" aria-label="Simpan soal" title="Tandai untuk disimpan ke Soal tersimpan">☆</button></div><div class="rg-q" id="rgQ"></div><div class="rg-imgs" id="rgI" hidden></div><ul class="rg-opts" id="rgO"></ul></div>' +
       '<button class="rg-tg" id="rgTg">Sembunyikan pilihan ▲</button></div>' +
       '<div class="rg-stage" id="rgStage"><canvas></canvas><div class="rg-flash"></div><div class="rg-msg" id="rgM"></div><div class="rg-tut" id="rgT" hidden></div></div>' +
       '<div class="rg-foot"><span class="rg-lane" id="rgL">Jalur C</span><button class="rg-ready" id="rgR">⏩ Siap menjawab</button></div>' +
@@ -525,7 +527,7 @@
       else return; e.preventDefault();
     }
     var tx = null, ty = null, sw = false;
-    function skip(t) { return t.closest && t.closest(".rg-hud,.rg-card,.rg-btn,.rg-ready,.rg-ov,.rg-tg,.rg-lb"); }
+    function skip(t) { return t.closest && t.closest(".rg-hud,.rg-card,.rg-btn,.rg-ready,.rg-bm,.rg-ov,.rg-tg,.rg-lb"); }
     function onTS(e) { if (skip(e.target)) { tx = null; return; } var t = e.touches[0]; tx = t.clientX; ty = t.clientY; sw = false; }
     function onTM(e) {
       if (tx == null || sw) return; var t = e.touches[0], dx = t.clientX - tx, dy = t.clientY - ty;
@@ -537,12 +539,13 @@
 
     /* ---------- alur soal ---------- */
     function showQuestion(i, rem) {
-      st.cur = i; st.phase = "q"; st.locked = false; st.gateSpawned = false; st.gate = null; st.lastSec = -1;
+      st.cur = i; st.bm = { idx: i, mark: false, answered: false, saved: false, qid: 0 }; bmUI(); st.phase = "q"; st.locked = false; st.gateSpawned = false; st.gate = null; st.lastSec = -1;
       st.remMs = TUT ? Infinity : Math.min(qTime, rem == null ? qTime : rem); st.qEnd = performance.now() + st.remMs;
       if (!laneOk(st.lane)) { for (var k = 0; k < LANES; k++) if (laneOk(k)) { st.lane = k; break; } }
       renderQ(); $("rgR").hidden = false; $("rgR").classList.toggle("pulse", TUT); setTimerUI();
       if (st.queuedGate) { st.queuedGate = false; spawnGates(); }
     }
+    function bmUI() { var b = $("rgBm"), m = st.bm; if (!b) return; if (!m || TUT || !host.bookmark) { b.hidden = true; return; } b.hidden = false; var on = m.answered ? m.saved : m.mark; b.textContent = on ? "★" : "☆"; b.classList.toggle("on", !!on); b.classList.toggle("pend", !!on && !m.answered); b.title = m.answered ? (m.saved ? "Tersimpan — ketuk untuk menghapus" : "Simpan soal ini") : on ? "Akan disimpan setelah soal dijawab" : "Tandai untuk disimpan (tersimpan setelah dijawab / waktu habis)"; }
     function feedback(r, letter) {
       var lane = letter ? LET.indexOf(letter) : st.lane, x = laneX(lane);
       var kn = ""; // kunci tidak ditulis; cukup pilihan soal diwarnai: benar = hijau, jawaban salah = merah
@@ -569,6 +572,10 @@
         host.toast && host.toast(r.j && r.j.err || "Sinkronisasi gagal"); return;
       }
       st.phase = "fb"; feedback(r.j, letter);
+      if (!TUT && host.bookmark && st.bm && st.bm.idx === idx) { // soal sudah dijawab / waktu habis → kunci terbuka, tanda simpan dikirim
+        var m0 = st.bm; m0.answered = true; bmUI();
+        if (m0.mark) { m0.mark = false; (async function () { var rr = null; try { rr = await host.bookmark(idx, false, 0); } catch (e) {} if (rr) { m0.saved = !!rr.on; m0.qid = rr.qid || 0; } if (st.bm === m0) bmUI(); })(); }
+      }
       if (r.j.done) { await sleep(FB_MS); if (!st.destroyed) finishGame(); return; }
       await sleep(FB_MS); if (st.destroyed) return;
       if (st.paused) { st.pendingNext = r.j; return; }
@@ -731,6 +738,12 @@
     try { tmo = new MutationObserver(function () { applyTheme(); }); tmo.observe(document.documentElement, { attributes: true, attributeFilter: ["data-theme"] }); } catch (e) {}
     try { if (window.ResizeObserver) { ro = new ResizeObserver(onResize); ro.observe($("rgStage")); } } catch (e) {}
     $("rgSnd").onclick = function () { ac(); toggleSnd(); }; $("rgPause").onclick = togglePause; $("rgR").onclick = callGate;
+    $("rgBm").onclick = async function () {
+      var m = st.bm; if (!m || TUT || !host.bookmark) return;
+      if (!m.answered) { m.mark = !m.mark; bmUI(); return; } // sebelum dijawab: hanya menandai
+      if (st.bmBusy) return; st.bmBusy = true; var r = null; try { r = await host.bookmark(m.idx, m.saved, m.qid); } catch (e) {} st.bmBusy = false;
+      if (r) { m.saved = !!r.on; m.qid = r.qid || m.qid; } if (st.bm === m) bmUI();
+    };
     $("rgTg").onclick = function () { root.classList.toggle("min"); $("rgTg").textContent = root.classList.contains("min") ? "Tampilkan pilihan ▼" : "Sembunyikan pilihan ▲"; fitHud(); };
     $("rgI").onclick = function (e) { var t = e.target; if (!t || t.tagName !== "IMG") return; var lb = el("div", "rg-lb"), im = el("img"); im.src = t.src; lb.appendChild(im); lb.onclick = function () { lb.remove(); }; root.appendChild(lb); };
     window.addEventListener("keydown", onKey); window.addEventListener("resize", onResize); document.addEventListener("visibilitychange", onVis);
