@@ -527,8 +527,8 @@
     h += "</div>" +
       "<div class='ex-nums'>" + E.qs.map(function (x, i) { return "<button class='" + (E.ans[i] ? "ans " : "") + (E.flag[i] ? "flg " : "") + (i === E.cur ? "cur" : "") + "' data-ex-go='" + i + "'>" + (i + 1) + "</button>"; }).join("") + "</div>" +
       "<div class='rn-row'><button class='btn s' data-ex-nav='-1'" + (E.cur <= 0 ? " disabled" : "") + ">‹ Sebelumnya</button>" +
-      "<button class='btn s' data-ex-nav='1'" + (E.cur >= E.total - 1 ? " disabled" : "") + ">Berikutnya ›</button></div>" +
-      "<div class='rn-row'><button class='btn' data-ex-submit style='flex:1'>📤 Kumpulkan ujian</button><a class='btn s' href='#/run'>✕ Keluar</a></div>" +
+      (E.cur >= E.total - 1 ? "" : "<button class='btn s' data-ex-nav='1'>Berikutnya ›</button>") + "</div>" +
+      "<div class='rn-row'><a class='btn s' href='#/run'>✕ Keluar</a><button class='btn' data-ex-submit style='flex:1'>📤 Kumpulkan ujian</button></div>" +
       "<div class='hint' style='text-align:center;margin-top:8px'>Jawaban tersimpan otomatis. Kunci & pembahasan hanya muncul setelah ujian dikumpulkan.</div></div>";
     setRR(h); window.scrollTo(0, 0); examBindNav();
     var rem = E.dl - performance.now(), el = g("exT"); if (el) { el.textContent = "⏱ " + fdur(Math.max(0, rem)); el.className = "rn-qt" + (rem < 60000 ? " low" : ""); }
