@@ -451,6 +451,7 @@ select.in option{background:#241a3f;color:#fff}
 
 <script src="mahasiswa.js"></script>
 <script src="run.js"></script>
+<script src="farmako.js"></script>
 <script src="profil.js"></script>
 <script>
 var $=function(i){return document.getElementById(i)};
@@ -1326,7 +1327,7 @@ function cards(items){return items.map(function(c){return "<a class='card g' hre
 /* ---------- pengaturan menu / navbar / kategori (admin) ---------- */
 var UI_DEF={
   nav:[{id:"home",n:"Beranda",i:"🏠"},{id:"materi",n:"Materi",i:"📚"},{id:"rekaman",n:"Rekaman",i:"🎬"},{id:"jadwal",n:"Jadwal",i:"🗓️"},{id:"tutor",n:"Tutor",i:"👥"},{id:"run",n:"Kuis",i:"🏃"},{id:"dokter",n:"Dokter",i:"📞"}],
-  menu:[{id:"materi",n:"Materi & Rangkuman",i:"📚",s:"Per blok, lab, dan Google Drive"},{id:"rekaman",n:"Rekaman Kuliah",i:"🎬",s:"Putar langsung per tahun"},{id:"jadwal",n:"Jadwal Kuliah",i:"🗓️",s:"Terhubung ke spreadsheet"},{id:"tutor",n:"Jadwal Tutorial",i:"👥",s:"Kelompok, tutor & ruang · konfirmasi WA ke tutor"},{id:"run",n:"GAME KUIS",i:"🏃",s:"3 mode: game 3D, mode soal & simulasi ujian"},{id:"dokter",n:"Kontak Dokter",i:"📞",s:"Nomor HP dosen & dokter · bisa usul ubah/tambah"}],
+  menu:[{id:"materi",n:"Materi & Rangkuman",i:"📚",s:"Per blok, lab, dan Google Drive"},{id:"rekaman",n:"Rekaman Kuliah",i:"🎬",s:"Putar langsung per tahun"},{id:"jadwal",n:"Jadwal Kuliah",i:"🗓️",s:"Terhubung ke spreadsheet"},{id:"tutor",n:"Jadwal Tutorial",i:"👥",s:"Kelompok, tutor & ruang · konfirmasi WA ke tutor"},{id:"run",n:"GAME KUIS",i:"🏃",s:"3 mode: game 3D, mode soal & simulasi ujian"},{id:"farmako",n:"Pharmacology Session",i:"💊",s:"Materi, pustaka obat, interaksi & permainan farmakologi"},{id:"dokter",n:"Kontak Dokter",i:"📞",s:"Nomor HP dosen & dokter · bisa usul ubah/tambah"}],
   mp:[{id:"blok",n:"PILIH BLOK",i:"📘"},{id:"drive",n:"DRIVE",i:"🗂️",c:"Google Drive Materi"}],
   cm:[{id:"all",n:"Seluruh Blok",i:"📖"},{id:"lab",n:"Lab",i:"🔬"}],
   cr:[{id:"kl",n:"Kuliah Lain",i:"📝"},{id:"blok",n:"Blok",i:"🧠"},{id:"lab",n:"Lab",i:"🔬"}]
@@ -1381,7 +1382,7 @@ function pHome(){
   "<p class='hint' style='text-align:center;font-size:14px'>Halo, <b>"+esc(myName())+"</b> 👋<br>Seluruh rekaman, rangkuman, soal, dan materi kuliah ada disini, semangat belajarnya 🤩✨</p>"+
   "<div id='cd'></div><div class='sec'>HARI INI</div><div id='today'>"+skel(2)+"</div><div id='next'></div>"+
   "<div class='sec'>MENU</div>"+cards(uiList("menu").filter(function(x){return !x.h}).map(function(x){return["#/"+x.id,x.i,x.n,x.s]}))+
-  (S.admin?"<div class='sec'>ADMIN</div>"+cards([["#/atur","🧭","Atur Menu, Navbar & Kategori","Ubah urutan, nama, dan ikon"],["#/run/admin","🛠️","Kelola GAME KUIS","Kategori · soal & PDF · leaderboard"],["#/dokter/admin","📋","Pengajuan Dokter","Cek, edit, lalu setujui usulan"],["#/akun","👥","Status Akun Mahasiswa","Siapa yang online, sudah buka web & ganti password"]])+"<div class='pn g'><b>Reset password mahasiswa</b><div class='hint'>Mengembalikan password ke username (mahasiswa wajib membuat password baru saat login).</div><input id='rU' class='in' placeholder='G0025001'><button class='btn' data-a='reset'>Reset</button></div>":"")}
+  (S.admin?"<div class='sec'>ADMIN</div>"+cards([["#/atur","🧭","Atur Menu, Navbar & Kategori","Ubah urutan, nama, dan ikon"],["#/run/admin","🛠️","Kelola GAME KUIS","Kategori · soal & PDF · leaderboard"],["#/farmako/admin","💊","Kelola Pharmacology Session","Obat · kategori · materi · interaksi · impor data"],["#/dokter/admin","📋","Pengajuan Dokter","Cek, edit, lalu setujui usulan"],["#/akun","👥","Status Akun Mahasiswa","Siapa yang online, sudah buka web & ganti password"]])+"<div class='pn g'><b>Reset password mahasiswa</b><div class='hint'>Mengembalikan password ke username (mahasiswa wajib membuat password baru saat login).</div><input id='rU' class='in' placeholder='G0025001'><button class='btn' data-a='reset'>Reset</button></div>":"")}
 function skel(n){n=n||3;var h="";for(var i=0;i<n;i++)h+="<div class='sk skc'></div>";return h}
 function jkt(){return new Date().toLocaleDateString("en-CA",{timeZone:"Asia/Jakarta"})}
 function pickTab(tabs){return tabs[Math.min(S.def||0,tabs.length-1)]||tabs[0]}
@@ -1873,7 +1874,7 @@ $("main").addEventListener("click",function(e){var b=e.target.closest("[data-ak]
 $("main").addEventListener("input",function(e){if(e.target.id!=="akQ")return;S.akq=e.target.value;akDraw()});
 
 /* ---------- router ---------- */
-var TT={atur:"ATUR MENU",home:"ASTERION",materi:"MATERI & RANGKUMAN",rekaman:"REKAMAN KULIAH",jadwal:"JADWAL KULIAH",tutor:"JADWAL TUTORIAL",run:"GAME KUIS",dokter:"KONTAK DOKTER",akun:"STATUS AKUN",profil:"PROFIL & PROGRES"};
+var TT={atur:"ATUR MENU",home:"ASTERION",materi:"MATERI & RANGKUMAN",rekaman:"REKAMAN KULIAH",jadwal:"JADWAL KULIAH",tutor:"JADWAL TUTORIAL",run:"GAME KUIS",farmako:"FARMAKOLOGI",dokter:"KONTAK DOKTER",akun:"STATUS AKUN",profil:"PROFIL & PROGRES"};
 /* ---------- PENCARIAN: Materi, Rekaman, Jadwal (sampai ke dalam folder / playlist / tab lain) ---------- */
 var SQ={net:{},run:{},jc:{},jq:0};
 function sqNorm(s){var t=String(s==null?"":s).toLowerCase();try{t=t.normalize("NFD").replace(/[\u0300-\u036f]/g,"")}catch(e){}return t}
@@ -1987,7 +1988,7 @@ $("main").addEventListener("click",function(e){var b=e.target.closest&&e.target.
 function route(){
   if(!S.data)return;
   var P=location.hash.replace(/^#\/?/,"").split("/").filter(Boolean),tab=P[0]||"home",v;
-  if(tab==="materi")v=pMateri(P);else if(tab==="rekaman")v=pRekaman(P);else if(tab==="jadwal")v=pJadwal(P);else if(tab==="tutor")v=pTutor(P);else if(tab==="run"&&window.pRun)v=window.pRun(P);else if(tab==="dokter")v=pDokter(P);else if(tab==="atur")v=pAtur();else if(tab==="akun")v=pAkun();else if(tab==="profil"&&window.pProfil)v=window.pProfil(P);else{tab="home";v=pHome()}
+  if(tab==="materi")v=pMateri(P);else if(tab==="rekaman")v=pRekaman(P);else if(tab==="jadwal")v=pJadwal(P);else if(tab==="tutor")v=pTutor(P);else if(tab==="run"&&window.pRun)v=window.pRun(P);else if(tab==="farmako"&&window.pFarmako)v=window.pFarmako(P);else if(tab==="dokter")v=pDokter(P);else if(tab==="atur")v=pAtur();else if(tab==="akun")v=pAkun();else if(tab==="profil"&&window.pProfil)v=window.pProfil(P);else{tab="home";v=pHome()}
   document.body.dataset.r=tab;renderNav();$("main").innerHTML=v;$("ttl").textContent=(tab!=="home"&&tab!=="atur"&&uiName(tab)?uiName(tab).toUpperCase():TT[tab]);
   $("back").hidden=P.length<2;$("back").href="#/"+P.slice(0,-1).join("/");
   [].forEach.call(document.querySelectorAll(".nav a"),function(a){a.classList.toggle("on",a.dataset.t===tab)});
