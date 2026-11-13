@@ -54,6 +54,7 @@
     ".fm-q{font-size:16px;line-height:1.55;margin:10px 0 14px;overflow-wrap:anywhere}.fm-op{display:flex;gap:10px;align-items:flex-start;width:100%;text-align:left;color:inherit;cursor:pointer;font:inherit;font-size:14px;line-height:1.45;margin-bottom:8px;padding:12px;border-radius:14px;border:1px solid var(--line);background:rgba(128,128,160,.1)}.fm-op:hover:not(:disabled){border-color:var(--gold)}.fm-op b{flex:none;width:24px;height:24px;border-radius:50%;background:rgba(245,192,74,.25);display:flex;align-items:center;justify-content:center;font-size:12px}.fm-op:disabled{cursor:default}.fm-op.ok{border-color:var(--ok);background:rgba(74,222,128,.16)}.fm-op.no{border-color:var(--bad);background:rgba(248,113,113,.16)}" +
     ".fm-ex{margin-top:10px;padding:10px 12px;border-radius:12px;background:rgba(245,192,74,.1);border:1px solid rgba(245,192,74,.35);font-size:13px;line-height:1.5;white-space:pre-line;overflow-wrap:anywhere}.fm-tm{height:6px;border-radius:99px;background:rgba(128,128,160,.25);overflow:hidden}.fm-tm i{display:block;height:100%;width:100%;background:var(--gold);transform-origin:left}.fm-big{text-align:center;padding:22px 10px}.fm-big .sc{font:900 54px Cinzel,serif;color:var(--gold)}" +
     ".fm-cmp th:first-child,.fm-cmp td:first-child{color:var(--gold);font-weight:600;width:28%}.fm-cmp td{font-size:12.5px;line-height:1.5;white-space:pre-line}.fm-star{cursor:pointer;border:0;background:none;font-size:20px;color:var(--gold);padding:2px 6px}.fm-mc{display:flex;align-items:center;gap:10px;padding:12px 14px;border-radius:16px;margin-bottom:8px;color:inherit;text-decoration:none}.fm-mc .ck{flex:none;width:22px;height:22px;border-radius:50%;border:2px solid var(--line);display:flex;align-items:center;justify-content:center;font-size:12px}.fm-mc.done .ck{background:var(--ok);border-color:var(--ok);color:#06240f}.fm-mc.dis{opacity:.5;pointer-events:none}" +
+    ".fm-tbar{display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding:8px 12px;border-radius:14px;margin:8px 0 4px}.fm-trb{display:inline-block;font:600 10px Inter,sans-serif;color:var(--mut);margin-left:6px;vertical-align:middle}" +
     ".fm-sel{display:flex;gap:10px;align-items:flex-start;padding:12px 14px;border-radius:16px;margin-bottom:8px;cursor:pointer}.fm-sel input{width:auto;margin-top:3px}.fm-sel.on{box-shadow:0 0 0 2px var(--gold)}";
   (function () { var s = document.createElement("style"); s.textContent = CSS; document.head.appendChild(s); })();
 
@@ -125,6 +126,7 @@
       if (s === "interaksi") return await checker(k, (P[2] || "").split(",").map(Number).filter(Boolean));
       if (s === "game") return await gameRoute(P, k);
       if (s === "tersimpan") return await savedPage(k);
+      if (s === "usul") return await usulPage(k);
       if (s === "admin") { if (!S.admin) { location.hash = "#/farmako"; return; } return await loadAdmin(P, k); }
       location.hash = "#/farmako";
     } catch (e) { if (e !== 0 && alive(k)) setF("<div class='pn g empty'>Terjadi kesalahan: " + esc(e.message || e) + "</div>"); }
@@ -138,9 +140,52 @@
   }
   var bigCard = function (href, ico, t, sub) { return "<a class='card g' href='" + href + "'><span class='i'>" + ico + "</span><span class='t'>" + esc(t) + "<small>" + esc(sub) + "</small></span><span class='a'>›</span></a>"; };
   var back = function (href, t) { return "<div class='fm-row' style='margin-top:12px'><a class='btn s' href='" + href + "'>" + esc(t) + "</a></div>"; };
+  var usulLink = "<div class='fm-row' style='margin-top:10px'><a class='btn s' href='#/farmako/usul'>➕ Usulkan obat yang belum ada</a></div>";
   var emptyNote = function () { return "<div class='pn g empty'>Belum ada data farmakologi yang dipublikasikan.<br><small>" + (S.admin ? "Impor data dari DrugBank, DDInter, KEGG DRUG, PubChem, atau RxNorm di <a style='color:var(--gold)' href='#/farmako/admin/impor'>Panel Admin</a>, lalu verifikasi dan publikasikan." : "Admin perlu mengimpor, memverifikasi, dan mempublikasikan data terlebih dahulu.") + "</small></div>"; };
 
-  /* ======================= BERANDA ======================= */
+  /* ======================= TERJEMAHAN (Indonesia) =======================
+     Elemen [data-tr="fact:ID:value"] / [data-tr="inter:ID:mechanism"]. Terjemahan mesin selalu berlabel; teks asli bisa dilihat kembali. */
+  var TR = { lang: (function () { try { return localStorage.getItem("fm_lang") || "id"; } catch (e) { return "id"; } })(), map: {}, need: [], busy: 0, provider: true };
+  var trBar = function () { return "<div class='fm-tbar g'><span>🌐 Bahasa isi:</span><button class='chip g" + (TR.lang === "id" ? " on" : "") + "' data-lang='id'>Indonesia</button><button class='chip g" + (TR.lang === "en" ? " on" : "") + "' data-lang='en'>Asli</button><span id='fmTrSt' class='hint' style='margin:0;flex:1;min-width:120px'></span></div><div class='hint' style='margin:0 0 8px'>Terjemahan dibuat mesin dan bisa keliru; teks asli (Inggris) tetap rujukan.</div>"; };
+  var trSpan = function (ent, id, field, text) { return text ? "<span data-tr='" + ent + ":" + id + ":" + field + "'>" + esc(text) + "</span>" : ""; };
+  var trSt = function (t) { var e = g("fmTrSt"); if (e) e.textContent = t; };
+  function trPaint() {
+    [].forEach.call(document.querySelectorAll("#fm [data-tr]"), function (e) {
+      if (e._o == null) e._o = e.textContent;
+      var m = TR.map[e.dataset.tr], on = TR.lang === "id" && m && m.text && m.status !== "id";
+      e.textContent = on ? m.text : e._o;
+      if (on) { var b = document.createElement("span"); b.className = "fm-trb"; b.textContent = m.status === "verified" ? "✔ terjemahan terverifikasi" : "🌐 terjemahan mesin"; e.appendChild(b); }
+    });
+  }
+  async function trApply(k) {
+    var els = [].slice.call(document.querySelectorAll("#fm [data-tr]")); if (!els.length) return; trPaint();
+    var keys = []; els.forEach(function (e) { if (keys.indexOf(e.dataset.tr) < 0) keys.push(e.dataset.tr); });
+    var items = keys.map(function (x) { var p = x.split(":"); return { ent: p[0], ref: +p[1], field: p[2] }; });
+    var r = await fapi("tr/get", { m: "POST", b: { items: items } }); if (!alive(k) || !r.ok) return;
+    Object.keys(r.j.map).forEach(function (x) { TR.map[x] = r.j.map[x]; }); TR.need = r.j.need.slice(); TR.provider = r.j.provider; trPaint(); await trRun(k);
+  }
+  async function trRun(k) {
+    if (TR.lang !== "id" || !TR.need.length) return;
+    if (!TR.provider) return trSt("Terjemahan belum diaktifkan oleh admin — menampilkan teks asli.");
+    if (TR.busy) return; TR.busy = 1; var total = TR.need.length, n = 0;
+    try {
+      while (TR.need.length && TR.lang === "id" && alive(k)) {
+        var key = TR.need[0], p = key.split(":"); trSt("🌐 Menerjemahkan " + (n + 1) + "/" + total + "…");
+        var r = await fapi("tr/do", { m: "POST", b: { ent: p[0], ref: +p[1], field: p[2] } });
+        if (!r.ok) { trSt((r.j && r.j.err) || "Terjemahan gagal — menampilkan teks asli."); break; }
+        TR.map[key] = { text: r.j.text, status: r.j.status }; TR.need.shift(); n++; trPaint();
+      }
+      if (!TR.need.length) trSt("✓ Terjemahan selesai");
+    } finally { TR.busy = 0; }
+  }
+  document.addEventListener("click", function (e) {
+    var b = e.target.closest && e.target.closest("[data-lang]"); if (!b || !g("fm")) return;
+    TR.lang = b.dataset.lang; try { localStorage.setItem("fm_lang", TR.lang); } catch (er) { }
+    [].forEach.call(document.querySelectorAll("[data-lang]"), function (x) { x.classList.toggle("on", x.dataset.lang === TR.lang); });
+    trPaint(); if (TR.lang === "id") trRun(F.route); else trSt("");
+  });
+
+  /* ======================= BERANDA =======================
   async function home(k) {
     var r = await fapi("home"); if (!alive(k)) return; if (!r.ok) return setF("<div class='pn g empty'>" + esc((r.j && r.j.err) || "Gagal memuat") + "</div>");
     var j = r.j, c = j.counts, pct = j.progress.total ? Math.round(j.progress.done * 100 / j.progress.total) : 0;
@@ -152,7 +197,7 @@
     if (j.recent.length) h += "<div class='sec'>TERAKHIR DIBUKA</div>" + j.recent.map(function (x) { return "<a class='fm-card g' href='" + hrefOf(x) + "'><div class='fm-top'><div><b>" + (x.t === "drug" ? "💊 " : "📖 ") + esc(x.name) + "</b>" + (x.sub ? "<small>" + esc(x.sub) + "</small>" : "") + "</div></div></a>"; }).join("");
     if (j.saved.length) h += "<div class='sec'>OBAT TERSIMPAN</div><div class='fm-chips'>" + j.saved.map(function (x) { return "<a class='chip g' href='#/farmako/obat/" + x.id + "'>💊 " + esc(x.name) + "</a>"; }).join("") + "</div>";
     if (j.topCats.length) h += "<div class='sec'>KATEGORI</div><div class='fm-chips'>" + j.topCats.map(function (x) { return "<a class='chip g' href='#/farmako/belajar/" + x.id + "'>" + esc(x.name) + " (" + x.drugs + ")</a>"; }).join("") + "</div>";
-    h += "<div class='sec'>AKSES CEPAT</div><div class='fm-row'><a class='btn' href='#/farmako/interaksi'>⚠️ Cek interaksi</a><a class='btn' href='#/farmako/game'>🎮 Main game</a></div>" + DISC;
+    h += "<div class='sec'>AKSES CEPAT</div><div class='fm-row'><a class='btn' href='#/farmako/interaksi'>⚠️ Cek interaksi</a><a class='btn' href='#/farmako/game'>🎮 Main game</a><a class='btn s' href='#/farmako/usul'>➕ Usulkan obat</a></div>" + DISC;
     if (S.admin) h += "<div class='fm-row'><a class='btn s' href='#/farmako/admin'>🛠️ Panel Admin Farmakologi</a></div>";
     setF(h);
   }
@@ -226,7 +271,7 @@
     h += j.rows.map(function (d) { var on = F.cmp.indexOf(d.id) >= 0; return "<div class='fm-card g'><div class='fm-top'><a style='flex:1;min-width:0;color:inherit;text-decoration:none' href='#/farmako/obat/" + d.id + "'><b>💊 " + esc(d.generic) + "</b><small>" + esc(d.pharm_class || "Golongan belum tersedia") + (d.brands.length ? " · " + esc(d.brands.join(", ")) : "") + (d.summary ? "<br>" + esc(d.summary) : "") + "</small></a><button class='chip g" + (on ? " on" : "") + "' data-cmp='" + d.id + "' title='Pilih untuk dibandingkan'>⇄</button></div></div>"; }).join("");
     var pages = Math.ceil(j.total / 40); if (pages > 1) h += "<div class='fm-row'><button class='btn s' data-lp='-1'" + (LIB.pg ? "" : " disabled") + ">‹ Sebelumnya</button><span class='hint' style='text-align:center;align-self:center;margin:0'>Halaman " + (LIB.pg + 1) + " / " + pages + "</span><button class='btn s' data-lp='1'" + (LIB.pg + 1 < pages ? "" : " disabled") + ">Berikutnya ›</button></div>";
     if (F.cmp.length) h += "<div class='fm-bar g'><span class='t'>⇄ " + F.cmp.length + "/2 obat dipilih untuk dibandingkan</span>" + (F.cmp.length === 2 ? "<a class='btn' href='#/farmako/banding/" + F.cmp[0] + "/" + F.cmp[1] + "'>Bandingkan</a>" : "") + "<button class='btn s' data-cmpx='1'>Kosongkan</button></div>";
-    g("fmLib").innerHTML = h + back("#/farmako", "‹ Pharmacology Session");
+    g("fmLib").innerHTML = h + usulLink + back("#/farmako", "‹ Pharmacology Session");
   }
   document.addEventListener("change", function (e) {
     if (!g("fmLib")) return; var t = e.target;
@@ -249,7 +294,7 @@
     return keys.map(function (f) {
       var v = facts.filter(function (x) { return x.field === f; });
       if (!v.length && !required.includes(f)) return "";
-      return "<div class='fm-fact'><div class='fm-fh'>" + esc(F.meta.fields[f] || f) + "</div>" + (v.length ? v.map(function (x) { return "<div>" + srcTag(x.src, x.sid) + "<span class='hint' style='margin:0'>diperbarui " + fdate(x.updated) + "</span></div><div class='fm-v'>" + esc(x.value) + "</div>"; }).join("<div style='height:6px'></div>") : NA) + "</div>";
+      return "<div class='fm-fact'><div class='fm-fh'>" + esc(F.meta.fields[f] || f) + "</div>" + (v.length ? v.map(function (x) { return "<div>" + srcTag(x.src, x.sid) + "<span class='hint' style='margin:0'>diperbarui " + fdate(x.updated) + "</span></div><div class='fm-v' data-tr='fact:" + x.id + ":value'>" + esc(x.value) + "</div>"; }).join("<div style='height:6px'></div>") : NA) + "</div>";
     }).join("");
   }
   async function drugPage(id, k) {
@@ -257,12 +302,12 @@
     var j = r.j, d = j.drug, br = j.names.filter(function (n) { return n.kind === "brand"; }), sy = j.names.filter(function (n) { return n.kind === "synonym"; });
     var uq = function (a) { var s = {}; return a.filter(function (n) { var k2 = n.name.toLowerCase(); if (s[k2]) return false; s[k2] = 1; return true; }); };
     var h = "<div class='fm-x'><h2 style='margin:0;flex:1;font-size:22px'>💊 " + esc(d.generic) + "</h2><button class='fm-star' data-fb='drug:" + d.id + "' aria-label='Simpan obat'>" + (j.bookmarked ? "★" : "☆") + "</button></div><div style='margin:4px 0 8px'>" + stTag(d.status) + " <span class='tag'>Diperbarui " + fdate(d.updated) + "</span></div>";
-    h += "<div class='fm-row'><a class='btn s' href='#/farmako/interaksi/" + d.id + "'>⚠️ Cek interaksi</a><button class='btn s' data-cmp1='" + d.id + "'>⇄ Bandingkan</button></div>";
+    h += "<div class='fm-row'><a class='btn s' href='#/farmako/interaksi/" + d.id + "'>⚠️ Cek interaksi</a><button class='btn s' data-cmp1='" + d.id + "'>⇄ Bandingkan</button></div>" + trBar();
     h += "<div class='fm-sec g'><h3>A. Informasi Dasar</h3><div class='fm-kv'><b>Nama generik</b><div>" + esc(d.generic) + "</div><b>Nama dagang</b><div>" + (br.length ? uq(br).map(function (n) { return esc(n.name); }).join(", ") : NA) + "</div>" + (sy.length ? "<b>Sinonim</b><div>" + uq(sy).map(function (n) { return esc(n.name); }).join(", ") + "</div>" : "") + "<b>Golongan farmakologis</b><div>" + (esc(d.pharm_class) || NA) + "</div><b>Golongan terapeutik</b><div>" + (esc(d.ther_class) || NA) + "</div><b>Klasifikasi</b><div>" + (esc(d.classification) || NA) + "</div>" + (j.cats.length ? "<b>Kategori</b><div>" + j.cats.map(function (c) { return "<a class='tag' style='text-decoration:none;margin:0 4px 4px 0;display:inline-block' href='#/farmako/belajar/" + c.id + "'>" + esc(c.name) + "</a>"; }).join("") + "</div>" : "") + "<b>Identitas di database</b><div>" + (j.xref.length ? j.xref.map(function (x) { return srcTag(x.src, x.sid); }).join("") : NA) + "</div></div></div>";
     h += GRP.map(function (gr, gi) { var req = gi === 0 ? ["moa", "targets", "pk"] : ["indications", "contraindications", "adverse"]; return "<div class='fm-sec g'><h3>" + (gi ? "C. " : "B. ") + gr[0] + "</h3>" + (factsHtml(j.facts, gr[1], req) || NA) + (gi === 1 ? "<div class='fm-fact'><div class='fm-fh'>Interaksi Obat</div>" + (j.interactions ? "<span class='tag warn'>" + j.interactions + " data interaksi terpublikasi</span> <a style='color:var(--gold)' href='#/farmako/interaksi/" + d.id + "'>Periksa kombinasi ›</a>" : NA) + "</div>" : "") + "</div>"; }).join("");
     var extra = factsHtml(j.facts, ["notes", "physchem"], []);
     h += "<div class='fm-sec g'><h3>D. Informasi Tambahan</h3>" + (extra || "") + "<div class='fm-fact'><div class='fm-fh'>Obat dalam golongan yang sama</div>" + (j.same.length ? j.same.map(function (x) { return "<a class='chip g' style='display:inline-block;margin:2px' href='#/farmako/obat/" + x.id + "'>" + esc(x.generic) + "</a>"; }).join("") : NA) + "</div><div class='fm-fact'><div class='fm-fh'>Obat dengan mekanisme serupa</div>" + (j.similar.length ? j.similar.map(function (x) { return "<a class='chip g' style='display:inline-block;margin:2px' href='#/farmako/obat/" + x.id + "'>" + esc(x.generic) + "</a>"; }).join("") : NA) + "</div>" + (j.related.length ? "<div class='fm-fact'><div class='fm-fh'>Obat terkait (kategori sama)</div>" + j.related.map(function (x) { return "<a class='chip g' style='display:inline-block;margin:2px' href='#/farmako/obat/" + x.id + "'>" + esc(x.generic) + "</a>"; }).join("") + "</div>" : "") + "<div class='fm-fact'><div class='fm-fh'>Sumber database</div>" + (j.xref.length ? j.xref.map(function (x) { return srcTag(x.src, x.sid) + "<span class='hint' style='margin:0'>sinkron " + fdate(x.synced) + "</span> "; }).join("<br>") : srcTag("manual")) + "</div></div>" + DISC;
-    setF(h + back("#/farmako/obat", "‹ Pustaka Obat"));
+    setF(h + back("#/farmako/obat", "‹ Pustaka Obat")); trApply(k);
   }
   document.addEventListener("click", function (e) { var b = e.target.closest && e.target.closest("[data-cmp1]"); if (!b || !g("fm")) return; var id = +b.dataset.cmp1; if (F.cmp.indexOf(id) < 0) { if (F.cmp.length >= 2) F.cmp.shift(); F.cmp.push(id); } if (F.cmp.length === 2) location.hash = "#/farmako/banding/" + F.cmp[0] + "/" + F.cmp[1]; else { toast("Dipilih ✓ — pilih obat kedua di Pustaka Obat"); location.hash = "#/farmako/obat"; } });
   async function comparePage(a, b, k) {
@@ -295,7 +340,7 @@
     res.innerHTML = skel(2); var r = await fapi("interact", { m: "POST", b: { ids: CK.picks.map(function (p) { return p.id; }) } }); if (!g("fmRes")) return;
     if (!r.ok) { res.innerHTML = "<div class='pn g empty'>" + esc((r.j && r.j.err) || "Gagal memeriksa") + "</div>"; return; }
     var j = r.j, h = "", item = function (i) {
-      return "<div class='fm-ib'><div class='fm-x'>" + sevTag(i.severity) + srcTag(i.src, i.sid) + (i.verified_at ? "<span class='tag'>Diverifikasi " + fdate(i.verified_at) + "</span>" : "") + "</div><div class='fm-kv' style='margin-top:8px'>" + (i.subject ? "<b>Keterangan</b><div>" + esc(i.subject) + "</div>" : "") + "<b>Tingkat keparahan</b><div>" + esc(i.severity || "Unknown") + " <span class='hint' style='margin:0'>(label asli " + esc(srcName(i.src)) + ")</span></div><b>Mekanisme interaksi</b><div>" + (esc(i.mechanism) || NA) + "</div><b>Dampak klinis</b><div>" + (esc(i.effect) || NA) + "</div><b>Rekomendasi pengelolaan</b><div>" + (esc(i.management) || NA) + "</div><b>Bukti pendukung</b><div>" + (esc(i.evidence) || NA) + "</div></div></div>";
+      return "<div class='fm-ib'><div class='fm-x'>" + sevTag(i.severity) + srcTag(i.src, i.sid) + (i.verified_at ? "<span class='tag'>Diverifikasi " + fdate(i.verified_at) + "</span>" : "") + "</div><div class='fm-kv' style='margin-top:8px'>" + (i.subject ? "<b>Keterangan</b><div>" + esc(i.subject) + "</div>" : "") + "<b>Tingkat keparahan</b><div>" + esc(i.severity || "Unknown") + " <span class='hint' style='margin:0'>(label asli " + esc(srcName(i.src)) + ")</span></div><b>Mekanisme interaksi</b><div>" + (trSpan("inter", i.id, "mechanism", i.mechanism) || NA) + "</div><b>Dampak klinis</b><div>" + (trSpan("inter", i.id, "effect", i.effect) || NA) + "</div><b>Rekomendasi pengelolaan</b><div>" + (trSpan("inter", i.id, "management", i.management) || NA) + "</div><b>Bukti pendukung</b><div>" + (trSpan("inter", i.id, "evidence", i.evidence) || NA) + "</div></div></div>";
     };
     if (j.missing && j.missing.length) h += "<div class='fm-warn'>Sebagian obat tidak ditemukan atau belum dipublikasikan dan dilewati.</div>";
     if (j.drugs.length < 2) h += "<div class='fm-warn'>Butuh minimal dua obat terpublikasi untuk pemeriksaan pasangan.</div>";
@@ -307,8 +352,8 @@
     var lab = { food: "Drug-Food Interaction", disease: "Drug-Disease Interaction", alcohol: "Drug-Alcohol Interaction" };
     Object.keys(j.other).forEach(function (t) { if (j.other[t].length) h += "<div class='sec'>" + lab[t].toUpperCase() + "</div>" + j.other[t].map(function (i) { return "<div class='fm-pair g " + sevCls(i.severity) + "'><h4>" + esc(i.drug) + " <span class='tag'>" + lab[t] + "</span></h4>" + item(i) + "</div>"; }).join(""); });
     var srcs = {}; j.pairs.forEach(function (p) { p.items.forEach(function (i) { srcs[i.src] = 1; }); }); j.combos.concat(j.other.food, j.other.disease, j.other.alcohol).forEach(function (i) { srcs[i.src] = 1; });
-    h += "<div class='fm-disc'><b>Keterbatasan:</b> hasil mencakup " + (Object.keys(srcs).length ? "sumber: " + Object.keys(srcs).map(srcName).join(", ") : "data terpublikasi (tidak ada kecocokan sumber)") + ". Klasifikasi keparahan ditampilkan apa adanya dari tiap sumber dan tidak dipetakan ulang; bila beberapa sumber berbeda, semuanya ditampilkan. Pemeriksaan: " + fdate(j.at) + ".</div>" + DISC;
-    res.innerHTML = h;
+    h += "<div class='fm-disc'><b>Keterbatasan:</b> hasil mencakup " + (Object.keys(srcs).length ? "sumber: " + Object.keys(srcs).map(srcName).join(", ") : "data terpublikasi (tidak ada kecocokan sumber)") + ". " + (srcs.ddinter ? "Data DDInter 2.0 © Computational Biology &amp; Drug Design Group, lisensi CC BY-NC-SA 4.0 (khusus non-komersial). " : "") + "Klasifikasi keparahan ditampilkan apa adanya dari tiap sumber dan tidak dipetakan ulang; bila beberapa sumber berbeda, semuanya ditampilkan. Pemeriksaan: " + fdate(j.at) + ".</div>" + DISC;
+    res.innerHTML = trBar() + h; trApply(F.route);
   }
 
   /* ======================= PERMAINAN ======================= */
@@ -391,6 +436,22 @@
     var r = await fapi("game/history"); if (!alive(k)) return; var j = r.j || { rows: [], best: 0 };
     setF("<h2 style='font-size:18px'>🕘 Riwayat Permainan</h2>" + (j.rows.length ? "<div class='hint'>Skor tertinggi: <b>" + (j.best || 0) + "</b></div>" + j.rows.map(function (x) { return "<a class='fm-card g' href='#/farmako/game/hasil/" + esc(x.id) + "'><div class='fm-top'><div><b>" + esc((F.meta.modes[x.mode] || {}).n || x.mode) + " · " + esc((F.meta.diffs[x.diff] || {}).n || x.diff) + "</b><small>" + fdate(x.fin) + " · " + x.correct + "/" + x.total + " benar · skor " + x.score + "</small></div><span style='color:var(--gold)'>›</span></div></a>"; }).join("") : "<div class='pn g empty'>Belum ada permainan yang selesai.</div>") + back("#/farmako/game", "‹ Permainan"));
   }
+
+  /* ======================= USULKAN OBAT ======================= */
+  async function usulPage(k) {
+    var r = await fapi("usul/saya"); if (!alive(k)) return; var rows = (r.j && r.j.rows) || [], ST = { pending: ["Menunggu admin", "warn"], approved: ["Disetujui", "ok"], rejected: ["Ditolak", ""] };
+    setF("<h2 style='font-size:18px'>➕ Usulkan Obat</h2><div class='fm-disc'>Tidak menemukan obat yang Anda cari? Usulkan <b>namanya</b>. Admin akan memeriksa; bila disetujui, informasinya diambil dari sumber terpercaya (bukan dari ketikan pengusul). Usulan tidak langsung tampil di Pustaka.</div><div class='pn g' style='margin-top:0'><label for='uN'>Nama generik obat *</label><input id='uN' class='in' maxlength='100' placeholder='mis. metformin' autocomplete='off'><label for='uB'>Nama dagang (opsional)</label><input id='uB' class='in' maxlength='200' placeholder='mis. Glucophage'><label for='uT'>Catatan / sumber (opsional)</label><textarea id='uT' rows='2' maxlength='500' placeholder='Mis. dipakai di skenario PBL, atau tautan rujukan'></textarea><div class='fm-row'><button class='btn' data-fu='send'>📨 Kirim usulan</button></div><div id='uOut' class='hint'></div></div>" +
+      "<div class='sec'>USULAN SAYA</div>" + (rows.length ? rows.map(function (x) { var st = ST[x.status] || [x.status, ""]; return "<div class='fm-card g'><div class='fm-top'><div><b>💊 " + esc(x.name) + "</b><small>" + fdate(x.created) + (x.brands ? " · " + esc(x.brands) : "") + (x.admin_note ? "<br>Catatan admin: " + esc(x.admin_note) : "") + (x.status === "approved" ? "<br>" + (x.pub ? "<a style='color:var(--gold)' href='#/farmako/obat/" + x.drug_id + "'>Lihat di Pustaka ›</a>" : "Sedang diisi datanya oleh admin.") : "") + "</small></div><span class='tag " + st[1] + "'>" + st[0] + "</span></div></div>"; }).join("") : "<div class='pn g empty'>Belum ada usulan.</div>") + back("#/farmako/obat", "‹ Pustaka Obat"));
+  }
+  document.addEventListener("click", async function (e) {
+    var b = e.target.closest && e.target.closest("[data-fu=send]"); if (!b || !g("uN")) return;
+    var name = g("uN").value.trim(); if (name.length < 2) return toast("Isi nama obat dulu"); b.disabled = true;
+    var r = await fapi("usul", { m: "POST", b: { name: name, brands: g("uB").value, note: g("uT").value } }); b.disabled = false; var o = g("uOut");
+    if (!r.ok) { o.textContent = (r.j && r.j.err) || "Gagal mengirim"; return; }
+    if (r.j.exists) { o.innerHTML = esc(r.j.msg) + (r.j.published ? " <a style='color:var(--gold)' href='#/farmako/obat/" + r.j.id + "'>Buka ›</a>" : ""); return; }
+    if (r.j.dup) { o.textContent = r.j.msg; return; }
+    toast("Usulan terkirim ✓"); usulPage(F.route);
+  });
 
   async function savedPage(k) {
     var r = await fapi("bookmarks"); if (!alive(k)) return; var j = r.j || { drugs: [], materials: [] };
