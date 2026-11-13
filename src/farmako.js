@@ -656,6 +656,12 @@ async function admin(db, a, p, qp, body, M, t, env) {
     if (body.reject) await db.prepare("UPDATE fm_drug_facts SET pending = NULL WHERE id = ?").bind(f.id).run(); else await db.prepare("UPDATE fm_drug_facts SET value = pending, pending = NULL, updated = ? WHERE id = ?").bind(t, f.id).run();
     dirty(); await audit(db, u, body.reject ? "fakta.tolak" : "fakta.setujui", "drug", f.drug_id, f.field + "/" + f.src); return J({ ok: 1 });
   }
+  if (p === "drug/del" && M === "POST") { // hapus PERMANEN obat beserta turunannya (nama, ID sumber, fakta, kategori-tautan, interaksi yang melibatkannya, bookmark, status sinkron)
+    const ids = uniq((Array.isArray(body.ids) ? body.ids : []).map((x) => int(x)).filter(Boolean)).slice(0, 20); if (!ids.length) return err("Pilih obat terlebih dahulu.");
+    const names = (await byIds(db, (q) => `SELECT generic FROM fm_drugs WHERE id IN (${q})`, ids)).map((x) => x.generic);
+    for (const id of ids) await db.batch(["DELETE FROM fm_inter_members WHERE inter_id IN (SELECT id FROM fm_inter WHERE drug_a = ?1 OR drug_b = ?1) OR drug_id = ?1", "DELETE FROM fm_inter WHERE drug_a = ?1 OR drug_b = ?1", "DELETE FROM fm_drug_names WHERE drug_id = ?1", "DELETE FROM fm_drug_xref WHERE drug_id = ?1", "DELETE FROM fm_drug_facts WHERE drug_id = ?1", "DELETE FROM fm_drug_cat WHERE drug_id = ?1", "DELETE FROM fm_sync_state WHERE drug_id = ?1", "DELETE FROM fm_bookmarks WHERE kind = 'drug' AND ref = ?1", "DELETE FROM fm_recent WHERE kind = 'drug' AND ref = ?1", "DELETE FROM fm_drugs WHERE id = ?1"].map((q) => db.prepare(q).bind(id)));
+    dirty(); await audit(db, u, "obat.hapus", "drug", ids.length === 1 ? ids[0] : 0, clip(names.join(", "), 400)); return J({ n: ids.length });
+  }
   if (p === "dups") {
     const d1 = (await db.prepare("SELECT a.id aid, a.generic ag, b.id bid, b.generic bg FROM fm_drugs a JOIN fm_drugs b ON a.id < b.id AND (b.generic_lc LIKE a.generic_lc || ' %' OR a.generic_lc LIKE b.generic_lc || ' %') LIMIT 100").all()).results.map((r) => ({ ...r, why: "nama berawalan sama" }));
     const d2 = (await db.prepare("SELECT x.id aid, x.generic ag, y.id bid, y.generic bg FROM fm_drug_names n1 JOIN fm_drug_names n2 ON n1.name_lc = n2.name_lc AND n1.drug_id < n2.drug_id AND n1.kind = 'generic' JOIN fm_drugs x ON x.id = n1.drug_id JOIN fm_drugs y ON y.id = n2.drug_id LIMIT 100").all()).results.map((r) => ({ ...r, why: "nama generik sama" }));
