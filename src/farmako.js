@@ -675,7 +675,7 @@ async function bulkInters(db, rows, src, u, target, t, autoDrugs) {
   for (const r of norm) {
     let da = map.get(lc(r.a)) || 0, db2 = r.itype === "ddi" ? map.get(lc(r.b)) || 0 : 0;
     const subject = r.itype === "ddi" ? "" : clip(r.b, 300);
-    if (!da || (r.itype === "ddi" && (!db2 || da === db2))) { nskip++; if (skipped.length < 8) skipped.push("Tidak dikenali: " + clip(r.a + " × " + r.b, 90)); continue; }
+    if (!da || (r.itype === "ddi" && (!db2 || da === db2))) { nskip++; if (skipped.length < 8) skipped.push("Obat tidak ditemukan: " + clip(r.a + " × " + r.b, 90)); continue; }
     if (r.itype === "ddi" && da > db2) { const x = da; da = db2; db2 = x; }
     vals.push([r.itype, da, db2, subject, r.severity, r.mechanism, r.effect, r.management, r.evidence, src, r.sid, target, t, t]);
   }
@@ -692,7 +692,7 @@ async function bulkImport(db, body, u, t) {
   const kind = body.kind === "interactions" ? "interactions" : "drugs", target = targetOf(body.publish);
   let r;
   if (kind === "drugs") r = await bulkDrugs(db, rows, src, u, target, t);
-  else r = await bulkInters(db, rows, src, u, target, t, body.auto_drugs !== false);
+  else r = await bulkInters(db, rows, src, u, target, t, body.auto_drugs === true);
   try { await db.prepare("UPDATE fm_sources SET last_sync = ? WHERE code = ?").bind(t, src).run(); } catch (e) { /* sumber tidak terdaftar */ }
   dirty();
   if (body.last) await db.prepare("INSERT INTO fm_sync_log (t, u, src, act, ok, n_in, n_up, n_skip, msg) VALUES (?, ?, ?, ?, 1, ?, ?, ?, ?)").bind(t, u, src, "impor " + kind, int(body.tot_in) + r.nin, int(body.tot_up) + r.nup, int(body.tot_skip) + r.nskip, "berkas: " + clip(body.file, 80)).run();
