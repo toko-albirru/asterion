@@ -185,7 +185,7 @@
     trPaint(); if (TR.lang === "id") trRun(F.route); else trSt("");
   });
 
-  /* ======================= BERANDA =======================
+  /* ======================= BERANDA ======================= */
   async function home(k) {
     var r = await fapi("home"); if (!alive(k)) return; if (!r.ok) return setF("<div class='pn g empty'>" + esc((r.j && r.j.err) || "Gagal memuat") + "</div>");
     var j = r.j, c = j.counts, pct = j.progress.total ? Math.round(j.progress.done * 100 / j.progress.total) : 0;
