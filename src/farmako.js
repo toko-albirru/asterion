@@ -572,6 +572,35 @@ function multiIns(db, table, cols, rows, opt) {
 const catList = (v) => Array.isArray(v) ? v : (typeof v === "string" ? v.split("|").map((x) => { const i = x.indexOf(":"); return i > 0 ? { kind: x.slice(0, i).trim(), name: x.slice(i + 1).trim() } : null; }).filter(Boolean) : []);
 const targetOf = (v) => v === "published" || v === "publish" ? "published" : v === true || v === "pending" ? "pending" : "draft";
 
+// Kategori dibuat berjenjang (akar → anak) dan dipakai ulang lintas sumber, agar taksonomi
+// dari berkas (mis. path ["Sistem Saraf", "Antikonvulsan"]) tidak kehilangan induknya.
+async function ensureCats(db, cats, src, t) {
+  const ids = new Map();
+  if (!cats.size) return ids;
+  const depthOf = (key) => { let d = 0, k = key, g = 0; while (k && g++ < 12) { d++; const c = cats.get(k); k = c ? c.parentKey : ""; } return d; };
+  const levels = new Map();
+  for (const key of cats.keys()) { const d = depthOf(key); if (!levels.has(d)) levels.set(d, []); levels.get(d).push(key); }
+  const idx = new Map();
+  const load = async (keys) => {
+    const names = uniq(keys.map((k) => lc(cats.get(k).name)));
+    for (const part of chunk(names, 90)) for (const x of (await db.prepare("SELECT id, kind, name_lc, parent_id FROM fm_categories WHERE name_lc IN (" + inList(part.length) + ")").bind(...part).all()).results) { const ik = x.kind + "|" + x.name_lc + "|" + (x.parent_id || 0); if (!idx.has(ik)) idx.set(ik, x.id); }
+  };
+  await load([...cats.keys()]);
+  for (const d of [...levels.keys()].sort((a, b) => a - b)) {
+    const pend = [];
+    for (const k of levels.get(d)) {
+      const c = cats.get(k), pid = c.parentKey ? ids.get(c.parentKey) || 0 : 0;
+      const hit = idx.get(c.kind + "|" + lc(c.name) + "|" + pid);
+      if (hit) ids.set(k, hit); else pend.push([k, c, pid]);
+    }
+    if (!pend.length) continue;
+    await db.batch(multiIns(db, "fm_categories", ["kind", "name", "name_lc", "parent_id", "src", "sid", "created"], pend.map((x) => [x[1].kind, x[1].name, lc(x[1].name), x[2], src, "", t])));
+    await load(pend.map((x) => x[0]));
+    for (const x of pend) { const hit = idx.get(x[1].kind + "|" + lc(x[1].name) + "|" + x[2]); if (hit) ids.set(x[0], hit); }
+  }
+  return ids;
+}
+
 async function bulkDrugs(db, rows, src, u, target, t) {
   const list = rows.map((r) => ({ r, generic: clip(r.generic, 160) })).filter((x) => x.generic);
   const skipped = [], nskip0 = rows.length - list.length;
@@ -597,17 +626,19 @@ async function bulkDrugs(db, rows, src, u, target, t) {
     for (const k of Object.keys(FIELDS)) if (r[k] != null && String(r[k]).trim()) f[k] = r[k];
     if (r.facts && typeof r.facts === "object") for (const k of Object.keys(r.facts)) if (FIELDS[k] && r.facts[k] != null && String(r.facts[k]).trim()) f[k] = r.facts[k];
     for (const k of Object.keys(f)) fx.push([id, k, clip(f[k], 8000), src, clip(r.source_id || "", 80), t]);
-    const addC = (kind, name) => { const n = clip(name, 160); if (!n) return; const key = kind + "|" + lc(n); if (!cats.has(key)) cats.set(key, { kind, name: n }); links.push([id, key]); };
-    for (const c of catList(r.categories)) addC(CAT_KINDS[c.kind] ? c.kind : "other", c.name || (Array.isArray(c.path) ? c.path[c.path.length - 1] : ""));
-    addC("pharm_class", r.pharm_class); addC("ther_class", r.ther_class); addC("classification", r.classification);
+    const addC = (kind, name, parentKey) => { const n = clip(name, 160); if (!n) return ""; const kd = CAT_KINDS[kind] ? kind : "other"; const key = kd + "|" + lc(n) + "|" + (parentKey || ""); if (!cats.has(key)) cats.set(key, { kind: kd, name: n, parentKey: parentKey || "" }); return key; };
+    for (const c of catList(r.categories)) {
+      const chain = Array.isArray(c.path) && c.path.length ? c.path : [c.name];
+      let pk = "";
+      for (const nm of chain) pk = addC(c.kind || "other", nm, pk) || pk;
+      if (pk) links.push([id, pk]);
+    }
+    for (const f of [["pharm_class", r.pharm_class], ["ther_class", r.ther_class], ["classification", r.classification]]) { const k = addC(f[0], f[1]); if (k) links.push([id, k]); }
   }
   const st = [...multiIns(db, "fm_drug_names", ["drug_id", "name", "name_lc", "kind", "src"], nm), ...multiIns(db, "fm_drug_facts", ["drug_id", "field", "value", "src", "sid", "updated"], fx)];
-  const crows = [...cats.values()].map((c) => [c.kind, c.name, lc(c.name), 0, "manual", "", t]); // kategori disimpan sekali (hemat ruang)
-  if (crows.length) st.push(...multiIns(db, "fm_categories", ["kind", "name", "name_lc", "parent_id", "src", "sid", "created"], crows));
   if (st.length) await db.batch(st);
-  if (crows.length) {
-    const cmap = new Map();
-    for (const part of chunk(crows.map((x) => x[2]), 90)) for (const x of (await db.prepare("SELECT id, kind, name_lc FROM fm_categories WHERE parent_id = 0 AND name_lc IN (" + inList(part.length) + ")").bind(...part).all()).results) { const k = x.kind + "|" + x.name_lc; if (!cmap.has(k)) cmap.set(k, x.id); }
+  if (links.length) {
+    const cmap = await ensureCats(db, cats, src, t);
     const lk = links.map((x) => [x[0], cmap.get(x[1])]).filter((x) => x[1]);
     if (lk.length) await db.batch(multiIns(db, "fm_drug_cat", ["drug_id", "cat_id"], lk));
   }
