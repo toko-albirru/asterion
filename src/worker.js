@@ -1,4 +1,5 @@
 // ASTERION dashboard - Cloudflare Worker (login, data, jadwal)
+import { farmakoApi, farmakoCron } from "./farmako.js";
 const SHEET_ID = "1D3ZaMWmvgEmWs1eKBVPs4FYY3y3_KnYUglsJz1qdYEw";
 const YT = (n, id) => ({ n, u: "https://www.youtube.com/playlist?list=" + id });
 const BLOK = ["1.1", "1.2", "1.3", "2.1", "2.2", "2.3", "3.1", "3.2", "3.3"];
@@ -1108,6 +1109,7 @@ export default {
       return J({ ok: 1 });
     }
     if (path.startsWith("run/")) return runApi(request, env, a, path.slice(4), url, body, M);
+    if (path.startsWith("farmako/")) return farmakoApi(request, env, a, path.slice(8), url, body, M);
     if (path === "dokter" || path.startsWith("dokter/")) return dokter(env, a, path, M, body);
 
     if (path === "data") {
@@ -1233,6 +1235,8 @@ export default {
     }
     return J({ err: "not found" }, 404);
   },
+  // Cron Trigger (lihat wrangler.jsonc): sinkron berkala Pharmacology Session untuk sumber yang diaktifkan admin
+  async scheduled(event, env, ctx) { ctx.waitUntil(farmakoCron(env, "cron").catch((e) => console.error("farmako cron", e))); },
 };
 
 
