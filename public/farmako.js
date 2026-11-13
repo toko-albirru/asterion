@@ -157,6 +157,35 @@
       if (on) { var b = document.createElement("span"); b.className = "fm-trb"; b.textContent = m.status === "verified" ? "✔ terjemahan terverifikasi" : "🌐 terjemahan mesin"; e.appendChild(b); }
     });
   }
+  // Seluruh interaksi obat ditampilkan langsung di Detail Obat (bukan hanya jumlah / tombol).
+  function interBlock(x) {
+    var head = "<div class='fm-fact'><div class='fm-fh'>Interaksi Obat</div>";
+    if (!x || !x.total) return head + "<div class='fm-na'>Belum ada interaksi terpublikasi untuk obat ini.</div><div class='hint' style='margin:0'>Setelah admin mengimpor lalu mempublikasikan data, seluruh interaksi langsung tampil di sini.</div></div>";
+    var sevTag = function (s) {
+      if (!s) return "<span class='tag'>keparahan tidak disebutkan</span>";
+      var t = String(s).toLowerCase(), c = /contra|major|tinggi|berat/.test(t) ? "warn" : /moderate|sedang/.test(t) ? "warn" : "ok";
+      return "<span class='tag " + c + "'>" + esc(s) + "</span>";
+    };
+    var card = function (o, title) {
+      var h = "<div class='fm-fact' style='border-left:3px solid var(--gold);margin:8px 0'><div class='fm-x'><b style='flex:1'>" + title + "</b>" + sevTag(o.severity) + "</div>";
+      if (o.src || o.sid) h += "<div class='hint' style='margin:2px 0'>Sumber: " + esc((FM.srcName ? FM.srcName(o.src) : o.src) || "—") + (o.sid ? " · ID " + esc(o.sid) : "") + "</div>";
+      [["Mekanisme kerja", "mechanism"], ["Efek klinis", "effect"], ["Penanganan", "management"], ["Bukti / rujukan", "evidence"]].forEach(function (f) {
+        if (o[f[1]]) h += "<div style='margin-top:6px'><div class='fm-fh' style='margin:0'>" + f[0] + "</div><div class='fm-v' data-tr='inter:" + o.id + ":" + f[1] + "'>" + esc(o[f[1]]) + "</div></div>";
+      });
+      return h + "</div>";
+    };
+    var h = head + "<div class='hint' style='margin:0'><b>" + x.total + "</b> interaksi terpublikasi — seluruhnya ditampilkan di bawah ini (antar-obat: " + x.ddi.length + ").</div>";
+    if (x.ddi.length) h += "<div class='fm-sec g' style='margin-top:8px'><b style='font-size:13px'>Antar-obat (" + x.ddi.length + ")</b></div>" + x.ddi.map(function (o) {
+      var t = o.other && o.other.name ? "<a style='color:var(--gold)' href='#/farmako/obat/" + o.other.id + "'>" + esc(o.other.name) + "</a>" : esc(o.subject || "—");
+      return card(o, "⚠️ " + t);
+    }).join("");
+    [["food", "Makanan"], ["disease", "Penyakit"], ["alcohol", "Alkohol"]].forEach(function (gp) {
+      var arr = x[gp[0]] || [];
+      if (arr.length) h += "<div class='fm-sec g' style='margin-top:8px'><b style='font-size:13px'>" + gp[1] + " (" + arr.length + ")</b></div>" + arr.map(function (o) { return card(o, "⚠️ " + esc(o.subject || "—")); }).join("");
+    });
+    return h + "<div class='fm-row' style='margin-top:8px'><a class='btn s' href='#/farmako/interaksi'>🔍 Periksa kombinasi obat lain</a></div></div>";
+  }
+
   async function trApply(k) {
     var els = [].slice.call(document.querySelectorAll("#fm [data-tr]")); if (!els.length) return; trPaint();
     var keys = []; els.forEach(function (e) { if (keys.indexOf(e.dataset.tr) < 0) keys.push(e.dataset.tr); });
@@ -304,7 +333,7 @@
     var h = "<div class='fm-x'><h2 style='margin:0;flex:1;font-size:22px'>💊 " + esc(d.generic) + "</h2><button class='fm-star' data-fb='drug:" + d.id + "' aria-label='Simpan obat'>" + (j.bookmarked ? "★" : "☆") + "</button></div><div style='margin:4px 0 8px'>" + stTag(d.status) + " <span class='tag'>Diperbarui " + fdate(d.updated) + "</span></div>";
     h += "<div class='fm-row'><a class='btn s' href='#/farmako/interaksi/" + d.id + "'>⚠️ Cek interaksi</a><button class='btn s' data-cmp1='" + d.id + "'>⇄ Bandingkan</button></div>" + trBar();
     h += "<div class='fm-sec g'><h3>A. Informasi Dasar</h3><div class='fm-kv'><b>Nama generik</b><div>" + esc(d.generic) + "</div><b>Nama dagang</b><div>" + (br.length ? uq(br).map(function (n) { return esc(n.name); }).join(", ") : NA) + "</div>" + (sy.length ? "<b>Sinonim</b><div>" + uq(sy).map(function (n) { return esc(n.name); }).join(", ") + "</div>" : "") + "<b>Golongan farmakologis</b><div>" + (esc(d.pharm_class) || NA) + "</div><b>Golongan terapeutik</b><div>" + (esc(d.ther_class) || NA) + "</div><b>Klasifikasi</b><div>" + (esc(d.classification) || NA) + "</div>" + (j.cats.length ? "<b>Kategori</b><div>" + j.cats.map(function (c) { return "<a class='tag' style='text-decoration:none;margin:0 4px 4px 0;display:inline-block' href='#/farmako/belajar/" + c.id + "'>" + esc(c.name) + "</a>"; }).join("") + "</div>" : "") + "<b>Identitas di database</b><div>" + (j.xref.length ? j.xref.map(function (x) { return srcTag(x.src, x.sid); }).join("") : NA) + "</div></div></div>";
-    h += GRP.map(function (gr, gi) { var req = gi === 0 ? ["moa", "targets", "pk"] : ["indications", "contraindications", "adverse"]; return "<div class='fm-sec g'><h3>" + (gi ? "C. " : "B. ") + gr[0] + "</h3>" + (factsHtml(j.facts, gr[1], req) || NA) + (gi === 1 ? "<div class='fm-fact'><div class='fm-fh'>Interaksi Obat</div>" + (j.interactions ? "<span class='tag warn'>" + j.interactions + " data interaksi terpublikasi</span> <a style='color:var(--gold)' href='#/farmako/interaksi/" + d.id + "'>Periksa kombinasi ›</a>" : NA) + "</div>" : "") + "</div>"; }).join("");
+    h += GRP.map(function (gr, gi) { var req = gi === 0 ? ["moa", "targets", "pk"] : ["indications", "contraindications", "adverse"]; return "<div class='fm-sec g'><h3>" + (gi ? "C. " : "B. ") + gr[0] + "</h3>" + (factsHtml(j.facts, gr[1], req) || NA) + (gi === 1 ? interBlock(j.inter) : "") + "</div>"; }).join("");
     var extra = factsHtml(j.facts, ["notes", "physchem"], []);
     h += "<div class='fm-sec g'><h3>D. Informasi Tambahan</h3>" + (extra || "") + "<div class='fm-fact'><div class='fm-fh'>Obat dalam golongan yang sama</div>" + (j.same.length ? j.same.map(function (x) { return "<a class='chip g' style='display:inline-block;margin:2px' href='#/farmako/obat/" + x.id + "'>" + esc(x.generic) + "</a>"; }).join("") : NA) + "</div><div class='fm-fact'><div class='fm-fh'>Obat dengan mekanisme serupa</div>" + (j.similar.length ? j.similar.map(function (x) { return "<a class='chip g' style='display:inline-block;margin:2px' href='#/farmako/obat/" + x.id + "'>" + esc(x.generic) + "</a>"; }).join("") : NA) + "</div>" + (j.related.length ? "<div class='fm-fact'><div class='fm-fh'>Obat terkait (kategori sama)</div>" + j.related.map(function (x) { return "<a class='chip g' style='display:inline-block;margin:2px' href='#/farmako/obat/" + x.id + "'>" + esc(x.generic) + "</a>"; }).join("") + "</div>" : "") + "<div class='fm-fact'><div class='fm-fh'>Sumber database</div>" + (j.xref.length ? j.xref.map(function (x) { return srcTag(x.src, x.sid) + "<span class='hint' style='margin:0'>sinkron " + fdate(x.synced) + "</span> "; }).join("<br>") : srcTag("manual")) + "</div></div>" + DISC;
     setF(h + back("#/farmako/obat", "‹ Pustaka Obat")); trApply(k);
