@@ -635,8 +635,28 @@ async function bulkDrugs(db, rows, src, u, target, t) {
     }
     for (const f of [["pharm_class", r.pharm_class], ["ther_class", r.ther_class], ["classification", r.classification]]) { const k = addC(f[0], f[1]); if (k) links.push([id, k]); }
   }
-  const st = [...multiIns(db, "fm_drug_names", ["drug_id", "name", "name_lc", "kind", "src"], nm), ...multiIns(db, "fm_drug_facts", ["drug_id", "field", "value", "src", "sid", "updated"], fx)];
+  // fakta: simpan baru; perbarui bila obat belum terbit; catat sebagai TERTUNDA bila obat sudah terbit
+  const fxNew = [], fxUpd = [];
+  if (fx.length) {
+    const dIds = uniq(fx.map((x) => x[0])), ex = new Map(), pub = new Set();
+    for (const part of chunk(dIds, 90)) for (const x of (await db.prepare("SELECT id, drug_id, field, src, value FROM fm_drug_facts WHERE drug_id IN (" + inList(part.length) + ")").bind(...part).all()).results) ex.set(x.drug_id + "|" + x.field + "|" + x.src, x);
+    for (const part of chunk(dIds, 90)) for (const x of (await db.prepare("SELECT id FROM fm_drugs WHERE status = 'published' AND id IN (" + inList(part.length) + ")").bind(...part).all()).results) pub.add(x.id);
+    const seenK = new Set();
+    for (const f of fx) {
+      const k = f[0] + "|" + f[1] + "|" + f[3];
+      if (seenK.has(k)) continue;
+      seenK.add(k);
+      const cur = ex.get(k);
+      if (!cur) { fxNew.push(f); continue; }
+      if (cur.value === f[2]) continue;
+      fxUpd.push({ id: cur.id, val: f[2], sid: f[4], pend: pub.has(f[0]) });
+    }
+  }
+  const st = [...multiIns(db, "fm_drug_names", ["drug_id", "name", "name_lc", "kind", "src"], nm), ...multiIns(db, "fm_drug_facts", ["drug_id", "field", "value", "src", "sid", "updated"], fxNew)];
   if (st.length) await db.batch(st);
+  if (fxUpd.length) await db.batch(fxUpd.map((u) => u.pend
+    ? db.prepare("UPDATE fm_drug_facts SET pending = ?, updated = ? WHERE id = ?").bind(u.val, t, u.id)
+    : db.prepare("UPDATE fm_drug_facts SET value = ?, pending = NULL, sid = ?, updated = ? WHERE id = ?").bind(u.val, u.sid, t, u.id)));
   if (links.length) {
     const cmap = await ensureCats(db, cats, src, t);
     const lk = links.map((x) => [x[0], cmap.get(x[1])]).filter((x) => x[1]);
