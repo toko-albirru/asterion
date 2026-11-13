@@ -36,7 +36,7 @@ const GENERAL = ["Pengantar Farmakologi", "Farmakokinetik", "Absorpsi Obat", "Di
 export const SECTIONS = { intro: "Pendahuluan", definition: "Definisi", classification: "Klasifikasi", moa: "Mekanisme Kerja", pk: "Farmakokinetik", pd: "Farmakodinamik", indications: "Indikasi Klinis", contraindications: "Kontraindikasi", adverse: "Efek Samping", interactions: "Interaksi Obat", clinical: "Pertimbangan Klinis" };
 const SOURCES = [
   ["drugbank", "DrugBank", "https://go.drugbank.com/", "Informasi obat, mekanisme kerja, target, farmakokinetik, indikasi, interaksi. Diimpor dari berkas yang Anda unduh sendiri (perlu akun/lisensi)."],
-  ["ddinter", "DDInter 2.0", "https://ddinter2.scbdd.com/", "Interaksi antarobat beserta tingkat keparahan. Diimpor dari berkas unduhan."],
+  ["ddinter", "DDInter 2.0", "https://ddinter2.scbdd.com/", "Interaksi antarobat + tingkat keparahan. Unduh 8 berkas CSV (kelompok ATC A,B,D,H,L,P,R,V) dari ddinter2.scbdd.com/download. Lisensi CC BY-NC-SA 4.0: non-komersial, wajib mencantumkan sumber, turunan berbagi lisensi sama."],
   ["kegg", "KEGG DRUG", "https://www.kegg.jp/kegg/drug/", "Identitas, klasifikasi, hubungan obat–target. Diimpor dari berkas; periksa ketentuan lisensi KEGG."],
   ["chembl", "ChEMBL", "https://www.ebi.ac.uk/chembl/", "Mekanisme kerja dan target molekuler obat. Dapat disinkronkan lewat API publik (ChEMBL web services)."],
   ["openfda", "openFDA (label FDA)", "https://open.fda.gov/apis/drug/label/", "Teks label obat AS: indikasi, kontraindikasi, efek samping, peringatan, interaksi, farmakokinetik. API publik; isi berbahasa Inggris."],
@@ -79,6 +79,10 @@ export const FM_DDL = [
   `CREATE TABLE IF NOT EXISTS fm_sync_log (id INTEGER PRIMARY KEY AUTOINCREMENT, t INTEGER NOT NULL, u TEXT NOT NULL, src TEXT NOT NULL, act TEXT NOT NULL, ok INTEGER NOT NULL DEFAULT 1, n_in INTEGER NOT NULL DEFAULT 0, n_up INTEGER NOT NULL DEFAULT 0, n_skip INTEGER NOT NULL DEFAULT 0, msg TEXT NOT NULL DEFAULT '')`,
   `CREATE TABLE IF NOT EXISTS fm_audit (id INTEGER PRIMARY KEY AUTOINCREMENT, t INTEGER NOT NULL, u TEXT NOT NULL, act TEXT NOT NULL, ent TEXT NOT NULL DEFAULT '', ref INTEGER NOT NULL DEFAULT 0, detail TEXT NOT NULL DEFAULT '')`,
   `CREATE INDEX IF NOT EXISTS ix_fma_e ON fm_audit (ent, ref, t)`,
+  `CREATE TABLE IF NOT EXISTS fm_tr (ent TEXT NOT NULL, ref INTEGER NOT NULL, field TEXT NOT NULL, h TEXT NOT NULL, text TEXT NOT NULL DEFAULT '', status TEXT NOT NULL DEFAULT 'auto', t INTEGER NOT NULL, PRIMARY KEY (ent, ref, field))`,
+  `CREATE TABLE IF NOT EXISTS fm_usul (id INTEGER PRIMARY KEY AUTOINCREMENT, u TEXT NOT NULL, name TEXT NOT NULL, name_lc TEXT NOT NULL, brands TEXT NOT NULL DEFAULT '', pharm_class TEXT NOT NULL DEFAULT '', note TEXT NOT NULL DEFAULT '', status TEXT NOT NULL DEFAULT 'pending', admin_note TEXT NOT NULL DEFAULT '', drug_id INTEGER NOT NULL DEFAULT 0, created INTEGER NOT NULL, decided INTEGER, decided_by TEXT NOT NULL DEFAULT '')`,
+  `CREATE INDEX IF NOT EXISTS ix_fmu_s ON fm_usul (status, created)`,
+  `CREATE INDEX IF NOT EXISTS ix_fmu_u ON fm_usul (u, created)`,
   `CREATE TABLE IF NOT EXISTS fm_sync_state (drug_id INTEGER NOT NULL, src TEXT NOT NULL, t INTEGER NOT NULL, ok INTEGER NOT NULL, msg TEXT NOT NULL DEFAULT '', PRIMARY KEY (drug_id, src))`,
 ];
 
@@ -88,7 +92,7 @@ async function fmDb(env) {
   if (!ready) {
     await env.DB.batch(FM_DDL.map((s) => env.DB.prepare(s)));
     const t = Date.now();
-    await env.DB.batch(SOURCES.map((s) => env.DB.prepare("INSERT OR IGNORE INTO fm_sources (code, name, url, descr) VALUES (?, ?, ?, ?)").bind(...s)));
+    await env.DB.batch(SOURCES.map((s) => env.DB.prepare("INSERT INTO fm_sources (code, name, url, descr) VALUES (?, ?, ?, ?) ON CONFLICT(code) DO UPDATE SET name = excluded.name, url = excluded.url, descr = excluded.descr").bind(...s)));
     const seeded = await env.DB.prepare("SELECT v FROM fm_meta WHERE k = 'seed_general'").first();
     if (!seeded) { // kerangka 20 materi umum: HANYA judul, berstatus draft (tidak tampil ke mahasiswa sampai admin mengisi & mempublikasikan)
       await env.DB.batch([...GENERAL.map((g, i) => env.DB.prepare("INSERT INTO fm_materials (cat_id, general, title, status, sort, created, updated) VALUES (0, 1, ?, 'draft', ?, ?, ?)").bind(g, i + 1, t, t)), env.DB.prepare("INSERT INTO fm_meta (k, v) VALUES ('seed_general', '1')")]);
@@ -458,6 +462,55 @@ export async function farmakoCron(env, u = "cron") {
   return { ran: out.length, out };
 }
 
+// ---------- terjemahan ke Bahasa Indonesia ----------
+// Penyedia: binding Workers AI (`AI`) ATAU endpoint LibreTranslate (`LIBRETRANSLATE_URL`, opsional `LIBRETRANSLATE_KEY`). Hasil mesin SELALU berlabel, teks asli tetap rujukan.
+const fnv = (str) => { let h = 2166136261 >>> 0; for (let i = 0; i < str.length; i++) { h ^= str.charCodeAt(i); h = Math.imul(h, 16777619) >>> 0; } return h.toString(16) + ":" + str.length; };
+const ID_W = new Set("yang dan untuk dengan pada dari adalah atau tidak dalam ini itu dapat oleh akan sebagai juga karena telah dapat harus sebaiknya pasien obat".split(" ")), EN_W = new Set("the of and to in is with for or may not be are by as this that should patients has have been is was from".split(" "));
+const looksId = (t) => { const w = String(t).toLowerCase().match(/[a-z]+/g) || []; let a = 0, b = 0; for (const x of w) { if (ID_W.has(x)) a++; if (EN_W.has(x)) b++; } return w.length >= 3 && a > b; };
+const trProvider = (env) => (env && env.AI && env.AI.run ? "ai" : env && env.LIBRETRANSLATE_URL ? "libre" : "");
+async function trChunk(env, text) {
+  if (env.AI && env.AI.run) {
+    let r; try { r = await env.AI.run("@cf/meta/m2m100-1.2b", { text, source_lang: "en", target_lang: "id" }); } catch (e1) { try { r = await env.AI.run("@cf/meta/m2m100-1.2b", { text, source_lang: "english", target_lang: "indonesian" }); } catch (e2) { throw new Error(clip(e2 && e2.message || e1 && e1.message, 120)); } }
+    const o = r && (r.translated_text || r.response); if (!o) throw new Error("respons terjemahan kosong"); return String(o);
+  }
+  if (env.LIBRETRANSLATE_URL) {
+    const ac = new AbortController(), tm = setTimeout(() => ac.abort(), 15000);
+    try { const r = await fetch(env.LIBRETRANSLATE_URL, { method: "POST", signal: ac.signal, headers: { "content-type": "application/json" }, body: JSON.stringify({ q: text, source: "en", target: "id", format: "text", ...(env.LIBRETRANSLATE_KEY ? { api_key: env.LIBRETRANSLATE_KEY } : {}) }) }); if (!r.ok) throw new Error("HTTP " + r.status); const j = await r.json(); if (!j.translatedText) throw new Error("respons terjemahan kosong"); return String(j.translatedText); } finally { clearTimeout(tm); }
+  }
+  throw new Error("Terjemahan belum dikonfigurasi (butuh binding AI atau LIBRETRANSLATE_URL).");
+}
+function splitText(text, max = 700) { // paragraf → kalimat, tiap potongan ≤ max; sambungan paragraf dipertahankan
+  const out = [];
+  text.split(/\n{2,}/).forEach((para, pi) => {
+    let cur = ""; const parts = para.replace(/[ \t]+/g, " ").trim().split(/(?<=[.!?;:])\s+/);
+    const flush = () => { if (cur.trim()) out.push({ t: cur.trim(), sep: " " }); cur = ""; };
+    for (let p of parts) { while (p.length > max) { flush(); out.push({ t: p.slice(0, max), sep: " " }); p = p.slice(max); } if ((cur + " " + p).length > max) flush(); cur += (cur ? " " : "") + p; }
+    flush(); if (out.length && pi >= 0) out[out.length - 1].sep = "\n\n";
+  });
+  return out;
+}
+const TR_INTER = ["mechanism", "effect", "management", "evidence"];
+async function trSource(db, ent, ref, field, admin) {
+  if (ent === "fact") { const r = await db.prepare(`SELECT f.value v FROM fm_drug_facts f JOIN fm_drugs d ON d.id = f.drug_id WHERE f.id = ?${admin ? "" : " AND d.status = 'published' AND d.active = 1"}`).bind(ref).first(); return r ? r.v : null; }
+  if (ent === "inter" && TR_INTER.includes(field)) { const r = await db.prepare(`SELECT ${field} v FROM fm_inter WHERE id = ?${admin ? "" : " AND status = 'published'"}`).bind(ref).first(); return r ? r.v : null; }
+  return null;
+}
+const trUp = (db, ent, ref, field, h, text, status, t) => db.prepare("INSERT INTO fm_tr (ent, ref, field, h, text, status, t) VALUES (?, ?, ?, ?, ?, ?, ?) ON CONFLICT(ent, ref, field) DO UPDATE SET h = excluded.h, text = excluded.text, status = excluded.status, t = excluded.t").bind(ent, ref, field, h, text, status, t).run();
+const dayKey = () => new Date().toISOString().slice(0, 10).replace(/-/g, "");
+async function trQuota(db, env, u) { const max = int(env.TR_DAILY_MAX, 150), k = "trq:" + u + ":" + dayKey(), v = int(await getMeta(db, k, "0")); if (v >= max) return false; await setMeta(db, k, v + 1); return true; }
+// menerjemahkan SATU item (dibatasi agar aman dari batas subrequest); hasil disimpan sehingga tidak dihitung ulang
+async function trDo(db, env, ent, ref, field, o) {
+  const src = await trSource(db, ent, ref, field, o.admin); if (!src || !src.trim()) return { err: "Teks tidak ditemukan.", s: 404 };
+  const h = fnv(src), ex = await db.prepare("SELECT h, text, status FROM fm_tr WHERE ent = ? AND ref = ? AND field = ?").bind(ent, ref, field).first();
+  if (ex && ex.h === h && !(o.force && o.admin)) return { text: ex.text, status: ex.status, cached: true };
+  if (looksId(src)) { await trUp(db, ent, ref, field, h, "", "id", Date.now()); return { status: "id", text: "" }; }
+  if (!trProvider(env)) return { err: "Terjemahan belum diaktifkan oleh admin.", s: 503 };
+  if (!o.admin && !(await trQuota(db, env, o.u))) return { err: "Batas terjemahan harian tercapai. Coba lagi besok.", s: 429 };
+  const ch = splitText(src); if (ch.length > 14) return { err: "Teks terlalu panjang untuk diterjemahkan.", s: 413 };
+  let txt = ""; for (const c of ch) { const tr = /[A-Za-z]{2}/.test(c.t) ? await trChunk(env, c.t) : c.t; txt += tr.trim() + c.sep; }
+  txt = txt.trim(); await trUp(db, ent, ref, field, h, txt, "auto", Date.now()); return { text: txt, status: "auto" };
+}
+
 // ---------- ekspor ke handler ----------
 const drugRow = (d, names) => ({ id: d.id, generic: d.generic, pharm_class: d.pharm_class, ther_class: d.ther_class, classification: d.classification, summary: d.summary, status: d.status, brands: (names || []).filter((n) => n.kind === "brand").map((n) => n.name).slice(0, 4) });
 const norm = (s) => String(s || "").trim();
@@ -521,7 +574,7 @@ export async function farmakoApi(request, env, a, path, url, body, M) {
     if (path.startsWith("drug/") && M === "GET") {
       const id = int(path.slice(5)), d = await db.prepare(`SELECT * FROM fm_drugs d WHERE ${pubWhere} AND id = ?`).bind(id).first(); if (!d) return err("Obat tidak ditemukan atau belum dipublikasikan.", 404);
       const names = (await drugNames(db, [id])).get(id) || [], cats = await drugCats(db, id);
-      const facts = (await db.prepare("SELECT field, value, src, sid, updated FROM fm_drug_facts WHERE drug_id = ? AND value <> '' ORDER BY field, src").bind(id).all()).results;
+      const facts = (await db.prepare("SELECT id, field, value, src, sid, updated FROM fm_drug_facts WHERE drug_id = ? AND value <> '' ORDER BY field, src").bind(id).all()).results;
       const xref = (await db.prepare("SELECT src, sid, synced FROM fm_drug_xref WHERE drug_id = ? ORDER BY src").bind(id).all()).results;
       const same = d.pharm_class ? (await db.prepare(`SELECT id, generic FROM fm_drugs d WHERE ${pubWhere} AND id <> ? AND lower(pharm_class) = ? ORDER BY generic LIMIT 12`).bind(id, lc(d.pharm_class)).all()).results : [];
       const moa = facts.find((f) => f.field === "moa"); let similar = [];
@@ -570,6 +623,28 @@ export async function farmakoApi(request, env, a, path, url, body, M) {
       return J({ drugs: dr.map((d) => ({ id: d.id, name: d.generic, sub: d.pharm_class })), materials: ma.map((m) => ({ id: m.id, name: m.title })) });
     }
 
+    if (path === "usul" && M === "POST") { // usulan obat dari pengguna → antrean persetujuan admin (TIDAK langsung masuk Pustaka)
+      const name = clip(body.name, 100).replace(/\s+/g, " "); if (String(body.name || "").trim().length > 100) return err("Nama obat terlalu panjang (maks. 100 karakter)."); if (name.length < 2 || !/^[\p{L}\p{N}][\p{L}\p{N} .,'()\/+\-]*$/u.test(name)) return err("Nama obat tidak valid. Gunakan huruf/angka (2–100 karakter).");
+      const nl = lc(name), ex = await db.prepare("SELECT d.id, d.status, d.active FROM fm_drug_names n JOIN fm_drugs d ON d.id = n.drug_id WHERE n.name_lc = ? ORDER BY (d.status = 'published') DESC LIMIT 1").bind(nl).first();
+      if (ex) { const pub = ex.status === "published" && !!ex.active; return J({ exists: true, published: pub, id: pub ? ex.id : 0, msg: pub ? "Obat ini sudah ada di Pustaka." : "Obat ini sudah ada dan sedang diproses admin." }); }
+      const dup = await db.prepare("SELECT u FROM fm_usul WHERE name_lc = ? AND status = 'pending' LIMIT 1").bind(nl).first(); if (dup) return J({ dup: true, mine: dup.u === u, msg: dup.u === u ? "Anda sudah mengusulkan obat ini; menunggu admin." : "Obat ini sudah diusulkan pengguna lain; menunggu admin." });
+      const my = (await db.prepare("SELECT SUM(status = 'pending') p, SUM(created > ?) d FROM fm_usul WHERE u = ?").bind(t - DAY, u).first()) || {};
+      if ((my.p || 0) >= 5) return err("Anda masih punya 5 usulan yang belum diproses. Tunggu admin dulu.", 429); if ((my.d || 0) >= 20) return err("Batas 20 usulan per hari tercapai.", 429);
+      const r = await db.prepare("INSERT INTO fm_usul (u, name, name_lc, brands, pharm_class, note, created) VALUES (?, ?, ?, ?, ?, ?, ?)").bind(u, name, nl, clip(body.brands, 200), clip(body.pharm_class, 100), clip(body.note, 500), t).run();
+      return J({ ok: 1, id: r.meta.last_row_id });
+    }
+    if (path === "usul/saya") { const rows = (await db.prepare("SELECT s.id, s.name, s.brands, s.status, s.admin_note, s.created, s.decided, s.drug_id, (d.status = 'published' AND d.active = 1) pub FROM fm_usul s LEFT JOIN fm_drugs d ON d.id = s.drug_id WHERE s.u = ? ORDER BY s.created DESC LIMIT 50").bind(u).all()).results; return J({ rows }); }
+    if (path === "tr/get" && M === "POST") { // terjemahan tersimpan (hanya yang masih cocok dengan teks asli saat ini)
+      const items = (Array.isArray(body.items) ? body.items : []).slice(0, 60).map((x) => ({ ent: x.ent === "inter" ? "inter" : "fact", ref: int(x.ref), field: x.ent === "inter" ? clip(x.field, 20) : "value" })).filter((x) => x.ref > 0 && (x.ent === "fact" || TR_INTER.includes(x.field)));
+      const fid = items.filter((x) => x.ent === "fact").map((x) => x.ref), iid = items.filter((x) => x.ent === "inter").map((x) => x.ref), src = {}, rows = {};
+      for (const r of await byIds(db, (q) => `SELECT f.id, f.value v FROM fm_drug_facts f JOIN fm_drugs d ON d.id = f.drug_id WHERE ${pubWhere} AND f.id IN (${q})`, fid)) src["fact:" + r.id + ":value"] = r.v;
+      for (const r of await byIds(db, (q) => `SELECT id, mechanism, effect, management, evidence FROM fm_inter WHERE status = 'published' AND id IN (${q})`, iid)) for (const f of TR_INTER) src["inter:" + r.id + ":" + f] = r[f];
+      for (const [ent, ids] of [["fact", fid], ["inter", iid]]) for (const r of await byIds(db, (q) => `SELECT ref, field, h, text, status FROM fm_tr WHERE ent = '${ent}' AND ref IN (${q})`, ids)) rows[ent + ":" + r.ref + ":" + r.field] = r;
+      const map = {}, need = [];
+      for (const x of items) { const k = x.ent + ":" + x.ref + ":" + x.field, st = src[k]; if (!st || !st.trim()) continue; const r = rows[k]; if (r && r.h === fnv(st)) map[k] = { text: r.text, status: r.status }; else if (looksId(st)) map[k] = { text: "", status: "id" }; else need.push(k); }
+      return J({ map, need, provider: !!trProvider(env) });
+    }
+    if (path === "tr/do" && M === "POST") { const ent = body.ent === "inter" ? "inter" : "fact", field = ent === "inter" ? clip(body.field, 20) : "value"; if (ent === "inter" && !TR_INTER.includes(field)) return err("Bidang tidak valid."); const r = await trDo(db, env, ent, int(body.ref), field, { u, admin: false }); return r.err ? err(r.err, r.s || 400) : J(r); }
     // ----- game -----
     if (path === "game/cats") return J({ cats: await gameCounts(db), modes: Object.fromEntries(Object.entries(MODES).map(([k, v]) => [k, { n: v.n, d: v.d }])), diffs: DIFF });
     if (path === "game/start" && M === "POST") {
@@ -618,7 +693,7 @@ async function admin(db, a, p, qp, body, M, t, env) {
     const one = async (s) => (await db.prepare(s).first()) || {};
     const d = await one("SELECT COUNT(*) n, SUM(status='published') pub, SUM(status='pending') pen, SUM(status='draft') dr, SUM(status='verified') ver FROM fm_drugs");
     const src = (await db.prepare("SELECT s.code, s.name, s.url, s.descr, s.enabled, s.last_sync, s.note, (SELECT COUNT(*) FROM fm_drug_xref x WHERE x.src = s.code) xr, (SELECT COUNT(*) FROM fm_drug_facts f WHERE f.src = s.code) facts, (SELECT COUNT(*) FROM fm_inter i WHERE i.src = s.code) inters FROM fm_sources s ORDER BY s.name").all()).results;
-    const q = await one("SELECT (SELECT COUNT(*) FROM fm_inter) i, (SELECT COUNT(*) FROM fm_inter WHERE status='published') ip, (SELECT COUNT(*) FROM fm_materials) m, (SELECT COUNT(*) FROM fm_materials WHERE status='published') mp, (SELECT COUNT(*) FROM fm_questions) q, (SELECT COUNT(*) FROM fm_categories) c, (SELECT COUNT(*) FROM fm_drug_facts WHERE pending IS NOT NULL) pend, (SELECT COUNT(*) FROM fm_game WHERE status='done') games");
+    const q = await one("SELECT (SELECT COUNT(*) FROM fm_inter) i, (SELECT COUNT(*) FROM fm_inter WHERE status='published') ip, (SELECT COUNT(*) FROM fm_materials) m, (SELECT COUNT(*) FROM fm_materials WHERE status='published') mp, (SELECT COUNT(*) FROM fm_questions) q, (SELECT COUNT(*) FROM fm_categories) c, (SELECT COUNT(*) FROM fm_drug_facts WHERE pending IS NOT NULL) pend, (SELECT COUNT(*) FROM fm_usul WHERE status = 'pending') usul, (SELECT COUNT(*) FROM fm_game WHERE status='done') games");
     const st = (await db.prepare("SELECT src, COUNT(*) n, SUM(ok = 1) good, SUM(ok = 2) nf, SUM(ok = 0) bad FROM fm_sync_state GROUP BY src").all()).results, act = (await db.prepare("SELECT COUNT(*) n FROM fm_drugs WHERE active = 1").first()).n;
     const metas = Object.fromEntries((await db.prepare("SELECT k, v FROM fm_meta WHERE k LIKE 'auto:%' OR k IN ('cron_batch','refresh_days')").all()).results.map((x) => [x.k, x.v]));
     for (const s2 of src) { const z = st.find((x) => x.src === s2.code); s2.can_sync = !!SYNCERS[s2.code]; s2.auto = metas["auto:" + s2.code] === "1"; s2.synced = z ? z.n : 0; s2.good = z ? z.good : 0; s2.notfound = z ? z.nf : 0; s2.bad = z ? z.bad : 0; }
@@ -641,7 +716,7 @@ async function admin(db, a, p, qp, body, M, t, env) {
   }
   if (p.startsWith("drug/") && M === "GET") {
     const id = int(p.slice(5)), d = await db.prepare("SELECT * FROM fm_drugs WHERE id = ?").bind(id).first(); if (!d) return err("Tidak ditemukan.", 404);
-    return J({ drug: d, names: (await drugNames(db, [id])).get(id) || [], facts: (await db.prepare("SELECT field, value, pending, src, sid, updated FROM fm_drug_facts WHERE drug_id = ? ORDER BY field, src").bind(id).all()).results, xref: (await db.prepare("SELECT src, sid, synced FROM fm_drug_xref WHERE drug_id = ?").bind(id).all()).results, cats: await drugCats(db, id) });
+    return J({ drug: d, names: (await drugNames(db, [id])).get(id) || [], facts: await (async () => { const f = (await db.prepare("SELECT id, field, value, pending, src, sid, updated FROM fm_drug_facts WHERE drug_id = ? ORDER BY field, src").bind(id).all()).results, tr = f.length ? await byIds(db, (q) => `SELECT ref, h, text, status FROM fm_tr WHERE ent = 'fact' AND field = 'value' AND ref IN (${q})`, f.map((x) => x.id)) : []; return f.map((x) => { const r = tr.find((y) => y.ref === x.id); return { ...x, tr: r && r.h === fnv(x.value) ? { text: r.text, status: r.status } : null, looks_id: looksId(x.value) }; }); })(), xref: (await db.prepare("SELECT src, sid, synced FROM fm_drug_xref WHERE drug_id = ?").bind(id).all()).results, cats: await drugCats(db, id) });
   }
   if (p === "drug" && M === "POST") {
     const src = SRC_CODES.includes(body.src) ? body.src : "manual";
@@ -661,6 +736,39 @@ async function admin(db, a, p, qp, body, M, t, env) {
     const names = (await byIds(db, (q) => `SELECT generic FROM fm_drugs WHERE id IN (${q})`, ids)).map((x) => x.generic);
     for (const id of ids) await db.batch(["DELETE FROM fm_inter_members WHERE inter_id IN (SELECT id FROM fm_inter WHERE drug_a = ?1 OR drug_b = ?1) OR drug_id = ?1", "DELETE FROM fm_inter WHERE drug_a = ?1 OR drug_b = ?1", "DELETE FROM fm_drug_names WHERE drug_id = ?1", "DELETE FROM fm_drug_xref WHERE drug_id = ?1", "DELETE FROM fm_drug_facts WHERE drug_id = ?1", "DELETE FROM fm_drug_cat WHERE drug_id = ?1", "DELETE FROM fm_sync_state WHERE drug_id = ?1", "DELETE FROM fm_bookmarks WHERE kind = 'drug' AND ref = ?1", "DELETE FROM fm_recent WHERE kind = 'drug' AND ref = ?1", "DELETE FROM fm_drugs WHERE id = ?1"].map((q) => db.prepare(q).bind(id)));
     dirty(); await audit(db, u, "obat.hapus", "drug", ids.length === 1 ? ids[0] : 0, clip(names.join(", "), 400)); return J({ n: ids.length });
+  }
+  if (p === "usul" && M === "GET") {
+    const st = ["pending", "approved", "rejected"].includes(qp("st")) ? qp("st") : "pending";
+    const rows = (await db.prepare("SELECT s.*, d.status dstatus FROM fm_usul s LEFT JOIN fm_drugs d ON d.id = s.drug_id WHERE s.status = ? ORDER BY s.created DESC LIMIT 100").bind(st).all()).results;
+    const c = (await db.prepare("SELECT SUM(status = 'pending') p, SUM(status = 'approved') a, SUM(status = 'rejected') r FROM fm_usul").first()) || {};
+    return J({ rows, counts: { pending: c.p || 0, approved: c.a || 0, rejected: c.r || 0 } });
+  }
+  if (p === "usul/decide" && M === "POST") {
+    const ids = uniq((Array.isArray(body.ids) ? body.ids : []).map((x) => int(x)).filter(Boolean)).slice(0, 20), act = body.act; if (!ids.length || !["approve", "reject", "delete"].includes(act)) return err("Pilih usulan dan tindakan.");
+    let n = 0; for (const id of ids) {
+      const r = await db.prepare("SELECT * FROM fm_usul WHERE id = ?").bind(id).first(); if (!r) continue;
+      if (act === "delete") { await db.prepare("DELETE FROM fm_usul WHERE id = ?").bind(id).run(); n++; continue; }
+      if (r.status !== "pending") continue;
+      if (act === "reject") { await db.prepare("UPDATE fm_usul SET status = 'rejected', admin_note = ?, decided = ?, decided_by = ? WHERE id = ?").bind(clip(body.note, 300), t, u, id).run(); n++; continue; }
+      const sv = await saveDrug(db, { generic: r.name, brands: r.brands }, u, "manual", true); if (sv.err) continue; // hanya nama (+nama dagang); isi lain berasal dari sumber, bukan dari pengusul
+      await db.prepare("UPDATE fm_usul SET status = 'approved', drug_id = ?, admin_note = ?, decided = ?, decided_by = ? WHERE id = ?").bind(sv.id, clip(body.note, 300), t, u, id).run(); n++;
+    }
+    dirty(); await audit(db, u, "usulan." + act, "usul", 0, n + " usulan"); return J({ n });
+  }
+  if (p === "tr/status") {
+    const q = (await db.prepare("SELECT (SELECT COUNT(*) FROM fm_drug_facts WHERE value <> '') total, (SELECT COUNT(*) FROM fm_tr WHERE ent = 'fact' AND status = 'auto') auto, (SELECT COUNT(*) FROM fm_tr WHERE ent = 'fact' AND status = 'verified') ver, (SELECT COUNT(*) FROM fm_tr WHERE ent = 'fact' AND status = 'id') idn").first()) || {};
+    const rem = (await db.prepare("SELECT COUNT(*) n FROM fm_drug_facts f JOIN fm_drugs d ON d.id = f.drug_id LEFT JOIN fm_tr t ON t.ent = 'fact' AND t.ref = f.id AND t.field = 'value' WHERE f.value <> '' AND d.active = 1 AND (t.ref IS NULL OR t.t < f.updated)").first()).n;
+    return J({ provider: trProvider(env) || "", ...q, remaining: rem });
+  }
+  if (p === "tr/test" && M === "POST") { const t0 = Date.now(); try { const txt = await trChunk(env, "Take one tablet by mouth once daily with food."); return J({ ok: true, provider: trProvider(env), ms: Date.now() - t0, text: txt }); } catch (e) { return J({ ok: false, provider: trProvider(env), ms: Date.now() - t0, msg: clip(e && e.message, 200) }); } }
+  if (p === "tr/do" && M === "POST") { const ent = body.ent === "inter" ? "inter" : "fact", field = ent === "inter" ? clip(body.field, 20) : "value"; const r = await trDo(db, env, ent, int(body.ref), field, { u, admin: true, force: !!body.force }); return r.err ? err(r.err, r.s || 400) : J(r); }
+  if (p === "tr/save" && M === "POST") { const ent = body.ent === "inter" ? "inter" : "fact", field = ent === "inter" ? clip(body.field, 20) : "value", ref = int(body.ref), src = await trSource(db, ent, ref, field, true), text = clip(body.text, 12000); if (!src) return err("Teks asli tidak ditemukan.", 404); if (!text) return err("Terjemahan kosong."); await trUp(db, ent, ref, field, fnv(src), text, "verified", t); await audit(db, u, "terjemahan.simpan", ent, ref, field); return J({ ok: 1 }); }
+  if (p === "tr/batch" && M === "POST") { // terjemahkan 1 fakta berikutnya yang belum/ketinggalan; browser mengulang sampai remaining = 0
+    const nx = await db.prepare("SELECT f.id FROM fm_drug_facts f JOIN fm_drugs d ON d.id = f.drug_id LEFT JOIN fm_tr t ON t.ent = 'fact' AND t.ref = f.id AND t.field = 'value' WHERE f.value <> '' AND d.active = 1 AND (t.ref IS NULL OR t.t < f.updated) ORDER BY f.id LIMIT 1").first();
+    if (!nx) return J({ done: 0, remaining: 0 });
+    const r = await trDo(db, env, "fact", nx.id, "value", { u, admin: true }); if (r.err) return err(r.err, r.s || 400);
+    const rem = (await db.prepare("SELECT COUNT(*) n FROM fm_drug_facts f JOIN fm_drugs d ON d.id = f.drug_id LEFT JOIN fm_tr t ON t.ent = 'fact' AND t.ref = f.id AND t.field = 'value' WHERE f.value <> '' AND d.active = 1 AND (t.ref IS NULL OR t.t < f.updated)").first()).n;
+    return J({ done: 1, id: nx.id, status: r.status, remaining: rem });
   }
   if (p === "dups") {
     const d1 = (await db.prepare("SELECT a.id aid, a.generic ag, b.id bid, b.generic bg FROM fm_drugs a JOIN fm_drugs b ON a.id < b.id AND (b.generic_lc LIKE a.generic_lc || ' %' OR a.generic_lc LIKE b.generic_lc || ' %') LIMIT 100").all()).results.map((r) => ({ ...r, why: "nama berawalan sama" }));
