@@ -122,7 +122,7 @@ const catOut = (c) => ({ id: c.id, kind: c.kind, name: c.name, parent_id: c.pare
 async function ensureCat(db, kind, name, parentId, src, sid, t) {
   kind = CAT_KINDS[kind] ? kind : "other"; name = clip(name, 160); if (!name) return 0;
   const nl = lc(name), p = parentId || 0;
-  const ex = await db.prepare("SELECT id FROM fm_categories WHERE kind = ? AND parent_id = ? AND name_lc = ? AND src = ?").bind(kind, p, nl, src).first();
+  const ex = await db.prepare("SELECT id FROM fm_categories WHERE kind = ? AND parent_id = ? AND name_lc = ? ORDER BY id LIMIT 1").bind(kind, p, nl).first();
   if (ex) return ex.id;
   const r = await db.prepare("INSERT INTO fm_categories (kind, name, name_lc, parent_id, src, sid, created) VALUES (?, ?, ?, ?, ?, ?, ?)").bind(kind, name, nl, p, src, clip(sid, 80), t).run();
   return r.meta.last_row_id;
@@ -170,27 +170,39 @@ async function saveDrug(db, o, u, src, imp) {
       await db.prepare("UPDATE fm_drugs SET generic = ?, generic_lc = ?, pharm_class = ?, ther_class = ?, classification = ?, summary = ?, updated = ?, updated_by = ? WHERE id = ?").bind(generic, lc(generic), ...cls, clip(o.summary, 600), t, u, id).run();
     }
   }
-  const st = [...setNames(db, id, generic, listOf(o.brands), listOf(o.synonyms), src)];
+  const cap = imp ? 12 : 40, st = [...setNames(db, id, generic, listOf(o.brands).slice(0, cap), listOf(o.synonyms).slice(0, cap), src)];
   for (const [s, sid] of Object.entries(xr)) if (clip(sid, 80)) st.push(db.prepare("INSERT INTO fm_drug_xref (drug_id, src, sid, synced) VALUES (?, ?, ?, ?) ON CONFLICT(src, sid) DO UPDATE SET synced = excluded.synced").bind(id, clip(s, 20), clip(sid, 80), t));
   await db.batch(st);
   // fakta per sumber (perbedaan antar-sumber dipertahankan: unik per drug+field+src)
   const cur = row ? row.status : "draft", facts = o.facts && typeof o.facts === "object" ? o.facts : {};
   let pend = 0;
-  for (const [f, v] of Object.entries(facts)) {
-    if (!FIELDS[f]) continue; const val = clip(v, 8000); if (!val) continue;
-    const ex = await db.prepare("SELECT id, value FROM fm_drug_facts WHERE drug_id = ? AND field = ? AND src = ?").bind(id, f, src).first();
-    if (!ex) await db.prepare("INSERT INTO fm_drug_facts (drug_id, field, value, src, sid, updated) VALUES (?, ?, ?, ?, ?, ?)").bind(id, f, val, src, clip(o.source_id || xr[src] || "", 80), t).run();
-    else if (ex.value !== val) {
-      if (imp && cur === "published") { await db.prepare("UPDATE fm_drug_facts SET pending = ?, updated = ? WHERE id = ?").bind(val, t, ex.id).run(); pend++; } // menunggu persetujuan admin
-      else await db.prepare("UPDATE fm_drug_facts SET value = ?, pending = NULL, sid = ?, updated = ? WHERE id = ?").bind(val, clip(o.source_id || xr[src] || "", 80), t, ex.id).run();
+  const entries = Object.entries(facts).filter(([f, v]) => FIELDS[f] && clip(v, 8000));
+  if (entries.length) { // hemat query D1: satu SELECT + satu batch (batas 50 query/permintaan di paket gratis)
+    const have = new Map((await db.prepare("SELECT id, field, value FROM fm_drug_facts WHERE drug_id = ? AND src = ?").bind(id, src).all()).results.map((x) => [x.field, x])), fst = [], sidv = clip(o.source_id || xr[src] || "", 80);
+    for (const [f, v] of entries) {
+      const val = clip(v, 8000), ex = have.get(f);
+      if (!ex) fst.push(db.prepare("INSERT INTO fm_drug_facts (drug_id, field, value, src, sid, updated) VALUES (?, ?, ?, ?, ?, ?)").bind(id, f, val, src, sidv, t));
+      else if (ex.value !== val) {
+        if (imp && cur === "published") { fst.push(db.prepare("UPDATE fm_drug_facts SET pending = ?, updated = ? WHERE id = ?").bind(val, t, ex.id)); pend++; } // menunggu persetujuan admin
+        else fst.push(db.prepare("UPDATE fm_drug_facts SET value = ?, pending = NULL, sid = ?, updated = ? WHERE id = ?").bind(val, sidv, t, ex.id));
+      }
     }
+    if (fst.length) await db.batch(fst);
   }
   // kategori: dari daftar eksplisit + kolom golongan (berdasarkan data, bukan tebakan)
   const cl = Array.isArray(o.categories) ? [...o.categories] : [];
   if (cls[0]) cl.push({ kind: "pharm_class", name: cls[0] }); if (cls[1]) cl.push({ kind: "ther_class", name: cls[1] }); if (cls[2]) cl.push({ kind: "classification", name: cls[2] });
+  const deep = [], seen = new Set(), cst = [];
   for (const c of cl) {
-    const path = Array.isArray(c.path) && c.path.length ? c.path : [c.name]; let p = 0;
-    for (const nm of path) { p = await ensureCat(db, c.kind || "other", nm, p, src, c.sid || "", t); }
+    if (Array.isArray(c.path) && c.path.length > 1) { deep.push(c); continue; }
+    const kind = CAT_KINDS[c.kind] ? c.kind : "other", nm = clip(Array.isArray(c.path) && c.path.length ? c.path[0] : c.name, 160), key = kind + "|" + lc(nm);
+    if (!nm || seen.has(key) || seen.size >= 12) continue; seen.add(key);
+    cst.push(db.prepare("INSERT INTO fm_categories (kind, name, name_lc, parent_id, src, sid, created) SELECT ?, ?, ?, 0, ?, ?, ? WHERE NOT EXISTS (SELECT 1 FROM fm_categories WHERE kind = ? AND parent_id = 0 AND name_lc = ?)").bind(kind, nm, lc(nm), src, clip(c.sid || "", 80), t, kind, lc(nm)));
+    cst.push(db.prepare("INSERT OR IGNORE INTO fm_drug_cat (drug_id, cat_id) SELECT ?, MIN(id) FROM fm_categories WHERE kind = ? AND parent_id = 0 AND name_lc = ?").bind(id, kind, lc(nm)));
+  }
+  if (cst.length) await db.batch(cst);
+  for (const c of deep) { // hierarki (mis. ATC): bertahap
+    let p = 0; for (const nm of c.path) p = await ensureCat(db, c.kind || "other", nm, p, src, c.sid || "", t);
     if (p) await db.prepare("INSERT OR IGNORE INTO fm_drug_cat (drug_id, cat_id) VALUES (?, ?)").bind(id, p).run();
   }
   dirty();
@@ -425,19 +437,20 @@ async function syncOne(db, env, d, src, u) {
   try {
     const r = await SYNCERS[src](d.generic, env);
     if (!r) { ok = 2; msg = "tidak ditemukan di " + src; }
-    else { const x = await saveDrug(db, { id: d.id, generic: d.generic, brands: r.brands, synonyms: r.syn, pharm_class: r.pharm_class, facts: r.facts, categories: r.categories, xref: r.sid ? { [src]: r.sid } : {}, source_id: r.sid }, u, src, true); msg = "ok " + (r.sid || "") + (x.pend ? " · " + x.pend + " pembaruan menunggu persetujuan" : ""); }
+    else { const x = await saveDrug(db, { id: d.id, generic: d.generic, brands: r.brands, synonyms: r.syn, pharm_class: r.pharm_class, facts: r.facts, categories: r.categories, xref: r.sid ? { [src]: r.sid } : {}, source_id: r.sid }, u, src, true); const got = Object.keys(r.facts || {}); msg = "ok " + (r.sid || "") + (got.length ? " · bidang: " + got.join(", ") : " · hanya identitas/nama, TANPA bidang isi (sumber tidak punya datanya)") + (x.pend ? " · " + x.pend + " pembaruan menunggu persetujuan" : ""); }
   } catch (e) { ok = 0; msg = "gagal: " + clip(e && e.message, 100); }
-  await db.prepare("INSERT INTO fm_sync_state (drug_id, src, t, ok, msg) VALUES (?, ?, ?, ?, ?) ON CONFLICT(drug_id, src) DO UPDATE SET t = excluded.t, ok = excluded.ok, msg = excluded.msg").bind(d.id, src, t, ok, msg).run();
+  try { await db.prepare("INSERT INTO fm_sync_state (drug_id, src, t, ok, msg) VALUES (?, ?, ?, ?, ?) ON CONFLICT(drug_id, src) DO UPDATE SET t = excluded.t, ok = excluded.ok, msg = excluded.msg").bind(d.id, src, t, ok, msg).run(); } catch (e) { msg += " (status tidak tercatat: " + clip(e && e.message, 60) + ")"; }
   return { id: d.id, generic: d.generic, ok, r: msg };
 }
 // Dipanggil Cloudflare Cron (scheduled) atau tombol admin. Hanya sumber yang diaktifkan admin ("otomatis"); batch kecil per sumber agar tidak melewati batas subrequest.
 export async function farmakoCron(env, u = "cron") {
   const db = await fmDb(env); if (!db) return { skipped: "D1 belum terpasang" };
-  const batch = Math.min(10, Math.max(1, int(await getMeta(db, "cron_batch", "3"), 3))), days = Math.max(1, int(await getMeta(db, "refresh_days", "30"), 30)), out = [], t = Date.now();
+  const batch = Math.min(10, Math.max(1, int(await getMeta(db, "cron_batch", "1"), 1))), days = Math.max(1, int(await getMeta(db, "refresh_days", "30"), 30)), out = [], t = Date.now();
   for (const src of Object.keys(SYNCERS)) {
+    if (out.length >= batch) break; // batch = total sinkron per putaran (semua sumber)
     if ((await getMeta(db, "auto:" + src, "0")) !== "1") continue;
     const en = await db.prepare("SELECT enabled FROM fm_sources WHERE code = ?").bind(src).first(); if (!en || !en.enabled) continue;
-    const due = (await db.prepare("SELECT d.id, d.generic FROM fm_drugs d LEFT JOIN fm_sync_state s ON s.drug_id = d.id AND s.src = ? WHERE d.active = 1 AND (s.t IS NULL OR s.t < ? - (CASE WHEN s.ok = 0 THEN ? ELSE ? END)) ORDER BY COALESCE(s.t, 0) LIMIT ?").bind(src, t, DAY, days * DAY, batch).all()).results;
+    const due = (await db.prepare("SELECT d.id, d.generic FROM fm_drugs d LEFT JOIN fm_sync_state s ON s.drug_id = d.id AND s.src = ? WHERE d.active = 1 AND (s.t IS NULL OR s.t < ? - (CASE WHEN s.ok = 0 THEN ? ELSE ? END)) ORDER BY COALESCE(s.t, 0) LIMIT ?").bind(src, t, DAY, days * DAY, batch - out.length).all()).results;
     let n = 0, bad = 0; for (const d of due) { const r = await syncOne(db, env, d, src, u); n++; if (r.ok === 0) bad++; out.push({ src, ...r }); }
     if (n) { await db.prepare("UPDATE fm_sources SET last_sync = ? WHERE code = ?").bind(Date.now(), src).run(); await db.prepare("INSERT INTO fm_sync_log (t, u, src, act, ok, n_in, n_up, n_skip, msg) VALUES (?, ?, ?, 'sinkron terjadwal', ?, 0, ?, ?, ?)").bind(Date.now(), u, src, bad ? 0 : 1, n - bad, bad, clip(due.map((d) => d.generic).join(", "), 300)).run(); }
   }
@@ -594,7 +607,7 @@ export async function farmakoApi(request, env, a, path, url, body, M) {
       return J({ rows, best: best ? best.s : 0 });
     }
     return err("Tidak ditemukan.", 404);
-  } catch (e) { console.error("farmako", path, e); return err("Terjadi kesalahan pada server Farmakologi.", 500); }
+  } catch (e) { console.error("farmako", path, e); return err("Terjadi kesalahan pada server Farmakologi." + (a.admin ? " Detail: " + clip(e && e.message, 220) : ""), 500); }
 }
 
 // ---------- ADMIN ----------
@@ -609,7 +622,7 @@ async function admin(db, a, p, qp, body, M, t, env) {
     const st = (await db.prepare("SELECT src, COUNT(*) n, SUM(ok = 1) good, SUM(ok = 2) nf, SUM(ok = 0) bad FROM fm_sync_state GROUP BY src").all()).results, act = (await db.prepare("SELECT COUNT(*) n FROM fm_drugs WHERE active = 1").first()).n;
     const metas = Object.fromEntries((await db.prepare("SELECT k, v FROM fm_meta WHERE k LIKE 'auto:%' OR k IN ('cron_batch','refresh_days')").all()).results.map((x) => [x.k, x.v]));
     for (const s2 of src) { const z = st.find((x) => x.src === s2.code); s2.can_sync = !!SYNCERS[s2.code]; s2.auto = metas["auto:" + s2.code] === "1"; s2.synced = z ? z.n : 0; s2.good = z ? z.good : 0; s2.notfound = z ? z.nf : 0; s2.bad = z ? z.bad : 0; }
-    return J({ drugs: d, other: q, sources: src, active: act, cron: { batch: int(metas.cron_batch, 3), days: int(metas.refresh_days, 30) } });
+    return J({ drugs: d, other: q, sources: src, active: act, cron: { batch: int(metas.cron_batch, 1), days: int(metas.refresh_days, 30) } });
   }
   if (p === "sources" && M === "POST") { await db.prepare("UPDATE fm_sources SET enabled = ?, note = ? WHERE code = ?").bind(body.enabled ? 1 : 0, clip(body.note, 300), clip(body.code, 20)).run(); await audit(db, u, "sumber.ubah", "source", 0, body.code); return J({ ok: 1 }); }
   if (p === "log") return J({ sync: (await db.prepare("SELECT * FROM fm_sync_log ORDER BY id DESC LIMIT 40").all()).results, audit: (await db.prepare("SELECT * FROM fm_audit ORDER BY id DESC LIMIT 80").all()).results });
@@ -778,11 +791,10 @@ async function admin(db, a, p, qp, body, M, t, env) {
   if (p === "sync" && M === "POST") {
     const src = body.src; if (!SYNCERS[src]) return err("Sinkronisasi langsung tersedia untuk: " + Object.keys(SYNCERS).join(", ") + ". DrugBank, DDInter, dan KEGG diimpor dari berkas.");
     const row = await db.prepare("SELECT enabled FROM fm_sources WHERE code = ?").bind(src).first(); if (!row || !row.enabled) return err("Sumber ini dinonaktifkan.");
-    const ids = uniq((Array.isArray(body.ids) ? body.ids : []).map((x) => int(x)).filter(Boolean)).slice(0, 8); if (!ids.length) return err("Pilih obat terlebih dahulu.");
+    const ids = uniq((Array.isArray(body.ids) ? body.ids : []).map((x) => int(x)).filter(Boolean)).slice(0, 1); if (!ids.length) return err("Pilih obat terlebih dahulu."); // 1 per permintaan: aman dari batas query D1 per invokasi (50 di paket gratis); browser mengulang
     let ok = 0, miss = 0, fail = 0; const out = [];
     for (const id of ids) { const d = await db.prepare("SELECT id, generic FROM fm_drugs WHERE id = ?").bind(id).first(); if (!d) continue; const r = await syncOne(db, env, d, src, u); if (r.ok === 1) ok++; else if (r.ok === 2) miss++; else fail++; out.push({ id, generic: d.generic, r: r.r }); }
-    await db.prepare("UPDATE fm_sources SET last_sync = ? WHERE code = ?").bind(t, src).run();
-    await db.prepare("INSERT INTO fm_sync_log (t, u, src, act, ok, n_in, n_up, n_skip, msg) VALUES (?, ?, ?, 'sinkron api', ?, 0, ?, ?, ?)").bind(t, u, src, fail ? 0 : 1, ok, miss + fail, clip(out.map((o) => o.generic + ": " + o.r).join("; "), 500)).run();
+    try { await db.batch([db.prepare("UPDATE fm_sources SET last_sync = ? WHERE code = ?").bind(t, src), db.prepare("INSERT INTO fm_sync_log (t, u, src, act, ok, n_in, n_up, n_skip, msg) VALUES (?, ?, ?, 'sinkron api', ?, 0, ?, ?, ?)").bind(t, u, src, fail ? 0 : 1, ok, miss + fail, clip(out.map((o) => o.generic + ": " + o.r).join("; "), 500))]); } catch (e) { /* pencatatan log tidak boleh menggagalkan sinkron */ }
     dirty(); return J({ ok, miss, fail, out });
   }
   // uji koneksi: satu kueri contoh ke layanan, TANPA menyimpan apa pun. "aspirin" hanya nama uji koneksi.
@@ -794,6 +806,19 @@ async function admin(db, a, p, qp, body, M, t, env) {
       if (!r) return J({ ok: false, reached: true, ms, msg: "Layanan terjangkau tetapi nama uji tidak ditemukan/tidak cocok. Bentuk respons mungkin berubah — periksa manual sebelum mengaktifkan otomatis." });
       return J({ ok: true, ms, msg: "Terhubung. Sid " + (r.sid || "—") + "; bidang terbaca: " + (Object.keys(r.facts || {}).join(", ") || "—") + "; sinonim/nama dagang: " + ((r.syn || []).length + (r.brands || []).length) + "; kategori: " + (r.categories || []).length + "." });
     } catch (e) { return J({ ok: false, ms: Date.now() - t0, msg: "Gagal: " + clip(e && e.message, 160) + ". Periksa akses jaringan Worker/server." }); }
+  }
+  if (p === "sync-all" && M === "POST") { // dipanggil berulang oleh browser sampai remaining = 0; tiap panggilan kecil agar aman dari batas Worker
+    const srcs = (Array.isArray(body.srcs) ? body.srcs : []).filter((x) => SYNCERS[x]); if (!srcs.length) return err("Pilih sumber.");
+    const cap = Math.min(6, Math.max(1, int(body.n, 1))), days = Math.max(1, int(await getMeta(db, "refresh_days", "30"), 30)), out = []; // cap = jumlah (obat×sumber) per permintaan; 1 aman untuk paket gratis
+    const dueSql = (lim) => "SELECT d.id, d.generic FROM fm_drugs d LEFT JOIN fm_sync_state s ON s.drug_id = d.id AND s.src = ? WHERE d.active = 1 AND (s.t IS NULL OR s.t < ? - (CASE WHEN s.ok = 0 THEN ? ELSE ? END)) ORDER BY COALESCE(s.t, 0)" + (lim ? " LIMIT ?" : "");
+    for (const src of srcs) {
+      if (out.length >= cap) break;
+      const en = await db.prepare("SELECT enabled FROM fm_sources WHERE code = ?").bind(src).first(); if (!en || !en.enabled) continue;
+      for (const d of (await db.prepare(dueSql(1)).bind(src, Date.now(), DAY, days * DAY, cap - out.length).all()).results) out.push({ src, ...(await syncOne(db, env, d, src, u)) });
+    }
+    let remaining = 0; for (const src of srcs) remaining += (await db.prepare("SELECT COUNT(*) n FROM (" + dueSql(0) + ")").bind(src, Date.now(), DAY, days * DAY).first()).n;
+    if (out.length) { dirty(); try { await db.batch([...srcs.map((x) => db.prepare("UPDATE fm_sources SET last_sync = ? WHERE code = ?").bind(Date.now(), x)), db.prepare("INSERT INTO fm_sync_log (t, u, src, act, ok, n_in, n_up, n_skip, msg) VALUES (?, ?, ?, 'sinkron semua', ?, 0, ?, ?, ?)").bind(Date.now(), u, srcs.join("+"), out.some((o) => o.ok === 0) ? 0 : 1, out.filter((o) => o.ok === 1).length, out.filter((o) => o.ok !== 1).length, clip(out.map((o) => o.generic + "@" + o.src + ": " + o.r).join("; "), 400))]); } catch (e) { /* log tidak fatal */ } }
+    return J({ done: out.length, ok: out.filter((o) => o.ok === 1).length, notfound: out.filter((o) => o.ok === 2).length, fail: out.filter((o) => o.ok === 0).length, remaining, out });
   }
   if (p === "auto" && M === "POST") {
     if (body.src) { if (!SYNCERS[body.src]) return err("Sumber tidak valid."); await setMeta(db, "auto:" + body.src, body.on ? "1" : "0"); }
