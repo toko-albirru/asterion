@@ -283,6 +283,8 @@ const { default: worker } = await import("./src/worker.js");
 await migrate();
 
 const env = { ...process.env, DB: new D1(), LINKS: new KV(), ASSETS };
+// Pengganti Cron Trigger untuk Docker/Node: aktifkan dengan FARMAKO_CRON_MIN=30 (menit). Tanpa variabel ini tidak ada yang berjalan.
+if (Number(process.env.FARMAKO_CRON_MIN) > 0 && worker.scheduled) setInterval(() => worker.scheduled({}, env, { waitUntil: (p) => p }), Number(process.env.FARMAKO_CRON_MIN) * 60000);
 
 async function handle(req, res) {
   const proto = req.headers["x-forwarded-proto"] || "http";

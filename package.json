@@ -8,7 +8,8 @@
     "start": "node server.js",
     "dev:cf": "wrangler dev --ip 0.0.0.0 --port 3000 --show-interactive-dev-session=false",
     "migrate:cf": "wrangler d1 migrations apply asterion-run --local",
-    "test": "node scripts/test-format-baru.js"
+    "test": "node scripts/test-format-baru.js",
+    "gen:migration-farmako": "node scripts/gen-migration-farmako.mjs"
   },
   "devDependencies": {
     "wrangler": "^4.159.0"
