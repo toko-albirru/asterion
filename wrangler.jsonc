@@ -1,0 +1,23 @@
+{
+  "name": "asterion",
+  "main": "src/worker.js",
+  "compatibility_date": "2026-10-01",
+  "keep_vars": true,
+  "triggers": { "crons": ["*/30 * * * *"] },
+  "ai": { "binding": "AI" },
+  "assets": {
+    "directory": "./public",
+    "binding": "ASSETS",
+    "run_worker_first": ["/api/*"]
+  },
+  "kv_namespaces": [
+    { "binding": "LINKS", "id": "587d322643cd4434a3909abc1f1405c6" }
+  ],
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "asterion-run",
+      "database_id": "de8e8827-c5c2-494a-b297-a2d88434b233"
+    }
+  ]
+}
