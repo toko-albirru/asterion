@@ -21,7 +21,13 @@
     });
   }
 
-  function inline(x) { return esc(x).replace(/\*\*(.+?)\*\*/g, "<b>$1</b>"); }
+  var REF_SEE = /\[(see\s[^\]\n]{2,90})\]/g;
+  var REF_NUM = /\(\s?(?:1[0-7]|[1-9])\.\d{1,2}(?:\s*,\s*(?:1[0-7]|[1-9])\.\d{1,2})*\s?\)(?=\s*(?:$|[.;,:]|\s[A-Z\u2022]))/g;
+  // rujukan silang label ("[see Warnings (5.1)]", "(1.1)") diredam supaya isi kalimat yang menonjol
+  function inline(x) {
+    return esc(x).replace(/\*\*(.+?)\*\*/g, "<b>$1</b>")
+      .replace(REF_SEE, "<span class='fm-ref'>[$1]</span>").replace(REF_NUM, function (m) { return "<span class='fm-ref'>" + m + "</span>"; });
+  }
 
   // Judul bagian baku label obat. Hanya judul yang dikenal yang dijadikan heading, supaya nama obat
   // di awal kalimat (mis. "Simvastatin is a lactone…") tidak salah dianggap judul.
@@ -53,6 +59,30 @@
       return "\n\n" + items.map(function (x) { return "@@L:" + x.trim() + "@@"; }).join("\n") + "\n\n";
     });
   }
+
+  // ---------- 1b. butir "•" yang menempel dalam satu paragraf → daftar ----------
+  // Teks label FDA: "…indicated: To reduce the risk of: • MI, stroke (1.1) • Adults with … (1.2) Limitations of Use: …"
+  var BUL = /\s*[\u2022\u25CF\u25AA\u2023\u25E6]\s+/g;
+  var ITEM_END = /\(\s?\d{1,2}(?:\.\d{1,2})*(?:\s*,\s*\d{1,2}(?:\.\d{1,2})*)*\s?\)\s+(?=[A-Z])/;
+  function bullets(t) {
+    if (!/[\u2022\u25CF\u25AA\u2023\u25E6]\s/.test(t)) return t;
+    var lines = t.replace(BUL, "\n@@B:").split("\n"), out = [], prevB = false;
+    for (var i = 0; i < lines.length; i++) {
+      var l = lines[i];
+      if (l.slice(0, 4) !== "@@B:") { out.push((prevB ? "\n" : "") + l); prevB = false; continue; }
+      var item = l.slice(4).trim(), rest = "", m = ITEM_END.exec(item);
+      if (m) { rest = item.slice(m.index + m[0].length); item = item.slice(0, m.index + m[0].trim().length); }
+      var nextIsB = i + 1 < lines.length && lines[i + 1].slice(0, 4) === "@@B:";
+      if (!m && !nextIsB) { var sp = /^(.{40,}?[.!?])\s+(?=[A-Z])/.exec(item); if (sp) { rest = item.slice(sp[0].length); item = sp[1]; } }
+      out.push((prevB ? "" : "\n\n") + "@@L:" + item + "@@");
+      prevB = true;
+      if (rest) { out.push("\n\n" + rest); prevB = false; }
+    }
+    return out.join("\n").replace(/\n{3,}/g, "\n\n");
+  }
+  var LEADS = ["Important Limitations of Use", "Limitations of Use", "Important Administration Instructions", "Recommended Dosage", "Recommended Dose", "Dosage Adjustments?", "Risk Summary", "Clinical Considerations", "Pediatric Patients", "Geriatric Patients", "Adults", "Pregnancy", "Lactation", "Boxed Warning", "Warning", "Note", "Examples"];
+  var LEAD_RE = new RegExp("(^|[.!?)\\]]\\s+)(" + LEADS.join("|") + "):\\s+", "gm");
+  function leads(t) { return t.replace(LEAD_RE, function (m, pre, lab) { return pre + "\n\n**" + lab + ":** "; }); }
 
   // ---------- 2. judul bagian bernomor yang tidak ada di daftar baku ----------
   // Berlaku juga untuk judul hasil terjemahan ("6.1 Pengalaman Uji Klinis"). Hanya menerima
@@ -204,7 +234,7 @@
 
   // ---------- 6. enumerasi bersistem: "Body as a whole: malaise, pyrexia …" ----------
   function sysList(t) {
-    var ms = [], m, re = /([A-Z][A-Za-z][A-Za-z \/&-]{2,32}):\s/g;
+    var ms = [], m, re = /([A-Z][A-Za-z][A-Za-z \/&-]{1,32}):\s/g;
     while ((m = re.exec(t))) ms.push({ i: m.index, len: m[0].length, label: m[1].trim() });
     ms = ms.filter(function (x) { return x.label.split(/\s+/).length <= 4; });
     if (ms.length < 2) return null;
@@ -217,17 +247,82 @@
     return { intro: intro, items: items };
   }
 
+  // ---------- 5b. tabel angka tanpa label baris & rumus ----------
+  // Contoh: "DOSAGE TABLE FOR VANCOMYCIN … (Adapted from X et al. 1 ) Creatinine Clearance mL/min Vancomycin Dose mg/24 h 100 1,545 90 1,390 …"
+  // Deretan angka berpasangan (kolom pertama menurun/naik teratur) dijadikan tabel; judul kapital dirapikan.
+  var NUM = "(?:\\d{1,3}(?:,\\d{3})+|\\d+(?:\\.\\d+)?)";
+  var RUN_RE = new RegExp("(?:^|\\s)((?:" + NUM + "\\s+){7,}" + NUM + ")(?=\\s|$)");
+  var SMALL = { for: 1, in: 1, with: 1, of: 1, and: 1, the: 1, to: 1, on: 1, by: 1, or: 1, a: 1, an: 1, at: 1, from: 1 };
+  function titleCaps(x) {
+    return x.toLowerCase().split(/\s+/).map(function (w, i) {
+      var orig = x.split(/\s+/)[i];
+      if (orig.length <= 3 && !SMALL[w]) return orig;           // singkatan pendek (FDA, ICU, IV) dipertahankan
+      if (i && SMALL[w]) return w;
+      return w.replace(/^[a-z]/, function (c) { return c.toUpperCase(); });
+    }).join(" ");
+  }
+  var UNIT_RE = /\S*?[A-Za-z\u00B5]+\/\d*\s?[A-Za-z\u00B5]+/g;
+  function colLabels(head, c) {
+    var us = head.match(UNIT_RE) || [];
+    if (us.length !== c) return null;
+    var out = [], from = 0;
+    us.forEach(function (u) {
+      var i = head.indexOf(u, from), lab = head.slice(from, i).trim(), unit = u.trim();
+      out.push((lab || "Nilai") + " (" + unit + ")"); from = i + u.length;
+    });
+    return out;
+  }
+  function numTable(t) {
+    var m = RUN_RE.exec(t); if (!m) return null;
+    var toks = m[1].trim().split(/\s+/), n = toks.length, c = 0;
+    for (var k = 2; k <= 5 && !c; k++) {
+      if (n % k || n / k < 4) continue;
+      var col = [], dir = 0, okc = true;
+      for (var i = 0; i < n; i += k) col.push(parseFloat(toks[i].replace(/,/g, "")));
+      for (var j = 1; j < col.length && okc; j++) { var d = col[j] - col[j - 1]; if (!d || (dir && (d > 0) !== (dir > 0))) okc = false; dir = d; }
+      if (okc) c = k;
+    }
+    if (!c) return null;
+    var start = m.index + (/^\s/.test(m[0]) ? 1 : 0), before = t.slice(0, start).trim(), rest = t.slice(start + m[1].length).trim();
+    var cap = "", sub = "", mc = /^((?:[A-Z][A-Z0-9,\-\/&']*\s+){2,}[A-Z][A-Z0-9,\-\/&']*)\s*(\([^)]{0,90}\))?\s*/.exec(before);
+    if (mc) { cap = titleCaps(mc[1]); sub = (mc[2] || "").replace(/\s+\)/, ")"); before = before.slice(mc[0].length).trim(); }
+    var hs = before.split(/(?<=[.!?])\s+(?=[A-Z])/), head = hs.pop() || "", prefix = hs.join(" ");
+    var labels = colLabels(head, c);
+    if (!labels && head) { prefix = (prefix ? prefix + " " : "") + head; head = ""; }
+    var rows = []; for (var r = 0; r < n; r += c) rows.push(toks.slice(r, r + c));
+    var html = (prefix ? paragraphs(prefix).map(function (x) { return "<p>" + inline(x) + "</p>"; }).join("") : "") +
+      (cap ? "<div class='fm-cap'>" + inline(cap) + (sub ? " <span class='fm-ref'>" + esc(sub) + "</span>" : "") + "</div>" : "") +
+      "<div class='fm-tw'><table class='fm-tb fm-num'>" + (labels ? "<tr>" + labels.map(function (x) { return "<th>" + inline(x) + "</th>"; }).join("") + "</tr>" : "") +
+      rows.map(function (rw) { return "<tr>" + rw.map(function (x) { return "<td>" + esc(x) + "</td>"; }).join("") + "</tr>"; }).join("") + "</table></div>";
+    return html + (rest ? renderParagraph(rest) : "");
+  }
+  // "[Weight (kg) x (140 – age in years)] 72 x serum creatinine" → pecahan; "x" → ×; "0. 85" → "0.85"
+  function formula(b) {
+    var x = String(b).replace(/\b(0)\.\s+(\d)/g, "$1.$2").replace(/(\s)x(\s)/g, "$1\u00D7$2").trim();
+    var fm = /^(\[[^\]]+\])\s+(\d[^\[\]]*?)$/.exec(x);
+    if (fm) return "<span class='fm-frac'><span>" + inline(fm[1].replace(/^\[|\]$/g, "")) + "</span><span>" + inline(fm[2]) + "</span></span>";
+    return inline(x);
+  }
+  var FORM_MARK = /[\u00D7=]|\sx\s/;
   function renderParagraph(t) {
     var s = String(t).trim();
     if (!s) return "";
     var tb = tableInText(s);
     if (tb) return tb.html + (tb.rest ? renderParagraph(tb.rest) : "");
+    var nt = numTable(s);
+    if (nt) return nt;
     var sl = sysList(s);
     if (sl) {
+      var tail = "", last = sl.items.length - 1, lb = sl.items[last].body;
+      if (FORM_MARK.test(lb)) { // butir rumus terakhir: kalimat penutup keluar dari butir
+        var cut = /(?<=[a-z0-9)\]])\s+(?=[A-Z][a-z]{2,}\s+[a-z])/.exec(lb);
+        if (cut) { tail = lb.slice(cut.index).trim(); sl.items[last].body = lb.slice(0, cut.index).trim(); }
+      }
       return (sl.intro ? "<p>" + inline(sl.intro) + "</p>" : "") + "<ul>" + sl.items.map(function (x) {
+        if (FORM_MARK.test(x.body)) return "<li class='fm-eq'><b>" + inline(x.label + ":") + "</b> " + formula(x.body) + "</li>";
         var body = paragraphs(x.body).map(inline).join("<br>");
         return "<li><b>" + inline(x.label + ":") + "</b> " + body + "</li>";
-      }).join("") + "</ul>";
+      }).join("") + "</ul>" + (tail ? renderParagraph(tail) : "");
     }
     return paragraphs(s).map(function (x) { return "<p>" + inline(x) + "</p>"; }).join("");
   }
@@ -269,9 +364,18 @@
     return String(s == null ? "" : s).replace(/(^|[\s\-\/(])([a-z\u00E0-\u00FF])/g, function (m, p, c) { return p + c.toUpperCase(); });
   }
 
+  // Judul yang terulang dua kali di awal teks dan tanda kurung yang terputus baris ("…et al.\n\n1 )") dirapikan.
+  function heal(s) {
+    var L = s.split("\n"), a = (L[0] || "").trim(), b = (L[1] || "").trim();
+    if (a.length > 20 && b.length >= a.length && b.indexOf(a) === 0) { L.shift(); s = L.join("\n"); }
+    return s.replace(/(\([^()\n]*)\n+\s*(\d{1,2}\s*\))/g, "$1 $2").replace(/(\d)\s+\)/g, "$1)").replace(/\b(0)\.\s+(\d)/g, "$1.$2");
+  }
+
   function md(text) {
-    var s = String(text == null ? "" : text).replace(/\r\n?/g, "\n");
+    var s = heal(String(text == null ? "" : text).replace(/\r\n?/g, "\n"));
     s = crossLists(s);
+    s = bullets(s);
+    s = leads(s);
     s = titleLines(s);
     s = s.replace(MARK_RE, function (m, num, title) { return "\n\n@@H:" + num + " " + title + "@@\n\n"; });
     s = markGeneric(s);
@@ -279,9 +383,24 @@
     return s.split(/\n{2,}/).map(renderSeg).filter(Boolean).join("");
   }
 
+  // Teks panjang: tampilkan bagian awal, sisanya dilipat ("Tampilkan selengkapnya"). Judul tidak boleh menggantung di ujung bagian awal.
+  var TOP = /(?=<(?:p|h4|h5|ul)>|<(?:h4|h5) class=|<div class='fm-(?:cap|tw)')/;
+  function plain(h) { return h.replace(/<[^>]+>/g, "").length; }
+  function fold(text, opt) {
+    opt = opt || {};
+    var html = md(text), parts = html.split(TOP).filter(Boolean);
+    if (parts.length <= 4 || plain(html) <= (opt.chars || 1300)) return html;
+    var n = 0, len = 0;
+    while (n < parts.length && (n < 3 || len < (opt.show || 650))) { len += plain(parts[n]); n++; }
+    while (n > 1 && /^<h[45]/.test(parts[n - 1])) n--;
+    if (n >= parts.length) return html;
+    return parts.slice(0, n).join("") + "<details class='fm-more'><summary>" + esc(opt.more || "Tampilkan selengkapnya") + " (" + (parts.length - n) + " bagian lagi)</summary>" + parts.slice(n).join("") + "</details>";
+  }
+
   md.esc = esc;
   md.titles = TITLES;
   md.cap = cap;
-  md.ver = 3;
+  md.fold = fold;
+  md.ver = 4;
   return md;
 });
