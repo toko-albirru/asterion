@@ -468,7 +468,7 @@ const fnv = (str) => { let h = 2166136261 >>> 0; for (let i = 0; i < str.length;
 // Versi aturan terjemahan (glosarium istilah baku). Naikkan angka ini bila daftar istilah berubah:
 // hash cache ikut berubah, sehingga terjemahan otomatis lama tidak dipakai ulang dan dibuat ulang
 // dengan glosarium terbaru. Terjemahan berstatus "verified" (hasil kurasi admin) tetap dipertahankan.
-export const TR_VER = "2026-11-14b";
+export const TR_VER = "2026-11-14c";
 export const trHash = (s) => fnv(String(s == null ? "" : s) + "|" + TR_VER);
 const ID_W = new Set("yang dan untuk dengan pada dari adalah atau tidak dalam ini itu dapat oleh akan sebagai juga karena telah dapat harus sebaiknya pasien obat".split(" ")), EN_W = new Set("the of and to in is with for or may not be are by as this that should patients has have been is was from".split(" "));
 const looksId = (t) => { const w = String(t).toLowerCase().match(/[a-z]+/g) || []; let a = 0, b = 0; for (const x of w) { if (ID_W.has(x)) a++; if (EN_W.has(x)) b++; } return w.length >= 3 && a > b; };
@@ -496,7 +496,7 @@ const TR_SYS = [
   "3. Also keep unchanged: drug and brand names, enzyme/protein/gene names (CYP3A4, HMG-CoA reductase), species names (Homo sapiens), abbreviations (PK, AUC, Cmax), units, doses, numbers, percentages, comparison signs, section numbers (12.3), table numbers, cross-references such as [see Warnings and Precautions (5.1)], label section headings, URLs and phone numbers.",
   "4. Translate only the ordinary connecting language (grammar words, common verbs, nouns, adjectives) so each sentence reads fluently in Indonesian with the English medical terms embedded.",
   "5. Never add, omit, summarize, soften or reorder information. Every sentence, number and negation must be preserved. Keep modality exact: may = dapat/mungkin, should = sebaiknya, must = harus, not recommended = tidak dianjurkan, contraindicated = contraindicated.",
-  "6. Keep the same line breaks as the input.",
+  "6. Keep the same line breaks as the input, and keep bullet symbols (•, ◦) and numbering exactly where they are. Write every number with digits, never with words.",
 ].join("\n");
 const TR_SHOT_IN = "12.3 Pharmacokinetics Simvastatin is a lactone that is readily hydrolyzed in vivo to the corresponding β-hydroxyacid. Pharmacokinetics (PK) of simvastatin and its metabolites was originally characterized using inhibition of HMG-CoA reductase activity following base hydrolysis of plasma samples, as specific bioanalytical methods were not available.";
 const TR_SHOT_OUT = "12.3 Pharmacokinetics Simvastatin adalah lactone yang mudah mengalami hydrolysis in vivo menjadi β-hydroxyacid yang sesuai. Pharmacokinetics (PK) simvastatin dan metabolites-nya semula dikarakterisasi melalui inhibition aktivitas HMG-CoA reductase setelah hydrolysis basa pada plasma samples, karena metode bioanalytical yang spesifik belum tersedia.";
@@ -508,18 +508,20 @@ async function trLLM(env, text) {
 }
 // Satu potongan teks → terjemahan. 1) LLM (+ pemeriksaan ketat) 2) MT dengan istilah dilindungi (placeholder). Mengembalikan { text, via, low }.
 export async function trPiece(env, t) {
-  let why = "";
   if (env.AI && env.AI.run && env.TR_MODEL !== "m2m100") {
-    try { const o = await trLLM(env, t); why = trCheck(t, o); if (!why) return { text: o, via: "llm" }; } catch (e) { why = clip(e && e.message, 80); }
+    try { const o = await trLLM(env, t); if (!trCheck(t, o)) return { text: o, via: "llm" }; } catch (e) { /* lanjut ke cadangan */ }
   }
   const mk = maskTerms(t);
   if (!/[A-Za-z]{2}/.test(mk.text)) return { text: t.trim(), via: "keep" }; // seluruhnya istilah baku → biarkan apa adanya
-  const un = unmaskTerms(await trChunk(env, mk.text), mk.terms);
-  return { text: fixTr(un.text).trim(), via: "mt", low: un.missing ? "istilah baku hilang saat diterjemahkan" : "" };
+  try {
+    const un = unmaskTerms(await trChunk(env, mk.text), mk.terms), o = fixTr(un.text).trim();
+    if (!un.missing && !trCheck(t, o)) return { text: o, via: "mt" };
+  } catch (e) { /* mesin cadangan gagal */ }
+  return { text: t.trim(), via: "orig" }; // hanya potongan ini yang dibiarkan Inggris; potongan lain tetap diterjemahkan
 }
 // "e.g. ", "i.e. ", "vs. ", dst. bukan akhir kalimat: dilindungi agar kalimat tidak terpotong di tengah
 const ABBR = /\b(e\.g|i\.e|vs|approx|et al|Fig|Figs|No|Nos|Dr|St|ca|cf|incl|resp)\.\s/gi;
-export function splitText(text, max = 1200) { // paragraf → kalimat, tiap potongan ≤ max; sambungan paragraf dipertahankan
+export function splitText(text, max = Math.min(2400, Math.max(900, Math.ceil(String(text).length / 12)))) { // paragraf → kalimat, tiap potongan ≤ max; sambungan paragraf dipertahankan
   const out = [];
   text.split(/\n{2,}/).forEach((para, pi) => {
     let cur = ""; const parts = para.replace(/[ \t]+/g, " ").trim().replace(ABBR, "$1.\u0001").split(/(?<=[.!?;])\s+/).map((x) => x.replace(/\u0001/g, " "));
@@ -547,18 +549,16 @@ async function trDo(db, env, ent, ref, field, o) {
   if (!trProvider(env)) return { err: "Terjemahan belum diaktifkan oleh admin.", s: 503 };
   if (!o.admin && !(await trQuota(db, env, o.u))) return { err: "Batas terjemahan harian tercapai. Coba lagi besok.", s: 429 };
   const ch = splitText(src); if (ch.length > 14) return { err: "Teks terlalu panjang untuk diterjemahkan.", s: 413 };
-  let txt = "", low = "", need = 0;
+  let txt = "", done = 0, kept = 0;
   for (const c of ch) {
     if (!/[A-Za-z]{2}/.test(c.t)) { txt += c.t + c.sep; continue; }
     const pc = await trPiece(env, c.t);
-    if (pc.via !== "keep") need++;
-    if (pc.low) low = pc.low;
+    if (pc.via === "mt" || pc.via === "llm") done++; else if (pc.via === "orig") kept++;
     txt += pc.text + c.sep;
   }
   txt = txt.trim();
-  if (!need) { await trUp(db, ent, ref, field, h, "", "id", Date.now()); return { status: "id", text: "" }; }
-  const why = low || trCheck(src, txt);
-  if (why) { await trUp(db, ent, ref, field, h, "", "low", Date.now()); return { text: "", status: "low", warn: "Terjemahan mesin ditolak (" + why + "). Teks asli tetap ditampilkan." }; }
+  if (!done && !kept) { await trUp(db, ent, ref, field, h, "", "id", Date.now()); return { status: "id", text: "" }; }
+  if (!done) { await trUp(db, ent, ref, field, h, "", "low", Date.now()); return { text: "", status: "low", warn: "Terjemahan mesin ditolak (hasil tidak lolos pemeriksaan istilah/angka). Teks asli tetap ditampilkan." }; }
   await trUp(db, ent, ref, field, h, txt, "auto", Date.now()); return { text: txt, status: "auto" };
 }
 
@@ -569,7 +569,7 @@ async function trDo(db, env, ent, ref, field, o) {
 export const KEEP_TERMS = ["CYP1A2", "CYP2C9", "CYP2C19", "CYP2D6", "CYP2E1", "CYP3A4", "CYP3A5", "UGT1A1", "UGT2B7", "OATP1B1", "OATP1B3", "P-gp", "P-glycoprotein", "BCRP", "MDR1", "MRP2", "5-HT", "QTc", "INR", "aPTT", "AUC", "Cmax", "Tmax", "t1/2", "IC50", "EC50", "Ki", "Km", "pKa", "InChIKey", "SMILES", "NSAID", "NSAIDs", "SSRI", "SNRI", "TCA", "MAOI", "ARB", "PPI", "COX-1", "COX-2", "HMG-CoA", "in vitro", "in vivo", "ex vivo", "first-pass", "placebo", "randomized controlled trial", "systematic review", "meta-analysis", "PubMed", "Cochrane", "FDA", "EMA", "WHO", "BPOM", "DDInter", "DrugBank", "PubChem", "RxNorm", "ChEMBL", "openFDA", "KEGG", "mg", "mcg", "mL", "kg", "mmol", "IU", "IV", "IM", "SC", "PO", "qd", "bid", "tid", "qid", "prn", "stat"];
 const escRe = (x) => x.replace(/[-/\\^$*+?.()|[\]{}]/g, "\\$&");
 // Istilah medis/farmakologi baku yang DIPERTAHANKAN apa adanya: menerjemahkannya menggeser makna.
-const KEEP_EXTRA = ["Homo sapiens", "Homo sapiens sapiens", "Mus musculus", "Rattus norvegicus", "Escherichia coli", "Saccharomyces cerevisiae", "Candida albicans", "Drosophila melanogaster", "Danio rerio", "Sus scrofa", "Bos taurus", "Macaca mulatta", "Oryctolagus cuniculus", "Xenopus laevis", "clearance", "half-life", "steady state", "steady-state", "bioavailability", "volume of distribution", "therapeutic index", "first-pass metabolism", "prodrug", "metabolite", "glucuronidation", "sulfation", "acetylation", "hydrolysis", "oxidation", "reduction", "efflux", "uptake", "affinity", "efficacy", "potency", "agonist", "antagonist", "partial agonist", "inverse agonist", "ligand", "substrate", "inducer", "isoform", "polymorphism", "genotype", "phenotype", "allele", "nocebo", "peak", "trough", "loading dose", "maintenance dose", "titration", "therapeutic drug monitoring", "serum concentration", "adverse drug reaction", "contraindication", "precaution", "prophylaxis", "toxicity", "overdose", "receptor", "enzyme", "transporter", "channel", "cyclooxygenase", "prostaglandin", "thromboxane", "leukotriene", "angiotensin", "bradykinin", "renin", "aldosterone", "cortisol", "insulin", "glucagon", "serotonin", "dopamine", "norepinephrine", "epinephrine", "acetylcholine", "histamine", "GABA", "glutamate", "opioid", "cannabinoid", "cytokine", "interleukin", "tumor necrosis factor", "monoamine oxidase", "acetylcholinesterase", "carbonic anhydrase", "HMG-CoA reductase", "DNA gyrase", "dihydrofolate reductase", "topoisomerase", "beta-lactam", "penicillin-binding protein", "Pharmacokinetics", "pharmacokinetic", "pharmacodynamics", "pharmacodynamic", "Mechanism of Action", "Clinical Pharmacology", "lactone", "lactones", "hydrolyzed", "hydrolyze", "hydrolysis", "hydroxyacid", "hydroxy acid", "bioanalytical", "plasma", "plasma samples", "plasma concentration", "serum", "whole blood", "enzyme activity", "inhibitor", "inhibitors", "metabolites", "active metabolite", "glucuronide", "conjugation", "assay", "chromatography", "mass spectrometry", "HPLC", "LC-MS/MS", "sensitivity", "specificity", "placebo-controlled", "double-blind", "open-label", "crossover", "washout", "endpoint", "baseline", "adverse event", "serious adverse event", "tolerability", "kinetics", "agonism", "antagonism", "inhibition", "induction", "coadministration", "co-administration", "therapeutic range", "renal clearance", "hepatic clearance", "biliary excretion", "enterohepatic circulation", "dose proportionality", "accumulation", "single dose", "multiple dose", "food effect", "bioequivalence", "bioequivalent", "formulation", "excipient", "protein binding", "plasma protein binding", "Absorption", "Distribution", "Metabolism", "Excretion", "Elimination", "Indications and Usage", "Dosage and Administration", "Dosage Forms and Strengths", "Contraindications", "Warnings and Precautions", "Adverse Reactions", "Drug Interactions", "Use in Specific Populations", "Overdosage", "Description", "Clinical Studies", "Nonclinical Toxicology", "How Supplied", "Clinical Trials Experience", "Postmarketing Experience", "Pharmacogenomics", "Pediatric Use", "Geriatric Use", "Renal Impairment", "Hepatic Impairment", "half life", "elimination half-life", "terminal half-life", "dose-dependent", "dose-proportional", "time to peak", "peak concentration", "peak plasma concentration", "trough concentration", "area under the curve", "mean residence time", "volume of distribution", "tissue distribution", "blood-brain barrier", "placental transfer", "protein-bound", "lipophilic", "hydrophilic", "hepatotoxicity", "nephrotoxicity", "cardiotoxicity", "rhabdomyolysis", "myopathy", "hypoglycemia", "hyperglycemia", "hypotension", "hypertension", "bradycardia", "tachycardia", "QT prolongation", "anaphylaxis", "angioedema", "extrapyramidal", "serotonin syndrome", "neuroleptic malignant syndrome", "Stevens-Johnson syndrome", "agranulocytosis", "thrombocytopenia", "neutropenia", "hyperkalemia", "hypokalemia", "hyponatremia", "teratogenic", "embryo-fetal toxicity", "lactation", "oral", "intravenous", "intramuscular", "subcutaneous", "topical", "sublingual", "transdermal", "inhalation", "extended-release", "immediate-release", "delayed-release"];
+const KEEP_EXTRA = ["Homo sapiens", "Homo sapiens sapiens", "Mus musculus", "Rattus norvegicus", "Escherichia coli", "Saccharomyces cerevisiae", "Candida albicans", "Drosophila melanogaster", "Danio rerio", "Sus scrofa", "Bos taurus", "Macaca mulatta", "Oryctolagus cuniculus", "Xenopus laevis", "clearance", "half-life", "steady state", "steady-state", "bioavailability", "volume of distribution", "therapeutic index", "first-pass metabolism", "prodrug", "metabolite", "glucuronidation", "hydrolysis", "efflux", "affinity", "agonist", "antagonist", "partial agonist", "inverse agonist", "ligand", "substrate", "inducer", "isoform", "polymorphism", "genotype", "phenotype", "allele", "nocebo", "loading dose", "maintenance dose", "therapeutic drug monitoring", "serum concentration", "adverse drug reaction", "contraindication", "receptor", "enzyme", "transporter", "cyclooxygenase", "prostaglandin", "thromboxane", "leukotriene", "angiotensin", "bradykinin", "renin", "aldosterone", "cortisol", "insulin", "glucagon", "serotonin", "dopamine", "norepinephrine", "epinephrine", "acetylcholine", "histamine", "GABA", "glutamate", "opioid", "cannabinoid", "cytokine", "interleukin", "tumor necrosis factor", "monoamine oxidase", "acetylcholinesterase", "carbonic anhydrase", "HMG-CoA reductase", "DNA gyrase", "dihydrofolate reductase", "topoisomerase", "beta-lactam", "penicillin-binding protein", "Pharmacokinetics", "pharmacokinetic", "pharmacodynamics", "pharmacodynamic", "Mechanism of Action", "Clinical Pharmacology", "lactone", "lactones", "hydrolyzed", "hydrolyze", "hydrolysis", "hydroxyacid", "hydroxy acid", "bioanalytical", "plasma", "plasma samples", "plasma concentration", "serum", "whole blood", "enzyme activity", "inhibitor", "inhibitors", "metabolites", "active metabolite", "glucuronide", "conjugation", "chromatography", "mass spectrometry", "HPLC", "LC-MS/MS", "placebo-controlled", "double-blind", "adverse event", "serious adverse event", "agonism", "antagonism", "inhibition", "coadministration", "co-administration", "therapeutic range", "renal clearance", "hepatic clearance", "biliary excretion", "enterohepatic circulation", "dose proportionality", "single dose", "multiple dose", "food effect", "bioequivalence", "bioequivalent", "protein binding", "plasma protein binding", "Absorption", "Distribution", "Metabolism", "Excretion", "Elimination", "Indications and Usage", "Dosage and Administration", "Dosage Forms and Strengths", "Contraindications", "Warnings and Precautions", "Adverse Reactions", "Drug Interactions", "Use in Specific Populations", "Overdosage", "Description", "Clinical Studies", "Nonclinical Toxicology", "How Supplied", "Clinical Trials Experience", "Postmarketing Experience", "Pharmacogenomics", "Pediatric Use", "Geriatric Use", "Renal Impairment", "Hepatic Impairment", "half life", "elimination half-life", "terminal half-life", "dose-dependent", "dose-proportional", "time to peak", "peak concentration", "peak plasma concentration", "trough concentration", "area under the curve", "mean residence time", "volume of distribution", "tissue distribution", "blood-brain barrier", "placental transfer", "protein-bound", "lipophilic", "hydrophilic", "hepatotoxicity", "nephrotoxicity", "cardiotoxicity", "rhabdomyolysis", "myopathy", "hypoglycemia", "hyperglycemia", "hypotension", "hypertension", "bradycardia", "tachycardia", "QT prolongation", "anaphylaxis", "angioedema", "extrapyramidal", "serotonin syndrome", "neuroleptic malignant syndrome", "Stevens-Johnson syndrome", "agranulocytosis", "thrombocytopenia", "neutropenia", "hyperkalemia", "hypokalemia", "hyponatremia", "teratogenic", "embryo-fetal toxicity", "lactation", "oral", "intravenous", "intramuscular", "subcutaneous", "topical", "sublingual", "transdermal", "inhalation", "extended-release", "immediate-release", "delayed-release"];
 const ALL_KEEP = KEEP_TERMS.concat(KEEP_EXTRA);
 // Singkatan/simbol (huruf besar, angka, ≤3 huruf) dicocokkan persis; kata biasa tanpa membedakan huruf besar-kecil
 // ("Plasma" di awal kalimat juga dilindungi). Yang tertangkap disimpan apa adanya, jadi kapitalisasi asli terjaga.
@@ -578,13 +578,13 @@ const keepAlt = (arr) => arr.slice().sort((a, b) => b.length - a.length).map(esc
 const KEEP_STRICT_RE = new RegExp("\\b(?:" + keepAlt(ALL_KEEP.filter(isStrict)) + ")\\b", "g");
 const KEEP_WORD_RE = new RegExp("\\b(?:" + keepAlt(ALL_KEEP.filter((x) => !isStrict(x))) + ")\\b", "gi");
 // Pola nama ilmiah: enzim/protein/gen, genus–spesies, akronim, simbol gen, senyawa berkode.
+const ENZ = "(?:ATPase|kinase|reductase|oxidase|synthase|transferase|hydrolase|ligase|isomerase|phosphatase|dehydrogenase|hydroxylase|esterase|peptidase|polymerase|topoisomerase|lipoxygenase|oxygenase|protease|transporter|receptor|channel|subunit)";
 const SCI_PATTERNS = [
-  /\b[A-Z][a-z]+(?:\s+[a-z]+){1,2}\b(?=\s*\()/g,
-  /\(\s*[A-Z][a-z]+(?:\s+[a-z]+){1,2}\s*\)/g,
-  /\b[A-Z][a-z]+(?:-[a-z0-9]+)+\b/g,
-  /\b[A-Za-z-]*(?:ATPase|kinase|reductase|oxidase|synthase|transferase|hydrolase|ligase|isomerase|phosphatase|dehydrogenase|hydroxylase|esterase|peptidase|polymerase|topoisomerase|lipoxygenase|oxygenase|protease|transporter|receptor|channel|subunit)\b/g,
-  /\b[A-Z]{2,}[a-z0-9]*\b/g,
-  /\b[A-Za-z]{1,6}\d+[A-Za-z0-9]*\b/g,
+  new RegExp("\\([A-Z][a-z]{3,}\\s+[a-z]{4,}\\)", "g"),                                  // (Homo sapiens) — nama spesies dalam kurung
+  new RegExp("\\b[A-Z][a-z]+(?:-[a-z0-9]+)+(?=\\s+[A-Za-z-]*" + ENZ + "\\b)", "g"),       // Potassium-transporting ATPase
+  new RegExp("\\b[A-Za-z-]*" + ENZ + "\\b", "g"),                                          // nama enzim/protein/reseptor
+  /\b[A-Z]{2,6}[a-z0-9]*\b/g,                                                                // akronim: CHD, LDL, FDA, CYP3A4 (bukan kata kapital biasa)
+  /\b[A-Za-z]{1,6}\d+[A-Za-z0-9]*\b/g,                                                        // simbol gen/senyawa berkode
   /\b[A-Z]-[A-Za-z0-9]+\b/g,
 ];
 export function sciTokens(text) { const out = new Set(), s = String(text == null ? "" : text); for (const re of SCI_PATTERNS) { re.lastIndex = 0; for (const m of s.match(re) || []) out.add(m.trim()); } return out; }
@@ -624,7 +624,7 @@ export function fixTr(t) { let o = String(t); for (const p of TR_FIX) o = o.repl
 const nz = (x) => String(x).toLowerCase().replace(/ph/g, "f").replace(/th/g, "t").replace(/c(?=[eiy])/g, "s").replace(/c/g, "k").replace(/[yz]/g, (m) => (m === "y" ? "i" : "s")).replace(/(.)\1+/g, "$1");
 const stemOf = (w) => { const n = nz(w).replace(/[^a-z0-9]/g, ""); return n.slice(0, Math.max(3, Math.min(6, n.length - 1))); };
 export function keepTokens(text) { const out = new Map(), s = String(text == null ? "" : text); for (const re of [KEEP_STRICT_RE, KEEP_WORD_RE]) { re.lastIndex = 0; for (const m of s.match(re) || []) out.set(m.toLowerCase(), m); } return [...out.values()]; }
-const nums = (x) => (String(x).match(/\d[\d.,]*/g) || []).map((n) => n.replace(/[.,]+$/, "").replace(/[.,]/g, "")).filter(Boolean);
+const nums = (x) => (String(x).replace(/\b(\d)\.\s+(\d)/g, "$1.$2").match(/\d[\d.,]*/g) || []).map((n) => n.replace(/[.,]+$/, "").replace(/[.,]/g, "")).filter(Boolean);
 // tolak hasil mesin yang tidak layak dipakai: lebih baik teks asli daripada terjemahan yang salah
 export function trCheck(src, out) {
   const a = String(src).trim(), b = String(out).trim();
