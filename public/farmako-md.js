@@ -152,11 +152,14 @@
     PCT_RE.lastIndex = 0;
     while ((m = PCT_RE.exec(region))) pct.push({ label: m[1].trim(), n: m[2], at: m.index, len: m[0].length });
     var startAt = pct.length ? pct[pct.length - 1].at + pct[pct.length - 1].len : cap[0].length;
-    var tail = region.slice(startAt), rows = [], rm;
+    var tail = region.slice(startAt), rows = [], rm, prevEnd = 0;
     ROW_RE.lastIndex = 0;
     while ((rm = ROW_RE.exec(tail))) {
+      var gap = tail.slice(prevEnd, rm.index);
+      if (rows.length && /[.!?:]/.test(gap)) break; // baris tabel harus berurutan
       var nums = rm[2].trim().split(/\s+/);
       if (nums.length >= 2) rows.push({ label: rm[1].trim(), nums: nums, end: rm.index + rm[0].length });
+      prevEnd = rm.index + rm[0].length;
     }
     if (rows.length < 3) return null;
 
@@ -177,7 +180,7 @@
       }).join("") + "</tr>";
     }).join("");
 
-    var html = (prefix ? "<p>" + inline(prefix) + "</p>" : "") +
+    var html = (prefix ? paragraphs(prefix).map(function (x) { return "<p>" + inline(x) + "</p>"; }).join("") : "") +
       "<div class='fm-cap'>" + inline("Table " + cap[1] + ": " + caption) + "</div>" +
       "<div class='fm-tw'><table class='fm-tb'>" + head + body + "</table></div>";
     return { html: html, rest: tail.slice(rows[rows.length - 1].end).trim() };

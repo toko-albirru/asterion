@@ -39,5 +39,25 @@ t("teks pendek tetap satu paragraf", (md("Halo dunia.").match(/<p>/g) || []).len
 t("HTML di-escape", (() => { const x = md("<script>alert(1)</script>"); return x.includes("&lt;script&gt;") && !x.includes("<script>"); })());
 t("baris kosong berlebih diabaikan", !/<p><\/p>/.test(md("a\n\n\n\nb")));
 
+// Teks nyata atorvastatin (openFDA): daftar rujukan silang, subjudul 6.1, tabel angka, enumerasi.
+const ATORVA = "The following important adverse reactions are described below and elsewhere in the labeling: Myopathy and Rhabdomyolysis [see Warnings and Precautions (5.1) ] Immune-Mediated Necrotizing Myopathy [see Warnings and Precautions (5.2) ] Hepatic Dysfunction [see Warnings and Precautions (5.3) ] Increases in HbA1c and Fasting Serum Glucose Levels [see Warnings and Precautions (5.4) ] Most common adverse reactions (incidence ≥5%) are nasopharyngitis, arthralgia, diarrhea, pain in extremity, and urinary tract infection ( 6.1 ). To report SUSPECTED ADVERSE REACTIONS, contact Novadoz Pharmaceuticals LLC at 1-855-668-2369 or FDA at 1-800-FDA-1088 or www.fda.gov/medwatch. 6.1 Clinical Trials Experience Because clinical trials are conducted under widely varying conditions, the adverse reaction rates observed in the clinical trials of a drug cannot be directly compared to rates in the clinical trials of another drug and may not reflect the rates observed in practice. Table 1: Adverse Reactions Occurring in ≥ 2% in Patients Treated with any Dose and Greater than Placebo Adverse Reaction % Placebo N=7311 % 10 mg N=3908 % 40 mg N=604 % 80 mg N=4055 Nasopharyngitis 8.2 12.9 7.0 4.2 Arthralgia 6.5 8.9 10.6 4.3 Diarrhea 6.3 7.3 14.1 5.2 Pain in extremity 5.9 8.5 9.3 3.1 Urinary tract infection 5.6 6.9 8.0 4.1 Other adverse reactions reported in placebo-controlled trials include: Body as a whole: malaise, pyrexia Digestive system: abdominal discomfort, eructation Musculoskeletal system: muscle fatigue, neck pain Treating to New Targets Study (TNT) In TNT, [see Clinical Studies (14.1)] 10,001 patients with clinically evident CHD were treated with atorvastatin calcium 10 mg daily.";
+
+const a = md(ATORVA);
+t("rujukan silang jadi item daftar", /<ul><li>Myopathy and Rhabdomyolysis \[see Warnings and Precautions \(5\.1\) \]<\/li>/.test(a));
+t("empat rujukan silang jadi empat item", (a.match(/\[see Warnings and Precautions \(5\.[1-4]\) \]/g) || []).length === 4 && (a.match(/<li>/g) || []).length >= 4);
+t("pengantar rujukan tetap paragraf", /<p>The following important adverse reactions are described below and elsewhere in the labeling:<\/p>/.test(a));
+t("subjudul 6.1 dikenali", /<h4 class='fm-h'>6\.1 Clinical Trials Experience<\/h4>/.test(a));
+t("tabel angka jadi tabel", /<table class='fm-tb'>/.test(a));
+t("keterangan tabel ditampilkan", /<div class='fm-cap'>Table 1: Adverse Reactions Occurring/.test(a));
+t("header kolom memuat N", /<th>Placebo <span class='fm-n'>N=7311<\/span><\/th>/.test(a));
+t("baris tabel berlabel", /<th scope='row'>Nasopharyngitis<\/th><td>8\.2<\/td><td>12\.9<\/td>/.test(a));
+t("enumerasi bersistem jadi daftar", /<li><b>Body as a whole:<\/b> malaise, pyrexia<\/li>/.test(a));
+t("judul studi dikenali", /<h5 class='fm-h2'>Treating to New Targets Study \(TNT\)<\/h5>/.test(a));
+t("tidak ada paragraf raksasa di teks atorvastatin", (a.match(/<p>[^<]{420,}<\/p>/g) || []).length === 0);
+t("HTML mentah di sekitar tabel di-escape", (() => {
+  const x = md("Table 1: Data % Placebo N=1 % 5 mg N=2 Alpha 1 2 Beta 3 4 Gamma 5 6 <img src=x>");
+  return /<table class='fm-tb'>/.test(x) && !/<img/.test(x) && x.includes("&lt;img");
+})());
+
 console.log((bad ? "GAGAL " : "") + "PASS teks label — " + ok + " lulus, " + bad + " gagal");
 process.exit(bad ? 1 : 0);
