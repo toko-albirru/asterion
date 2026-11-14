@@ -594,11 +594,41 @@ function hOpen(x){
     if(b.dataset.hv==="back"){if(history.length>1)history.back();else{hClose();location.hash="#/materi"}}
     else{try{if(document.fullscreenElement)document.exitFullscreen();else o.requestFullscreen()}catch(e){}}});
   document.body.appendChild(o);document.documentElement.classList.add("hov-on");
-  if(x.h)o.querySelector("iframe").srcdoc=x.h;else hFill(x.hid)}
+  if(x.h)o.querySelector("iframe").srcdoc=hPrep(x.h);else hFill(x.hid)}
+// skrip kecil yang disisipkan ke materi HTML (iframe sandbox tanpa origin):
+// - link "#tab" pindah di dalam materi, bukan membuka web utama di dalam iframe
+// - localStorage/sessionStorage diganti versi memori bila diblokir sandbox
+var HFIX="<script>(function(){function mem(){var m={};return{getItem:function(k){return Object.prototype.hasOwnProperty.call(m,k)?m[k]:null},setItem:function(k,v){m[k]=String(v)},removeItem:function(k){delete m[k]},clear:function(){m={}},key:function(i){return Object.keys(m)[i]||null},get length(){return Object.keys(m).length}}}"+
+  "['localStorage','sessionStorage'].forEach(function(n){try{window[n].getItem('x')}catch(e){try{Object.defineProperty(window,n,{value:mem(),configurable:true})}catch(e2){}}});"+
+  "document.addEventListener('click',function(e){if(e.defaultPrevented||e.button)return;var a=e.target.closest&&e.target.closest('a[href^=\"#\"]');if(!a)return;e.preventDefault();var h=a.getAttribute('href');if(h.length<2)return;"+
+  "if(location.hash!==h)location.hash=h;else{var t=document.getElementById(decodeURIComponent(h.slice(1)));if(t)t.scrollIntoView({behavior:'smooth'})}})})()<\/script>";
+function hPrep(h){ // <base> agar alamat foto "/api/run/img/…" mengarah ke server web ini
+  var add="<base href=\""+location.origin+"/\">"+HFIX,m=/<head\b[^>]*>/i.exec(h)||/<!doctype[^>]*>/i.exec(h);
+  return m?h.slice(0,m.index+m[0].length)+add+h.slice(m.index+m[0].length):add+h}
+// foto base64 di dalam HTML dipisah: disimpan sebagai gambar di server, HTML hanya memuat alamatnya
+var DURI=/data:image\/(png|jpe?g|webp|gif);base64,(?:[A-Za-z0-9+\/=]|\\\/)+/g;
+function hLoadImg(src){return new Promise(function(ok,no){var i=new Image();i.onload=function(){ok(i)};i.onerror=no;i.src=src})}
+async function hImg(d){
+  d=d.replace(/\\\//g,"/").replace(/^data:image\/jpg;/,"data:image/jpeg;");
+  if(d.length>900000){ // terlalu besar untuk satu gambar → kecilkan di browser
+    var im=await hLoadImg(d);
+    for(var k=0,W=[1600,1280,1000];k<W.length;k++){var s=Math.min(1,W[k]/Math.max(im.naturalWidth,im.naturalHeight)),c=document.createElement("canvas");
+      c.width=Math.round(im.naturalWidth*s);c.height=Math.round(im.naturalHeight*s);c.getContext("2d").drawImage(im,0,0,c.width,c.height);
+      d=c.toDataURL("image/webp",k?0.7:0.82);if(d.length<=900000)break}}
+  var r=await api("run/admin/img",{m:"POST",b:{data:d}});
+  return r.ok&&r.j&&r.j.id?"/api/run/img/"+r.j.id:""}
+async function hShrink(h,name){
+  var m,map=new Map(),list=[],idx=0,done=0,fail=0;DURI.lastIndex=0;
+  while((m=DURI.exec(h)))if(m[0].length>3000&&!map.has(m[0])){map.set(m[0],"");list.push(m[0])}
+  if(!list.length)return{h:h,n:0,fail:0};
+  async function work(){while(idx<list.length){var d=list[idx++],u="";try{u=await hImg(d)}catch(e){}
+    if(u)map.set(d,u);else fail++;done++;if(done%3===0||done===list.length)toast("Memisahkan foto "+done+"/"+list.length+" · "+name)}}
+  await Promise.all([work(),work(),work(),work()]);
+  return{h:h.replace(DURI,function(x){return map.get(x)||x}),n:list.length-fail,fail:fail}}
 window.addEventListener("hashchange",hClose); // dipasang sebelum route(): bila masih di halaman materi, viewer membukanya lagi
 async function hFill(id){
   try{var r=await api("html?id="+encodeURIComponent(id)),f=$("hf");if(!f)return;
-    f.srcdoc=r.ok&&r.j&&typeof r.j.h==="string"?r.j.h:"<p style='font-family:sans-serif;color:#888;padding:20px'>Materi tidak bisa dimuat.</p>"
+    f.srcdoc=r.ok&&r.j&&typeof r.j.h==="string"?hPrep(r.j.h):"<p style='font-family:sans-serif;color:#888;padding:20px'>Materi tidak bisa dimuat.</p>"
   }catch(e){}}
 async function upHtml(files){
   var P=location.hash.replace(/^#\/?/,"").split("/").filter(Boolean),arr=arrAt(P.slice(0,3));
@@ -607,8 +637,10 @@ async function upHtml(files){
   toast("Mengunggah…");
   for(var i=0;i<list.length;i++){var f=list[i];
     if(!/\.html?$/i.test(f.name)){toast("Hanya file .html: "+f.name);continue}
-    if(f.size>5e6){toast("Lebih dari 5 MB: "+f.name);continue}
-    var r=await api("html",{m:"POST",b:{h:await f.text()}});
+    var sh;try{sh=await hShrink(await f.text(),f.name)}catch(e){toast("Gagal membaca "+f.name);continue}
+    if(sh.fail)toast(sh.fail+" foto gagal dipisah di "+f.name+" (tetap disimpan di dalam file)");
+    if(sh.h.length>5e6){toast("Teks "+f.name+" masih lebih dari 5 MB setelah foto dipisah — pecah per topik ya");continue}
+    var r=await api("html",{m:"POST",b:{h:sh.h}});
     if(!r.ok){toast("Gagal mengunggah "+f.name);continue}
     arr.unshift({n:(list.length===1&&ttl)||f.name.replace(/\.html?$/i,""),hid:r.j.id});n++}
   if(n){save();route();toast(n+" file ditambahkan")}}
@@ -1332,7 +1364,7 @@ function listPage(P,ico,withHtml){
     h+="<div class='row'>"+a+"<span class='i'>"+(x.h||x.hid?"📄":ico)+"</span><span class='t'>"+esc(x.n)+"</span><span class='a'>›</span></a>";
     if(S.admin)h+=ctl(i);
     h+="</div>"});
-  if(S.admin)h+="<div class='pn g'><b>＋ Tambah</b>"+(withHtml?"<div class='dz' id='dz'>📂 Seret &amp; lepas file .html ke sini<small>atau ketuk untuk memilih · bisa banyak file sekaligus · maks 5 MB per file · langsung ditambahkan</small></div><input type='file' id='fI' accept='.html,.htm,text/html' multiple hidden>":"")+"<label>Judul</label><input id='aN'><label>URL (YouTube, Drive, Docs, dll.)</label><input id='aU' placeholder='https://...'>"+(withHtml?"<label>Atau tempel kode HTML materi (opsional, dipakai jika URL kosong)</label><textarea id='aH' rows='4'></textarea>":"")+"<button class='btn' data-a='add'>Tambah</button><div class='hint'>Item baru muncul paling atas. Urutkan dengan tombol ↑ ↓.</div></div>";
+  if(S.admin)h+="<div class='pn g'><b>＋ Tambah</b>"+(withHtml?"<div class='dz' id='dz'>📂 Seret &amp; lepas file .html ke sini<small>atau ketuk untuk memilih · bisa banyak file sekaligus · foto di dalam file otomatis dipisah · teks maks 5 MB per file</small></div><input type='file' id='fI' accept='.html,.htm,text/html' multiple hidden>":"")+"<label>Judul</label><input id='aN'><label>URL (YouTube, Drive, Docs, dll.)</label><input id='aU' placeholder='https://...'>"+(withHtml?"<label>Atau tempel kode HTML materi (opsional, dipakai jika URL kosong)</label><textarea id='aH' rows='4'></textarea>":"")+"<button class='btn' data-a='add'>Tambah</button><div class='hint'>Item baru muncul paling atas. Urutkan dengan tombol ↑ ↓.</div></div>";
   return h}
 function topList(k,ico,sub,ph){
   var arr=S.data[k],h="";
