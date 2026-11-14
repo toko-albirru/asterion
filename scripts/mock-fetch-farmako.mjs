@@ -1,5 +1,5 @@
 // Preload uji: menggantikan fetch ke PubChem/RxNav/ChEMBL/openFDA dengan respons palsu BERBENTUK dokumentasi (bukan data nyata).
-// Hanya memeriksa logika kode (parsing, pemilihan, penyimpanan, penanganan galat) â€” BUKAN bukti layanan asli bekerja.
+// Hanya memeriksa logika kode (parsing, pemilihan, penyimpanan, penanganan galat) — BUKAN bukti layanan asli bekerja.
 const real = globalThis.fetch;
 const J = (x, s = 200) => new Response(JSON.stringify(x), { status: s, headers: { "content-type": "application/json" } });
 let libreN = 0;
