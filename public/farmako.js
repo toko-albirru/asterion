@@ -48,7 +48,7 @@
     ".fm-card{padding:14px;border-radius:18px;margin-bottom:10px;display:block;color:inherit;text-decoration:none}.fm-card b{font-size:15px}.fm-card small{display:block;color:var(--mut);font-size:12px;margin-top:3px;line-height:1.45}.fm-card .fm-top{display:flex;gap:8px;align-items:flex-start}.fm-card .fm-top>div{flex:1;min-width:0}" +
     ".fm-na{color:var(--mut);font-style:italic;font-size:13px}.fm-disc{font-size:12px;line-height:1.5;color:var(--mut);padding:10px 12px;border-radius:12px;border:1px dashed var(--line);margin:10px 0}.fm-warn{padding:10px 12px;border-radius:12px;border:1px solid rgba(251,191,36,.5);background:rgba(251,191,36,.12);font-size:13px;line-height:1.5;margin:10px 0}" +
     ".fm-sec{border-radius:18px;padding:14px;margin:10px 0}.fm-sec>h3{margin:0 0 8px;font:700 12px Cinzel,serif;letter-spacing:.14em;color:var(--gold);text-transform:uppercase}.fm-kv{display:grid;grid-template-columns:minmax(110px,32%) 1fr;gap:6px 12px;font-size:13px;line-height:1.5}.fm-kv>b{color:var(--mut);font-weight:600}.fm-kv>div{overflow-wrap:anywhere}@media(max-width:520px){.fm-kv{grid-template-columns:1fr}.fm-kv>b{margin-top:6px}}" +
-    ".fm-fact{padding:8px 0;border-bottom:1px dashed var(--line);font-size:13px;line-height:1.55}.fm-fact:last-child{border-bottom:0}.fm-fact .fm-fh{font-weight:700;font-size:12px;color:var(--gold);margin-bottom:3px}.fm-fact .fm-v{white-space:pre-line;overflow-wrap:anywhere}.fm-src{font-size:10px!important;margin:2px 4px 2px 0;display:inline-block}" +
+    ".fm-fact{padding:8px 0;border-bottom:1px dashed var(--line);font-size:13px;line-height:1.55}.fm-fact:last-child{border-bottom:0}.fm-fact .fm-fh{font-weight:700;font-size:12px;color:var(--gold);margin-bottom:3px}.fm-fact .fm-v{white-space:pre-line;overflow-wrap:anywhere}.fm-fact .fm-v.fm-md{white-space:normal}.fm-fact .fm-md .fm-h:first-child{margin-top:2px}.fm-trb.blk{display:block;margin:0 0 6px}.fm-src{font-size:10px!important;margin:2px 4px 2px 0;display:inline-block}" +
     ".fm-md p{margin:0 0 10px;line-height:1.65;font-size:14px;overflow-wrap:anywhere}.fm-md p:last-child{margin-bottom:0}.fm-md .fm-h{margin:14px 0 6px;font-size:12.5px;font-weight:700;color:var(--gold);letter-spacing:.02em}.fm-md .fm-h2{margin:12px 0 5px;font-size:12px;font-weight:600;color:var(--mut);letter-spacing:.02em}.fm-md .fm-cap{margin:12px 0 6px;font-size:12px;font-weight:600;color:var(--gold);line-height:1.45}.fm-md .fm-cap+div{margin-top:0}.fm-tb th[scope=row]{font-weight:600;color:inherit;white-space:normal;min-width:104px}.fm-tb .fm-n{color:var(--mut);font-weight:400;font-size:11px}.fm-md ul{margin:0 0 10px;padding-left:20px;line-height:1.6;font-size:14px}.fm-tw{overflow-x:auto;margin:0 0 10px}.fm-tb{border-collapse:collapse;width:100%;font-size:13px}.fm-tb th,.fm-tb td{padding:7px 8px;border-bottom:1px solid var(--line);text-align:left;vertical-align:top}.fm-tb th{color:var(--gold);font-weight:600;white-space:nowrap}" +
     ".fm-sev{display:inline-block;font:700 11px Inter,sans-serif;padding:3px 10px;border-radius:999px;border:1px solid var(--line)}.fm-sev.bad{background:rgba(248,113,113,.22);color:var(--bad);border-color:var(--bad)}.fm-sev.warn{background:rgba(251,191,36,.2);color:var(--warn);border-color:var(--warn)}.fm-sev.ok{background:rgba(74,222,128,.18);color:var(--ok);border-color:var(--ok)}.fm-sev.neu{background:rgba(128,128,160,.2)}" +
     ".fm-pair{border-radius:18px;padding:14px;margin-bottom:12px;border-left:5px solid var(--line)}.fm-pair.bad{border-left-color:var(--bad)}.fm-pair.warn{border-left-color:var(--warn)}.fm-pair.ok{border-left-color:var(--ok)}.fm-pair h4{margin:0 0 6px;font-size:15px}.fm-ib{padding:10px 0;border-top:1px dashed var(--line)}.fm-pick{display:flex;flex-wrap:wrap;gap:6px;margin:8px 0}.fm-pk{display:inline-flex;align-items:center;gap:6px;padding:6px 6px 6px 12px;border-radius:999px;font-size:13px;font-weight:600}.fm-pk button{border:0;background:rgba(128,128,160,.3);color:inherit;border-radius:50%;width:22px;height:22px;cursor:pointer}" +
@@ -139,7 +139,7 @@
     return new Promise(function (res, rej) {
       var go = function () { if (alive(k)) window.FMAdmin(P, k, { set: setF, alive: alive }).then(res, rej); else res(); };
       if (window.FMAdmin) return go();
-      var s = document.createElement("script"); s.src = "farmako-admin.js?v=12"; s.onload = go; s.onerror = function () { rej(new Error("farmako-admin.js tidak ditemukan")); }; document.head.appendChild(s);
+      var s = document.createElement("script"); s.src = "farmako-admin.js?v=13"; s.onload = go; s.onerror = function () { rej(new Error("farmako-admin.js tidak ditemukan")); }; document.head.appendChild(s);
     });
   }
   var bigCard = function (href, ico, t, sub) { return "<a class='card g' href='" + href + "'><span class='i'>" + ico + "</span><span class='t'>" + esc(t) + "<small>" + esc(sub) + "</small></span><span class='a'>›</span></a>"; };
@@ -155,10 +155,15 @@
   var trSt = function (t) { var e = g("fmTrSt"); if (e) e.textContent = t; };
   function trPaint() {
     [].forEach.call(document.querySelectorAll("#fm [data-tr]"), function (e) {
-      if (e._o == null) e._o = e.textContent;
+      var rich = e.dataset.md === "1";
+      if (e._o == null) e._o = rich ? e.innerHTML : e.textContent;
       var m = TR.map[e.dataset.tr], on = TR.lang === "id" && m && m.text && m.status !== "id";
-      e.textContent = on ? m.text : e._o;
-      if (on) { var b = document.createElement("span"); b.className = "fm-trb"; b.textContent = m.status === "verified" ? "✔ terjemahan terverifikasi" : "🌐 terjemahan mesin"; e.appendChild(b); }
+      var lab = m && m.status === "verified" ? "✔ terjemahan terverifikasi" : "🌐 terjemahan mesin";
+      if (rich) e.innerHTML = on ? "<span class='fm-trb blk'>" + lab + "</span>" + md(m.text) : e._o; // teks terjemahan dirapikan dengan pemformat yang sama dengan teks asli (md meng-escape HTML)
+      else {
+        e.textContent = on ? m.text : e._o;
+        if (on) { var b = document.createElement("span"); b.className = "fm-trb"; b.textContent = lab; e.appendChild(b); }
+      }
     });
   }
   // Seluruh interaksi obat ditampilkan langsung di Detail Obat (bukan hanya jumlah / tombol).
@@ -174,7 +179,7 @@
       var h = "<div class='fm-fact' style='border-left:3px solid var(--gold);margin:8px 0'><div class='fm-x'><b style='flex:1'>" + title + "</b>" + sevTag(o.severity) + "</div>";
       if (o.src || o.sid) h += "<div class='hint' style='margin:2px 0'>Sumber: " + esc((FM.srcName ? FM.srcName(o.src) : o.src) || "—") + (o.sid ? " · ID " + esc(o.sid) : "") + "</div>";
       [["Mekanisme kerja", "mechanism"], ["Efek klinis", "effect"], ["Penanganan", "management"], ["Bukti / rujukan", "evidence"]].forEach(function (f) {
-        if (o[f[1]]) h += "<div style='margin-top:6px'><div class='fm-fh' style='margin:0'>" + f[0] + "</div><div class='fm-v' data-tr='inter:" + o.id + ":" + f[1] + "'>" + esc(o[f[1]]) + "</div></div>";
+        if (o[f[1]]) h += "<div style='margin-top:6px'><div class='fm-fh' style='margin:0'>" + f[0] + "</div><div class='fm-v fm-md' data-md='1' data-tr='inter:" + o.id + ":" + f[1] + "'>" + md(o[f[1]]) + "</div></div>";
       });
       return h + "</div>";
     };
@@ -327,7 +332,7 @@
     return keys.map(function (f) {
       var v = facts.filter(function (x) { return x.field === f; });
       if (!v.length && !required.includes(f)) return "";
-      return "<div class='fm-fact'><div class='fm-fh'>" + esc(F.meta.fields[f] || f) + "</div>" + (v.length ? v.map(function (x) { return "<div>" + srcTag(x.src, x.sid) + "<span class='hint' style='margin:0'>diperbarui " + fdate(x.updated) + "</span></div><div class='fm-v' data-tr='fact:" + x.id + ":value'>" + esc(x.value) + "</div>"; }).join("<div style='height:6px'></div>") : NA) + "</div>";
+      return "<div class='fm-fact'><div class='fm-fh'>" + esc(F.meta.fields[f] || f) + "</div>" + (v.length ? v.map(function (x) { return "<div>" + srcTag(x.src, x.sid) + "<span class='hint' style='margin:0'>diperbarui " + fdate(x.updated) + "</span></div><div class='fm-v fm-md' data-md='1' data-tr='fact:" + x.id + ":value'>" + md(x.value) + "</div>"; }).join("<div style='height:6px'></div>") : NA) + "</div>";
     }).join("");
   }
   async function drugPage(id, k) {
