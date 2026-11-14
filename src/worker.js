@@ -370,10 +370,23 @@ function uiOk(u) {
 }
 
 function valid(d) {
-  const L = (a) => Array.isArray(a) && a.length <= 500 && a.every((x) => x && typeof x.n === "string" && x.n.length <= 200 && (x.u === undefined || (typeof x.u === "string" && x.u.length <= 2000)) && (x.h === undefined || (typeof x.h === "string" && x.h.length <= 100000)) && (x.hid === undefined || (typeof x.hid === "string" && /^[\w-]{6,40}$/.test(x.hid))));
+  const L = (a) => Array.isArray(a) && a.length <= 500 && a.every((x) => x && typeof x.n === "string" && x.n.length <= 200 && (x.u === undefined || (typeof x.u === "string" && x.u.length <= 2000)) && (x.h === undefined || (typeof x.h === "string" && x.h.length <= 100000)) && (x.hid === undefined || (typeof x.hid === "string" && /^[\w-]{6,40}$/.test(x.hid))) && (x.t === undefined || (Number.isFinite(x.t) && x.t >= 0)));
   return d && uiOk(d.ui) && L(d.drive) && Array.isArray(d.materi) && d.materi.length <= 60 && d.materi.every((b) => typeof b.n === "string" && L(b.lab) && L(b.all)) &&
     Array.isArray(d.rekaman) && d.rekaman.length <= 20 && d.rekaman.every((t) => typeof t.n === "string" && L(t.kl) && L(t.blok) && L(t.lab)) &&
     d.sheet && /^[\w-]{20,80}$/.test(d.sheet.id) && Array.isArray(d.sheet.tabs) && d.sheet.tabs.length <= 30 && d.sheet.tabs.every((t) => typeof t.n === "string" && /^\d{1,12}$/.test(t.g));
+}
+
+async function kvKeys(env, prefix) { const out = []; let cursor; do { const r = await env.LINKS.list({ prefix, cursor }); out.push(...r.keys); cursor = r.list_complete ? undefined : r.cursor; } while (cursor); return out; }
+// hapus foto materi HTML yang tidak dipakai lagi oleh file HTML mana pun (umur > 1 jam supaya upload yang sedang berjalan aman)
+async function htmlImgGc(env, siteRaw) {
+  const db = await runDb(env).catch(() => null);
+  if (!db) return 0;
+  const ref = new Set(), grab = (t) => { for (const m of String(t || "").matchAll(/\/api\/html\/img\/([\w-]{6,40})/g)) ref.add(m[1]); };
+  grab(siteRaw);
+  for (const k of await kvKeys(env, "h:")) grab(await env.LINKS.get(k.name));
+  const old = (await db.prepare("SELECT id FROM html_imgs WHERE created < ?").bind(Date.now() - 36e5).all()).results.filter((r) => !ref.has(r.id));
+  for (let i = 0; i < old.length; i += 80) await db.batch(old.slice(i, i + 80).map((r) => db.prepare("DELETE FROM html_imgs WHERE id = ?").bind(r.id)));
+  return old.length;
 }
 
 // ===== ASTERION RUN (mulai) =====================================================
@@ -402,6 +415,8 @@ const RUN_DDL = [
   // soal tersimpan (bookmark): snap = salinan soal saat disimpan, dipakai bila soal asli sudah dihapus admin
   "CREATE TABLE IF NOT EXISTS run_bookmarks ( u TEXT NOT NULL, qid INTEGER NOT NULL, cat_id INTEGER NOT NULL, snap TEXT NOT NULL, t INTEGER NOT NULL, PRIMARY KEY (u, qid) )",
   "CREATE INDEX IF NOT EXISTS ix_rb_user ON run_bookmarks (u, cat_id)",
+  // foto yang dipisah dari materi HTML saat upload (dihapus otomatis bila tidak dipakai materi mana pun)
+  "CREATE TABLE IF NOT EXISTS html_imgs ( id TEXT PRIMARY KEY, mime TEXT NOT NULL, data TEXT NOT NULL, created INTEGER NOT NULL )",
   // catatan waktu fokus/pomodoro (menit) → total jam fokus per minggu
   "CREATE TABLE IF NOT EXISTS run_focus ( id INTEGER PRIMARY KEY AUTOINCREMENT, u TEXT NOT NULL, t INTEGER NOT NULL, min INTEGER NOT NULL, kind TEXT NOT NULL DEFAULT 'fokus' )",
   "CREATE INDEX IF NOT EXISTS ix_rf_user ON run_focus (u, t)",
@@ -1083,6 +1098,13 @@ export default {
       if (!im) return new Response("", { status: 404 });
       return new Response(Uint8Array.from(atob(im.data), (c) => c.charCodeAt(0)), { headers: { "content-type": im.mime, "cache-control": "public, max-age=31536000, immutable", "x-content-type-options": "nosniff" } });
     }
+    if (path.startsWith("html/img/") && M === "GET") { // foto materi HTML (publik, alamatnya dari isi gambar)
+      const hdb = await runDb(env).catch(() => null), iid = path.slice(9);
+      if (!hdb || !/^[\w-]{6,40}$/.test(iid)) return new Response("", { status: hdb ? 400 : 503 });
+      const im = await hdb.prepare("SELECT mime, data FROM html_imgs WHERE id = ?").bind(iid).first();
+      if (!im) return new Response("", { status: 404 });
+      return new Response(Uint8Array.from(atob(im.data), (c) => c.charCodeAt(0)), { headers: { "content-type": im.mime, "cache-control": "public, max-age=31536000, immutable", "x-content-type-options": "nosniff", "cross-origin-resource-policy": "cross-origin" } });
+    }
     let body = {};
     if (M !== "GET" && path !== "run/admin/up/pdf") { try { body = await request.json(); } catch { body = {}; } }
 
@@ -1128,13 +1150,28 @@ export default {
         if (!a.admin) return J({ err: "admin" }, 403);
         if (!valid(body)) return J({ err: "invalid" }, 400);
         await env.LINKS.put("site", JSON.stringify(body));
-        try { // bersihkan file HTML yatim (lebih dari 1 jam & tidak dipakai lagi)
-          const ref = new Set(), col = (a) => (a || []).forEach((x) => x.hid && ref.add(x.hid));
-          col(body.drive); body.materi.forEach((b) => { col(b.lab); col(b.all); }); body.rekaman.forEach((t) => { col(t.kl); col(t.blok); col(t.lab); });
-          for (const k of (await env.LINKS.list({ prefix: "h:" })).keys) if (!ref.has(k.name.slice(2)) && (!k.metadata || Date.now() - k.metadata.t > 36e5)) await env.LINKS.delete(k.name);
+        try { // bersihkan file HTML yatim (lebih dari 1 jam & tidak dipakai lagi), lalu foto-fotonya
+          const ref = new Set(), raw = JSON.stringify(body);
+          for (const m of raw.matchAll(/"hid":"([\w-]{6,40})"/g)) ref.add(m[1]); // semua kategori, termasuk kategori buatan admin
+          let gone = 0;
+          for (const k of await kvKeys(env, "h:")) if (!ref.has(k.name.slice(2)) && (!k.metadata || Date.now() - k.metadata.t > 36e5)) { await env.LINKS.delete(k.name); gone++; }
+          if (gone) await htmlImgGc(env, raw);
         } catch {}
         return J({ ok: 1 });
       }
+    }
+    if (path === "html/img" && M === "POST") { // admin: simpan satu foto dari materi HTML (maks ±1 MB)
+      if (!a.admin) return J({ err: "admin" }, 403);
+      const m = String(body.data || "").match(/^data:(image\/(?:jpeg|png|webp|gif));base64,([A-Za-z0-9+/=]+)$/);
+      if (!m || m[2].length > 1400000) return J({ err: "Gambar tidak valid atau terlalu besar." }, 400);
+      let head = ""; try { head = atob(m[2].slice(0, 16)); } catch { return J({ err: "Data gambar rusak." }, 400); }
+      const sig = { "image/jpeg": head.startsWith("\xFF\xD8"), "image/png": head.startsWith("\x89PNG"), "image/gif": head.startsWith("GIF8"), "image/webp": head.startsWith("RIFF") && head.slice(8, 12) === "WEBP" }[m[1]];
+      if (!sig) return J({ err: "Isi berkas tidak sesuai tipe gambar." }, 400);
+      const hdb = await runDb(env).catch(() => null);
+      if (!hdb) return J({ err: "Database belum terpasang." }, 503);
+      const id = (await sha("himg:" + m[2])).slice(0, 24); // ID dari isi → foto sama tidak tersimpan dua kali
+      await hdb.prepare("INSERT INTO html_imgs (id, mime, data, created) VALUES (?, ?, ?, ?) ON CONFLICT(id) DO UPDATE SET created = excluded.created").bind(id, m[1], m[2], Date.now()).run();
+      return J({ id });
     }
     if (path === "html") { // file HTML materi hasil upload
       if (M === "GET") {

@@ -108,6 +108,9 @@ h1{margin:0;display:inline-block;padding:0 .12em;font-family:Cinzel,Georgia,seri
 #hov .hvbar b{flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;text-align:center;letter-spacing:.04em}
 #hov .hvbar button{flex:none;width:38px;height:38px;border-radius:12px;border:1px solid var(--line);background:rgba(255,255,255,.08);color:#fff;font-size:18px;cursor:pointer}
 .hov-on body{overflow:hidden}
+.badge.nw{margin-left:4px;vertical-align:2px;font-size:9px;letter-spacing:.06em}
+.card .t small.rd{color:var(--ok,#4ade80)}
+.sq-snip{display:block;margin-top:3px;font-size:11px;opacity:.85;font-style:italic}
 .hint{color:var(--mut);font-size:12px;line-height:1.5;margin:6px 4px 14px}
 .chips{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:14px}
 .chip{padding:7px 13px;border-radius:999px;font-size:12px;color:#fff;text-decoration:none;white-space:nowrap}
@@ -572,7 +575,7 @@ function folderRef(u){var m=(u||"").match(/drive\.google\.com\/drive\/(?:u\/\d+\
 function ytList(u){var m=(u||"").match(/[?&]list=([\w-]+)/);return /youtube\.com|youtu\.be/.test(u||"")&&m?m[1]:""}
 function fileIco(n){var e=(String(n).split(".").pop()||"").toLowerCase();return{pdf:"📕",doc:"📘",docx:"📘",ppt:"📙",pptx:"📙",xls:"📗",xlsx:"📗",csv:"📗",png:"🖼️",jpg:"🖼️",jpeg:"🖼️",gif:"🖼️",mp4:"🎞️",mkv:"🎞️",mp3:"🎵",zip:"🗜️",rar:"🗜️"}[e]||"📄"}
 function viewer(x,ex){
-  ex=ex||[];var sub=ex[ex.length-1];sub=/^[\w-]+$/.test(sub||"")?sub:"";
+  mMark(x);ex=ex||[];var sub=ex[ex.length-1];sub=/^[\w-]+$/.test(sub||"")?sub:"";
   var h="<div class='sec' id='ft'>"+esc(x.n)+"</div>",e=x.u&&embed(x.u),pl=ytList(x.u),fr=folderRef(x.u),ou=x.u;
   if(x.h||x.hid){hOpen(x);return h+"<div class='pn g empty'>Materi dibuka di layar penuh.</div>"}
   else if(pl&&e){h=h.replace("class='sec' id='ft'","class='sec' id='ft' style='margin:8px 2px 10px'");h+="<div class='pw'><div class='vw' id='pv'><iframe id='pf' src=\""+esc(e.s)+"\" allowfullscreen allow='fullscreen; autoplay; encrypted-media; picture-in-picture'></iframe></div><div class='plw'><button class='pa l g' data-pa='-1' disabled aria-label='Sebelumnya'>‹</button><div id='pl'><div class='empty'>Memuat daftar video…</div></div><button class='pa r g' data-pa='1' aria-label='Berikutnya'>›</button></div></div>";setTimeout(function(){plFill(pl,x.u)},0)}
@@ -584,39 +587,55 @@ function viewer(x,ex){
   if(gi)h+="<a class='card g' href='#' data-force='1' data-pv='"+esc(gi)+"' data-pn='"+esc(x.n)+"'"+(/presentation\/d\//.test(x.u)?" data-pk='slides'":"")+"><span class='i'>📖</span><span class='t'>Buka dengan pembaca<small>PDF besar lebih lancar · PPT + catatan pembicara</small></span><span class='a'>›</span></a>";
   if(ou&&!pl)h+="<a class='card g' href=\""+esc(ou)+"\" target='_blank' rel='noopener noreferrer'><span class='i'>↗</span><span class='t'>"+(fr?"Buka di Google Drive":pl?"Buka playlist di YouTube":"Buka di tab baru")+"</span></a>";
   return h}
+// ---- status materi (disimpan di perangkat ini): sudah dibuka & tab terakhir di materi HTML ----
+function lsJ(k){try{return JSON.parse(localStorage.getItem(k)||"{}")||{}}catch(e){return{}}}
+function lsP(k,o){try{localStorage.setItem(k,JSON.stringify(o))}catch(e){}}
+function mKey(x){return x.hid?"h:"+x.hid:x.u?"u:"+x.u:"n:"+(x.n||"")} // ganti file → hid baru → dianggap belum dibuka lagi
+function mRead(x){return!!lsJ("ast.read")[mKey(x)]}
+function mMark(x){if(!x||!x.n||x.n==="?")return;var o=lsJ("ast.read"),k=mKey(x);if(o[k])return;o[k]=Date.now();lsP("ast.read",o)}
+function mNew(x){return!!x.t&&Date.now()-x.t<7*864e5&&!mRead(x)} // BARU: diunggah/diganti ≤ 7 hari & belum dibuka
+function mCount(arr){var o=lsJ("ast.read"),n=0;(arr||[]).forEach(function(x){if(o[mKey(x)])n++});return n}
+function mAll(b){var a=[];uiList("cm").forEach(function(c){a=a.concat(b[c.id]||[])});return a}
+var HCUR="";
+window.addEventListener("message",function(e){var f=$("hf");if(!f||e.source!==f.contentWindow||!HCUR||!e.data||typeof e.data.asth!=="string")return;
+  var h=e.data.asth,o=lsJ("ast.hpos");if(/^#[\w\-%.]{1,80}$/.test(h))o[HCUR]=h;else delete o[HCUR];lsP("ast.hpos",o)});
+function pickHtml(){return new Promise(function(ok){var i=document.createElement("input");i.type="file";i.accept=".html,.htm,text/html";i.onchange=function(){ok(i.files&&i.files[0]||null)};i.click()})}
 // materi HTML: lapisan layar penuh di atas header & menu bawah
-function hClose(){var o=$("hov");if(o)o.remove();document.documentElement.classList.remove("hov-on")}
+function hClose(){var o=$("hov");if(o)o.remove();HCUR="";document.documentElement.classList.remove("hov-on")}
 function hOpen(x){
-  hClose();var o=document.createElement("div");o.id="hov";
+  hClose();HCUR=mKey(x);var pos=lsJ("ast.hpos")[HCUR]||"",o=document.createElement("div");o.id="hov";
   o.innerHTML="<div class='hvbar'><button type='button' class='g' data-hv='back' aria-label='Kembali'>‹</button><b></b><button type='button' class='g' data-hv='fs' aria-label='Layar penuh'>⛶</button></div><iframe id='hf' sandbox='allow-scripts'></iframe>";
   o.querySelector("b").textContent=x.n||"";
   o.addEventListener("click",function(ev){var b=ev.target.closest("[data-hv]");if(!b)return;
-    if(b.dataset.hv==="back"){if(history.length>1)history.back();else{hClose();location.hash="#/materi"}}
+    if(b.dataset.hv==="back"){var bk=$("back")&&$("back").getAttribute("href");location.hash=bk&&bk!=="#/"?bk:"#/materi"} // bukan history.back(): riwayat tab di dalam materi ikut tercatat
     else{try{if(document.fullscreenElement)document.exitFullscreen();else o.requestFullscreen()}catch(e){}}});
   document.body.appendChild(o);document.documentElement.classList.add("hov-on");
-  if(x.h)o.querySelector("iframe").srcdoc=hPrep(x.h);else hFill(x.hid)}
+  if(x.h)o.querySelector("iframe").srcdoc=hPrep(x.h,pos);else hFill(x.hid,pos)}
 // skrip kecil yang disisipkan ke materi HTML (iframe sandbox tanpa origin):
 // - link "#tab" pindah di dalam materi, bukan membuka web utama di dalam iframe
 // - localStorage/sessionStorage diganti versi memori bila diblokir sandbox
-var HFIX="<script>(function(){function mem(){var m={};return{getItem:function(k){return Object.prototype.hasOwnProperty.call(m,k)?m[k]:null},setItem:function(k,v){m[k]=String(v)},removeItem:function(k){delete m[k]},clear:function(){m={}},key:function(i){return Object.keys(m)[i]||null},get length(){return Object.keys(m).length}}}"+
+// - tab terakhir (#…) dikirim ke web utama dan dipulihkan saat materi dibuka lagi
+function hFix(pos){return"<script>(function(){var P="+JSON.stringify(/^#[\w\-%.]{1,80}$/.test(pos||"")?pos:"").replace(/</g,"\\u003c")+";if(P)addEventListener('load',function(){setTimeout(function(){try{if(location.hash!==P)location.hash=P}catch(e){}},0)});"+ // setelah materi siap (mengubah hash saat dokumen masih dimuat membuat iframe kosong)
+  "addEventListener('hashchange',function(){try{parent.postMessage({asth:location.hash},'*')}catch(e){}});"+HFIX}
+var HFIX="function mem(){var m={};return{getItem:function(k){return Object.prototype.hasOwnProperty.call(m,k)?m[k]:null},setItem:function(k,v){m[k]=String(v)},removeItem:function(k){delete m[k]},clear:function(){m={}},key:function(i){return Object.keys(m)[i]||null},get length(){return Object.keys(m).length}}}"+
   "['localStorage','sessionStorage'].forEach(function(n){try{window[n].getItem('x')}catch(e){try{Object.defineProperty(window,n,{value:mem(),configurable:true})}catch(e2){}}});"+
   "document.addEventListener('click',function(e){if(e.defaultPrevented||e.button)return;var a=e.target.closest&&e.target.closest('a[href^=\"#\"]');if(!a)return;e.preventDefault();var h=a.getAttribute('href');if(h.length<2)return;"+
   "if(location.hash!==h)location.hash=h;else{var t=document.getElementById(decodeURIComponent(h.slice(1)));if(t)t.scrollIntoView({behavior:'smooth'})}})})()<\/script>";
-function hPrep(h){ // <base> agar alamat foto "/api/run/img/…" mengarah ke server web ini
-  var add="<base href=\""+location.origin+"/\">"+HFIX,m=/<head\b[^>]*>/i.exec(h)||/<!doctype[^>]*>/i.exec(h);
+function hPrep(h,pos){ // <base> agar alamat foto "/api/html/img/…" mengarah ke server web ini
+  var add="<base href=\""+location.origin+"/\">"+hFix(pos),m=/<head\b[^>]*>/i.exec(h)||/<!doctype[^>]*>/i.exec(h);
   return m?h.slice(0,m.index+m[0].length)+add+h.slice(m.index+m[0].length):add+h}
 // foto base64 di dalam HTML dipisah: disimpan sebagai gambar di server, HTML hanya memuat alamatnya
 var DURI=/data:image\/(png|jpe?g|webp|gif);base64,(?:[A-Za-z0-9+\/=]|\\\/)+/g;
 function hLoadImg(src){return new Promise(function(ok,no){var i=new Image();i.onload=function(){ok(i)};i.onerror=no;i.src=src})}
 async function hImg(d){
   d=d.replace(/\\\//g,"/").replace(/^data:image\/jpg;/,"data:image/jpeg;");
-  if(d.length>900000){ // terlalu besar untuk satu gambar → kecilkan di browser
+  if(d.length>1300000){ // terlalu besar untuk satu gambar → kecilkan di browser
     var im=await hLoadImg(d);
-    for(var k=0,W=[1600,1280,1000];k<W.length;k++){var s=Math.min(1,W[k]/Math.max(im.naturalWidth,im.naturalHeight)),c=document.createElement("canvas");
+    for(var k=0,W=[1800,1400,1100];k<W.length;k++){var s=Math.min(1,W[k]/Math.max(im.naturalWidth,im.naturalHeight)),c=document.createElement("canvas");
       c.width=Math.round(im.naturalWidth*s);c.height=Math.round(im.naturalHeight*s);c.getContext("2d").drawImage(im,0,0,c.width,c.height);
-      d=c.toDataURL("image/webp",k?0.7:0.82);if(d.length<=900000)break}}
-  var r=await api("run/admin/img",{m:"POST",b:{data:d}});
-  return r.ok&&r.j&&r.j.id?"/api/run/img/"+r.j.id:""}
+      d=c.toDataURL("image/webp",k?0.72:0.85);if(d.length<=1300000)break}}
+  var r=await api("html/img",{m:"POST",b:{data:d}});
+  return r.ok&&r.j&&r.j.id?"/api/html/img/"+r.j.id:""}
 async function hShrink(h,name){
   var m,map=new Map(),list=[],idx=0,done=0,fail=0;DURI.lastIndex=0;
   while((m=DURI.exec(h)))if(m[0].length>3000&&!map.has(m[0])){map.set(m[0],"");list.push(m[0])}
@@ -626,9 +645,9 @@ async function hShrink(h,name){
   await Promise.all([work(),work(),work(),work()]);
   return{h:h.replace(DURI,function(x){return map.get(x)||x}),n:list.length-fail,fail:fail}}
 window.addEventListener("hashchange",hClose); // dipasang sebelum route(): bila masih di halaman materi, viewer membukanya lagi
-async function hFill(id){
+async function hFill(id,pos){
   try{var r=await api("html?id="+encodeURIComponent(id)),f=$("hf");if(!f)return;
-    f.srcdoc=r.ok&&r.j&&typeof r.j.h==="string"?hPrep(r.j.h):"<p style='font-family:sans-serif;color:#888;padding:20px'>Materi tidak bisa dimuat.</p>"
+    f.srcdoc=r.ok&&r.j&&typeof r.j.h==="string"?hPrep(r.j.h,pos):"<p style='font-family:sans-serif;color:#888;padding:20px'>Materi tidak bisa dimuat.</p>"
   }catch(e){}}
 async function upHtml(files){
   var P=location.hash.replace(/^#\/?/,"").split("/").filter(Boolean),arr=arrAt(P.slice(0,3));
@@ -642,7 +661,7 @@ async function upHtml(files){
     if(sh.h.length>5e6){toast("Teks "+f.name+" masih lebih dari 5 MB setelah foto dipisah — pecah per topik ya");continue}
     var r=await api("html",{m:"POST",b:{h:sh.h}});
     if(!r.ok){toast("Gagal mengunggah "+f.name);continue}
-    arr.unshift({n:(list.length===1&&ttl)||f.name.replace(/\.html?$/i,""),hid:r.j.id});n++}
+    arr.unshift({n:(list.length===1&&ttl)||f.name.replace(/\.html?$/i,""),hid:r.j.id,t:Date.now()});n++}
   if(n){save();route();toast(n+" file ditambahkan")}}
 (function(){var mn=$("main"),zone=function(e){return e.target.closest?e.target.closest("#dz"):null};
   ["dragenter","dragover"].forEach(function(ev){mn.addEventListener(ev,function(e){var z=zone(e);if(!z)return;e.preventDefault();z.classList.add("on")})});
@@ -1354,15 +1373,16 @@ setInterval(function(){if(!document.hidden&&S.t)fdFill()},30000);window.addEvent
 function arrAt(P){var d=S.data,a=P[0];
   if(a==="materi")return P[1]==="drive"?d.drive:d.materi[+P[1]]&&d.materi[+P[1]][P[2]];
   if(a==="rekaman")return d.rekaman[+P[1]]&&d.rekaman[+P[1]][P[2]]}
-function ctl(i,k){var a=k?" data-k='"+k+"'":"";return"<div class='ctl'><button"+a+" data-a='up' data-i='"+i+"'>↑</button><button"+a+" data-a='dn' data-i='"+i+"'>↓</button><button"+a+" data-a='ren' data-i='"+i+"'>✎</button><button class='x'"+a+" data-a='del' data-i='"+i+"'>✕</button></div>"}
+function ctl(i,k,x){var a=k?" data-k='"+k+"'":"";return"<div class='ctl'><button"+a+" data-a='up' data-i='"+i+"'>↑</button><button"+a+" data-a='dn' data-i='"+i+"'>↓</button><button"+a+" data-a='ren' data-i='"+i+"'>✎</button>"+(x&&(x.hid||x.h)?"<button data-a='rep' data-i='"+i+"' title='Ganti file HTML (posisi & judul tetap)' aria-label='Ganti file'>⇄</button>":"")+"<button class='x'"+a+" data-a='del' data-i='"+i+"'>✕</button></div>"}
 function listPage(P,ico,withHtml){
   var arr=arrAt(P),base=P.join("/"),h="";
   if(!arr)return "<div class='empty'>Tidak ditemukan.</div>";
   if(!arr.length)h+="<div class='pn g empty'>Belum ada isi.</div>";
   arr.forEach(function(x,i){
     var a="<a class='card g' href='#/"+base+"/"+i+"'>";
-    h+="<div class='row'>"+a+"<span class='i'>"+(x.h||x.hid?"📄":ico)+"</span><span class='t'>"+esc(x.n)+"</span><span class='a'>›</span></a>";
-    if(S.admin)h+=ctl(i);
+    var rd=mRead(x);
+    h+="<div class='row'>"+a+"<span class='i'>"+(x.h||x.hid?"📄":ico)+"</span><span class='t'>"+esc(x.n)+(mNew(x)?" <span class='badge nw'>BARU</span>":"")+(rd?"<small class='rd'>✓ sudah dibuka</small>":"")+"</span><span class='a'>›</span></a>";
+    if(S.admin)h+=ctl(i,"",x);
     h+="</div>"});
   if(S.admin)h+="<div class='pn g'><b>＋ Tambah</b>"+(withHtml?"<div class='dz' id='dz'>📂 Seret &amp; lepas file .html ke sini<small>atau ketuk untuk memilih · bisa banyak file sekaligus · foto di dalam file otomatis dipisah · teks maks 5 MB per file</small></div><input type='file' id='fI' accept='.html,.htm,text/html' multiple hidden>":"")+"<label>Judul</label><input id='aN'><label>URL (YouTube, Drive, Docs, dll.)</label><input id='aU' placeholder='https://...'>"+(withHtml?"<label>Atau tempel kode HTML materi (opsional, dipakai jika URL kosong)</label><textarea id='aH' rows='4'></textarea>":"")+"<button class='btn' data-a='add'>Tambah</button><div class='hint'>Item baru muncul paling atas. Urutkan dengan tombol ↑ ↓.</div></div>";
   return h}
@@ -1398,7 +1418,8 @@ function renderNav(){
   var l=uiList("nav").filter(function(x){return !x.h});if(l.length<2)l=UI_DEF.nav;
   $("nav").innerHTML=l.map(function(x){return "<a href='"+(x.id==="home"?"#/":"#/"+x.id)+"' data-t='"+x.id+"'><b>"+esc(x.i)+"</b>"+esc(x.n)+"</a>"}).join("")}
 function catCards(g,idx,o,suffix){
-  return cards(uiList(g).map(function(c){var arr=o[c.id]||[];return["#/"+(g==="cm"?"materi":"rekaman")+"/"+idx+"/"+c.id,c.i,c.n,arr.length+suffix]}))}
+  return cards(uiList(g).map(function(c){var arr=o[c.id]||[],r=g==="cm"?mCount(arr):0,nw=g==="cm"?arr.filter(mNew).length:0;
+    return["#/"+(g==="cm"?"materi":"rekaman")+"/"+idx+"/"+c.id,c.i,c.n,arr.length+suffix+(r?" · "+r+"/"+arr.length+" dibuka":"")+(nw?" · "+nw+" baru":"")]}))}
 function uiRow(g,x,i,n){
   return "<div class='row'><div class='card g' style='margin-bottom:0;cursor:default"+(x.h?";opacity:.45":"")+"'><span class='i'>"+esc(x.i)+"</span><span class='t'>"+esc(x.n)+(x.s!==undefined?"<small>"+esc(x.s)+"</small>":"")+(x.c!==undefined?"<small>Kartu: "+esc(x.c)+"</small>":"")+"</span></div>"+
   "<div class='ctl'><button data-a='ui-up' data-g='"+g+"' data-i='"+i+"'>↑</button><button data-a='ui-dn' data-g='"+g+"' data-i='"+i+"'>↓</button><button data-a='ui-ren' data-g='"+g+"' data-i='"+i+"'>✎</button>"+
@@ -1458,7 +1479,7 @@ function pMateri(P){
   if(P[1]==="drive"&&P[2]===undefined)return sqWrap("materi","Cari materi, folder, atau isi folder…",listPage(P,"🗂️",false));
   if(!P[1])return sqWrap("materi","Cari materi, folder, atau isi folder…",uiList("mp").map(function(x){
     if(x.id==="drive")return "<div class='sec'>"+esc(x.n)+"</div>"+cards([["#/materi/drive",x.i,x.c,d.drive.length+" folder"]]);
-    return "<div class='sec'>"+esc(x.n)+"</div>"+topList("materi",x.i,function(b){return(b.lab.length+b.all.length)+" materi"},"mis. Blok 4.1")}).join(""));
+    return "<div class='sec'>"+esc(x.n)+"</div>"+topList("materi",x.i,function(b){var al=mAll(b),r=mCount(al),nw=al.filter(mNew).length;return al.length+" materi"+(r?" · "+r+"/"+al.length+" dibuka":"")+(nw?" · "+nw+" baru":"")},"mis. Blok 4.1")}).join(""));
   if(P[1]==="drive")return P[2]!==undefined?viewer(d.drive[+P[2]]||{n:"?"},P.slice(3)):listPage(P,"🗂️",false);
   var b=d.materi[+P[1]];if(!b)return "<div class='empty'>Tidak ditemukan.</div>";
   if(!P[2])return "<div class='sec'>"+esc(b.n)+"</div>"+catCards("cm",P[1],b," materi");
@@ -1954,7 +1975,8 @@ function sqBase(scope){
 /* sumber yang bisa ditelusuri isinya: folder Drive & playlist YouTube */
 function sqSources(scope){
   var d=S.data,out=[];
-  function add(x,base,path){if(!x||!x.u)return;var q=folderRef(x.u),pl=ytList(x.u);
+  function add(x,base,path){if(x&&x.hid&&scope==="materi"){out.push({k:"h",hid:x.hid,n:x.n,base:base,path:path,key:"h|"+x.hid,depth:0});return}
+    if(!x||!x.u)return;var q=folderRef(x.u),pl=ytList(x.u);
     if(q)out.push({k:"fd",q:q,base:base,path:path,key:"fd|"+q,depth:0});
     else if(pl)out.push({k:"pl",id:pl,base:base,path:path,key:"pl|"+pl,depth:0})}
   if(scope==="materi"){
@@ -1968,6 +1990,13 @@ function sqFetch(path,key){
   if(SQ.net[key])return SQ.net[key];
   var p=api(path).then(function(r){return r.ok&&r.j&&r.j.v?r.j:null}).catch(function(){return null});
   SQ.net[key]=p;p.then(function(j){if(!j)delete SQ.net[key]});return p}
+/* isi teks materi HTML (sudah dinormalisasi untuk dicari) */
+function sqHtml(hid){
+  var k="h|"+hid;if(SQ.net[k])return SQ.net[k];
+  var p=api("html?id="+encodeURIComponent(hid)).then(function(r){if(!r.ok||!r.j||typeof r.j.h!=="string")return null;
+    return sqNorm(r.j.h.replace(/data:[^"'\s)]+/g," ").replace(/\/api\/[\w\/-]+/g," ").replace(/<[^>]+>/g," ").replace(/&nbsp;/g," ").replace(/&amp;/g,"&").replace(/\\n/g," ").replace(/["'`]\s*[,:]\s*["'`]/g," · ").replace(/[{}\[\]"'`]+/g," ").replace(/\s+/g," "))}).catch(function(){return null});
+  SQ.net[k]=p;p.then(function(t){if(!t)delete SQ.net[k]});return p}
+function sqSnip(txt,toks){var i=txt.indexOf(toks[0]);if(i<0)return"";var a=Math.max(0,i-50),b=Math.min(txt.length,i+toks[0].length+80);return(a?"…":"")+txt.slice(a,b).trim()+(b<txt.length?"…":"")}
 function sqCrawl(scope){
   if(SQ.run[scope])return;
   var queue=sqSources(scope),R=SQ.run[scope]={total:queue.length,done:0,rec:[],fin:false},active=0;
@@ -1975,9 +2004,10 @@ function sqCrawl(scope){
     while(active<4&&queue.length){active++;one(queue.shift())}
     if(!active&&!queue.length&&!R.fin){R.fin=true;sqRefresh()}}
   function one(s){
-    var p=s.k==="fd"?sqFetch("folder?"+s.q,s.key):sqFetch("playlist?id="+encodeURIComponent(s.id),s.key);
+    var p=s.k==="h"?sqHtml(s.hid):s.k==="fd"?sqFetch("folder?"+s.q,s.key):sqFetch("playlist?id="+encodeURIComponent(s.id),s.key);
     p.then(function(j){
       if(!j)return;
+      if(s.k==="h"){R.rec.push({t:s.n,path:s.path.slice(0,-1),href:s.base,ico:"📄",txt:j});return}
       j.v.forEach(function(f){
         if(s.k==="pl"){R.rec.push({t:f.t||"Video",path:s.path,href:s.base,ico:"🎬",vid:f.id,pl:s.id});return}
         if(f.f){
@@ -1989,14 +2019,19 @@ function sqCrawl(scope){
 function sqCard(x){
   var path=x.path&&x.path.length?"<small>"+esc(x.path.join(" › "))+"</small>":"";
   if(x.file)return"<a class='card g'"+pvAttr(x.t,x.u,x.id)+" href=\""+esc(x.u)+"\" target='_blank' rel='noopener noreferrer'><span class='i'>"+fileIco(x.t)+"</span><span class='t'>"+esc(x.t)+path+"</span><span class='a'>"+(pvKind(x.t,/docs\.google\.com\/presentation\/d\//.test(x.u||"")?"slides":"")?"👁":"↗")+"</span></a>";
-  return"<a class='card g' href='"+esc(x.href)+"'"+(x.vid?" data-sqv='"+esc(x.vid)+"' data-sql='"+esc(x.pl)+"'":"")+"><span class='i'>"+x.ico+"</span><span class='t'>"+esc(x.t)+path+"</span><span class='a'>›</span></a>"}
+  return"<a class='card g' href='"+esc(x.href)+"'"+(x.vid?" data-sqv='"+esc(x.vid)+"' data-sql='"+esc(x.pl)+"'":"")+"><span class='i'>"+x.ico+"</span><span class='t'>"+esc(x.t)+path+(x.snip?"<span class='sq-snip'>di dalam materi: "+esc(x.snip)+"</span>":"")+"</span><span class='a'>›</span></a>"}
 function sqRender(){
   var i=$("sq"),r=$("sqr");if(!i||!r)return;var sc=i.dataset.sc,toks=sqToks();
   if(!toks.length){sqVis(sc,false);return}
   sqVis(sc,true);
   if(sc==="jadwal")return sqRenderJ(toks);
   var R=SQ.run[sc],all=sqBase(sc).concat(R?R.rec:[]),seen={},hit=[];
-  all.forEach(function(x){var k=(x.href||x.u||"")+"|"+x.t+"|"+(x.vid||"");if(seen[k])return;seen[k]=1;
+  all.forEach(function(x){
+    if(x.txt){ // isi materi HTML: hanya bila judulnya sendiri belum cocok (kalau cocok, kartu judul sudah tampil)
+      if(sqHit(x.t+" "+(x.path||[]).join(" "),toks))return;
+      for(var q=0;q<toks.length;q++)if(x.txt.indexOf(toks[q])<0)return;
+      var k2=x.href+"|txt";if(seen[k2])return;seen[k2]=1;hit.push({x:Object.assign({},x,{snip:sqSnip(x.txt,toks)}),s:2});return}
+    var k=(x.href||x.u||"")+"|"+x.t+"|"+(x.vid||"");if(seen[k])return;seen[k]=1;
     if(sqHit(x.t+" "+(x.path||[]).join(" "),toks))hit.push({x:x,s:sqHit(x.t,toks)?0:1})});
   hit.sort(function(a,b){return a.s-b.s});
   var h="";
@@ -2052,7 +2087,13 @@ $("main").addEventListener("click",async function(e){
   else if(a==="del"){if(b.dataset.arm){arr.splice(i,1)}else{b.dataset.arm=1;b.textContent="?";setTimeout(function(){b.textContent="✕";delete b.dataset.arm},2500);return}}
   else if(a==="add"){var n=$("aN").value.trim(),u=$("aU").value.trim(),hh=$("aH")?$("aH").value.trim():"";
     if(!n||(!u&&!hh)){toast("Isi judul dan URL/HTML");return}
-    var o={n:n};if(u){o.u=/^https?:\/\//i.test(u)?u:"https://"+u}else if(hh.length>6e4){var rr=await api("html",{m:"POST",b:{h:hh}});if(!rr.ok){toast("Gagal menyimpan HTML");return}o.hid=rr.j.id}else o.h=hh;arr.unshift(o)}
+    var o={n:n};if(u){o.u=/^https?:\/\//i.test(u)?u:"https://"+u}else if(hh.length>6e4){var rr=await api("html",{m:"POST",b:{h:hh}});if(!rr.ok){toast("Gagal menyimpan HTML");return}o.hid=rr.j.id;o.t=Date.now()}else{o.h=hh;o.t=Date.now()}arr.unshift(o)}
+  else if(a==="rep"){var it=arr&&arr[i];if(!it)return;var fl=await pickHtml();if(!fl)return;
+    if(!/\.html?$/i.test(fl.name)){toast("Hanya file .html: "+fl.name);return}
+    var sh;try{sh=await hShrink(await fl.text(),fl.name)}catch(er){toast("Gagal membaca "+fl.name);return}
+    if(sh.h.length>5e6){toast("Teks masih lebih dari 5 MB setelah foto dipisah — pecah per topik ya");return}
+    var rp=await api("html",{m:"POST",b:{h:sh.h}});if(!rp.ok){toast("Gagal mengunggah "+fl.name);return}
+    it.hid=rp.j.id;delete it.h;it.t=Date.now();toast("File “"+it.n+"” diganti ✓")}
   else if(a==="ren"){var nn=await Dlg.prompt("Nama baru:",arr[i].n,{title:"Ganti nama",icon:"✎",okText:"Simpan"});if(nn===null||!nn.trim())return;arr[i].n=nn.trim().slice(0,200)}
   else if(a==="addtop"){var nm=$("tN").value.trim();if(!nm){toast("Isi nama dulu");return}arr.unshift(b.dataset.k==="materi"?{n:nm,lab:[],all:[]}:{n:nm,kl:[],blok:[],lab:[]})}
   else if(a.indexOf("ui-")===0){if(!(await uiAct(b,a)))return}

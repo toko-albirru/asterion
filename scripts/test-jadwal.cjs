@@ -43,31 +43,28 @@ ok(/class='rn-hist'/.test(run) && /\.rn-hist \.card \.t small\{[^}]*line-height:
 ok(/\.rn-lb \.n small\{[^}]*text-overflow:ellipsis/.test(run), "teks leaderboard dipangkas rapi");
 ok(/#tl \.sl \.bd b\{[^}]*overflow-wrap:anywhere/.test(run), "teks tutorial ditata rapi");
 
-/* 4. mode terang: pita ungu hanya di atas (logo + navbar home/login) */
+/* 4. mode terang: pita ungu sudah dihapus, logo & judul tetap terbaca */
 ok(!/#bb9bef/.test(html), "gradasi ungu full-page dihapus");
-ok(/:root\[data-theme="light"\] html\{background-color:#fdfcff[^}]*overflow-x:hidden/.test(html), "latar halaman putih terang");
-ok(/\.hband::before\{[^}]*width:100vw[^}]*#8b5cf6[^}]*#6d28d9/.test(html), "pita ungu melebar full width");
-ok(/\.hband::before\{[^}]*border-radius:0 0 26px 26px/.test(html), "pita ungu berhenti dengan sudut membulat di bawah logo");
-ok(/\.gate \.hband\{margin:0 -18px;padding:0 18px;--hb-t:-18px\}/.test(html), "pita ungu login mulai dari paling atas");
-ok(/<div class="hband">\s*<div class="gthm">/.test(html) && /class="ttl" style="margin-top:-46px"><h1>ASTERION<\/h1>[\s\S]{0,80}<\/div>\s*<\/div>/.test(html), "logo login dibungkus pita ungu");
-ok(/class='hband'><div class='hero'>[\s\S]{0,140}ASTERION/.test(html), "logo home dibungkus pita ungu");
-ok(/body\[data-r="home"\] \.top::before\{background:linear-gradient\(180deg,#7c3aed,#6d28d9\)/.test(html), "navbar atas ungu di home");
-ok(/body\[data-r="home"\] \.top h2\{color:#fff\}/.test(html), "judul navbar putih di atas ungu");
-ok(/document\.body\.dataset\.r=tab;/.test(html) && /document\.body\.dataset\.r=w==="gate"\?"login"/.test(html), "halaman aktif ditandai (home/login)");
-ok(/\.hband \.ttl h1\{[^}]*#ffffff,#ffe9a8/.test(html), "tulisan ASTERION terang di atas ungu");
+const has = (s, t) => s.indexOf(t) > -1;
+ok(has(html, ".hband::before{display:none}"), "pita ungu di belakang logo tidak lagi digambar");
+ok(has(html, ".gate .hband{margin:0 -18px;padding:calc(10px + env(safe-area-inset-top,0px)) 18px 0;--hb-t:-18px}"), "logo login memberi ruang untuk notch/safe-area");
+ok(has(html, '<div class="hband">') && /class='hband'><div class='hero'>[\s\S]{0,140}ASTERION/.test(html), "logo login & home dibungkus .hband");
+ok(has(html, "document.body.dataset.r=tab;") && has(html, 'document.body.dataset.r=w==="gate"?"login"'), "halaman aktif ditandai (home/login)");
+ok(has(html, ".hband .ttl h1{background:linear-gradient(180deg,#3a2a66,#9a6a12)"), "tulisan ASTERION gelap-emas agar terbaca di latar terang");
 
 /* 5. label Besok/Lusa berwarna cerah */
 ok(/\.badge\.nx\{background:linear-gradient\(135deg,#fde68a,#fbbf24 55%,#f59e0b\)/.test(html), "warna cerah untuk Besok/Lusa");
-ok((html.match(/class='badge nx'/g) || []).length === 2, "label Besok/Lusa dan BESOK memakai warna cerah");
+ok(has(html, "class='badge nx'>\"+lb+\"") && has(html, "class='badge nx'>BESOK"), "label Besok/Lusa dan BESOK memakai warna cerah");
 
 /* 6. label & caption GAME KUIS: tiga mode (game, mode soal, simulasi ujian) */
 ok(!/GAME RUN/i.test(html + run), "tidak ada lagi tulisan GAME RUN");
 ok(/<h1>GAME KUIS<\/h1>/.test(run) && /n:"GAME KUIS"/.test(html) && /run:"GAME KUIS"/.test(html), "label GAME KUIS di judul, menu, dan judul halaman");
-ok(/Tiga mode: 🎮 <b>Game<\/b>/.test(run) && /gerbang <b>A–E<\/b>/.test(run), "caption menyebut mode game & gerbang A–E");
-ok(/📝 <b>Mode Soal<\/b> — tanpa game, kunci &amp; pembahasan tiap pilihan/.test(run), "caption menyebut Mode Soal + pembahasan per pilihan");
-ok(/🎓 <b>Simulasi Ujian<\/b> — jawaban baru terbuka di akhir/.test(run), "caption menyebut Simulasi Ujian (jawaban di akhir)");
-ok(/kembali ke nomor sebelumnya, lompat ke nomor mana pun, dan menandai soal \(flag\)/.test(run), "caption menyebut pindah nomor & flag soal");
-ok(/Skor: benar \+1, salah\/kosong 0\. Waktu <b>per soal<\/b>\. Setelah selesai, kamu mendapat pembahasan semua soal\./.test(run), "caption tetap memuat skor, waktu per soal, dan pembahasan akhir");
+ok(has(run, "Pilih salah satu dari empat mode belajar") && /<b>🎮 Game<\/b>[\s\S]{0,200}gerbang A–E/.test(run), "caption menyebut mode game & gerbang A–E");
+ok(/<b>📝 Mode Soal<\/b>[\s\S]{0,200}Kunci dan pembahasan tiap pilihan/.test(run), "caption menyebut Mode Soal + pembahasan per pilihan");
+ok(/<b>🌿 Mode Santai<\/b>[\s\S]{0,200}tanpa timer/.test(run), "caption menyebut Mode Santai (tanpa timer)");
+ok(/<b>🎓 Simulasi Ujian<\/b>[\s\S]{0,120}Jawaban baru terbuka di akhir/.test(run), "caption menyebut Simulasi Ujian (jawaban di akhir)");
+ok(has(run, "kembali ke nomor sebelumnya, melompat ke nomor mana pun, dan menandai soal (flag)"), "caption menyebut pindah nomor & flag soal");
+ok(has(run, "Skor: benar +1, salah/kosong 0 · Waktu dihitung per soal · Setelah selesai, kamu mendapat pembahasan semua soal."), "caption tetap memuat skor, waktu per soal, dan pembahasan akhir");
 ok(["#/run/play/", "#/run/quiz/", "#/run/exam/"].every(function (x) { return run.indexOf(x) > -1; }), "tiga tombol mode tersedia di kartu kategori");
 ok(/s:"3 mode: game 3D, mode soal & simulasi ujian"/.test(html), "subjudul menu home menyebut tiga mode");
 
