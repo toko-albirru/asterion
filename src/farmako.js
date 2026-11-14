@@ -507,14 +507,18 @@ async function trDo(db, env, ent, ref, field, o) {
   if (!trProvider(env)) return { err: "Terjemahan belum diaktifkan oleh admin.", s: 503 };
   if (!o.admin && !(await trQuota(db, env, o.u))) return { err: "Batas terjemahan harian tercapai. Coba lagi besok.", s: 429 };
   const ch = splitText(src); if (ch.length > 14) return { err: "Teks terlalu panjang untuk diterjemahkan.", s: 413 };
-  let txt = "", low = "";
+  let txt = "", low = "", need = 0;
   for (const c of ch) {
     if (!/[A-Za-z]{2}/.test(c.t)) { txt += c.t + c.sep; continue; }
-    const mk = maskTerms(c.t), tr = await trChunk(env, mk.text), un = unmaskTerms(tr, mk.terms);
+    const mk = maskTerms(c.t);
+    if (!/[A-Za-z]{2}/.test(mk.text)) { txt += c.t.trim() + c.sep; continue; } // seluruhnya istilah baku → biarkan apa adanya
+    need++;
+    const tr = await trChunk(env, mk.text), un = unmaskTerms(tr, mk.terms);
     if (un.missing) low = "istilah baku hilang saat diterjemahkan";
     txt += fixTr(un.text).trim() + c.sep;
   }
   txt = txt.trim();
+  if (!need) { await trUp(db, ent, ref, field, h, "", "id", Date.now()); return { status: "id", text: "" }; }
   const why = low || trCheck(src, txt);
   if (why) { await trUp(db, ent, ref, field, h, "", "low", Date.now()); return { text: "", status: "low", warn: "Terjemahan mesin ditolak (" + why + "). Teks asli tetap ditampilkan." }; }
   await trUp(db, ent, ref, field, h, txt, "auto", Date.now()); return { text: txt, status: "auto" };
@@ -525,10 +529,29 @@ async function trDo(db, env, ent, ref, field, o) {
 // Mesin terjemahan umum sering mengubah istilah farmakologi baku sehingga maknanya bergeser
 // (mis. "clearance", "agonist", "CYP3A4"). Istilah di daftar ini tidak diterjemahkan.
 export const KEEP_TERMS = ["CYP1A2", "CYP2C9", "CYP2C19", "CYP2D6", "CYP2E1", "CYP3A4", "CYP3A5", "UGT1A1", "UGT2B7", "OATP1B1", "OATP1B3", "P-gp", "P-glycoprotein", "BCRP", "MDR1", "MRP2", "5-HT", "QTc", "INR", "aPTT", "AUC", "Cmax", "Tmax", "t1/2", "IC50", "EC50", "Ki", "Km", "pKa", "InChIKey", "SMILES", "NSAID", "NSAIDs", "SSRI", "SNRI", "TCA", "MAOI", "ARB", "PPI", "COX-1", "COX-2", "HMG-CoA", "in vitro", "in vivo", "ex vivo", "first-pass", "placebo", "randomized controlled trial", "systematic review", "meta-analysis", "PubMed", "Cochrane", "FDA", "EMA", "WHO", "BPOM", "DDInter", "DrugBank", "PubChem", "RxNorm", "ChEMBL", "openFDA", "KEGG", "mg", "mcg", "mL", "kg", "mmol", "IU", "IV", "IM", "SC", "PO", "qd", "bid", "tid", "qid", "prn", "stat"];
-const escRe = (x) => x.replace(/[-/\\^$*+?.()|[\]{}]/g, "\\// ---------- ekspor ke handler ----------");
-const KEEP_RE = new RegExp("\\b(?:" + KEEP_TERMS.slice().sort((a, b) => b.length - a.length).map(escRe).join("|") + ")\\b", "g");
-function maskTerms(text) { const terms = []; const out = String(text).replace(KEEP_RE, (m) => { terms.push(m); return "⟦" + (terms.length - 1) + "⟧"; }); return { text: out, terms }; }
-function unmaskTerms(text, terms) {
+const escRe = (x) => x.replace(/[-/\\^$*+?.()|[\]{}]/g, "\\$&");
+// Istilah medis/farmakologi baku yang DIPERTAHANKAN apa adanya: menerjemahkannya menggeser makna.
+const KEEP_EXTRA = ["Homo sapiens", "Homo sapiens sapiens", "Mus musculus", "Rattus norvegicus", "Escherichia coli", "Saccharomyces cerevisiae", "Candida albicans", "Drosophila melanogaster", "Danio rerio", "Sus scrofa", "Bos taurus", "Macaca mulatta", "Oryctolagus cuniculus", "Xenopus laevis", "clearance", "half-life", "steady state", "steady-state", "bioavailability", "volume of distribution", "therapeutic index", "first-pass metabolism", "prodrug", "metabolite", "glucuronidation", "sulfation", "acetylation", "hydrolysis", "oxidation", "reduction", "efflux", "uptake", "affinity", "efficacy", "potency", "agonist", "antagonist", "partial agonist", "inverse agonist", "ligand", "substrate", "inducer", "isoform", "polymorphism", "genotype", "phenotype", "allele", "nocebo", "peak", "trough", "loading dose", "maintenance dose", "titration", "therapeutic drug monitoring", "serum concentration", "adverse drug reaction", "contraindication", "precaution", "prophylaxis", "toxicity", "overdose", "receptor", "enzyme", "transporter", "channel", "cyclooxygenase", "prostaglandin", "thromboxane", "leukotriene", "angiotensin", "bradykinin", "renin", "aldosterone", "cortisol", "insulin", "glucagon", "serotonin", "dopamine", "norepinephrine", "epinephrine", "acetylcholine", "histamine", "GABA", "glutamate", "opioid", "cannabinoid", "cytokine", "interleukin", "tumor necrosis factor", "monoamine oxidase", "acetylcholinesterase", "carbonic anhydrase", "HMG-CoA reductase", "DNA gyrase", "dihydrofolate reductase", "topoisomerase", "beta-lactam", "penicillin-binding protein"];
+const ALL_KEEP = KEEP_TERMS.concat(KEEP_EXTRA);
+const KEEP_RE = new RegExp("\\b(?:" + ALL_KEEP.slice().sort((a, b) => b.length - a.length).map(escRe).join("|") + ")\\b", "g");
+// Pola nama ilmiah: enzim/protein/gen, genus–spesies, akronim, simbol gen, senyawa berkode.
+const SCI_PATTERNS = [
+  /\b[A-Z][a-z]+(?:\s+[a-z]+){1,2}\b(?=\s*\()/g,
+  /\(\s*[A-Z][a-z]+(?:\s+[a-z]+){1,2}\s*\)/g,
+  /\b[A-Z][a-z]+(?:-[a-z0-9]+)+\b/g,
+  /\b[A-Za-z-]*(?:ATPase|kinase|reductase|oxidase|synthase|transferase|hydrolase|ligase|isomerase|phosphatase|dehydrogenase|hydroxylase|esterase|peptidase|polymerase|topoisomerase|lipoxygenase|oxygenase|protease|transporter|receptor|channel|subunit)\b/g,
+  /\b[A-Z]{2,}[a-z0-9]*\b/g,
+  /\b[A-Za-z]{1,6}\d+[A-Za-z0-9]*\b/g,
+  /\b[A-Z]-[A-Za-z0-9]+\b/g,
+];
+export function sciTokens(text) { const out = new Set(), s = String(text == null ? "" : text); for (const re of SCI_PATTERNS) { re.lastIndex = 0; for (const m of s.match(re) || []) out.add(m.trim()); } return out; }
+export function maskTerms(text) {
+  const terms = [], put = (m) => { terms.push(m); return "⟦" + (terms.length - 1) + "⟧"; };
+  let out = String(text).replace(KEEP_RE, put);
+  for (const re of SCI_PATTERNS) { re.lastIndex = 0; out = out.replace(re, put); }
+  return { text: out, terms };
+}
+export function unmaskTerms(text, terms) {
   let missing = false;
   const out = String(text).replace(/[⟦\[«]\s*(\d+)\s*[⟧\]»]/g, (m, i) => { const v = terms[+i]; if (v == null) { missing = true; return m; } return v; });
   if (/[⟦\[«]\s*\d+\s*[⟧\]»]/.test(out)) missing = true;
@@ -546,14 +569,21 @@ const TR_FIX = [
   [/\bjalur pemberian\b/gi, "rute pemberian"],
   [/\bpenyerapan\b/gi, "absorpsi"],
   [/\bketersediaan hayati\b/gi, "bioavailabilitas"],
+  [/\bpengangkutan kalium atpase\b/gi, "Potassium-transporting ATPase"],
+  [/\batpase pengangkutan kalium\b/gi, "Potassium-transporting ATPase"],
+  [/\bsiklooksigenase\b/gi, "Cyclooxygenase"],
+  [/\bmanusia \(homo sapiens\)\b/gi, "(Homo sapiens)"],
+  [/\bwaktu paruh eliminasi\b/gi, "half-life"],
 ];
-function fixTr(t) { let o = String(t); for (const p of TR_FIX) o = o.replace(p[0], p[1]); return o; }
+export function fixTr(t) { let o = String(t); for (const p of TR_FIX) o = o.replace(p[0], p[1]); return o; }
 // tolak hasil mesin yang tidak layak dipakai: lebih baik teks asli daripada terjemahan yang salah
-function trCheck(src, out) {
+export function trCheck(src, out) {
   const a = String(src).trim(), b = String(out).trim();
   if (!b) return "hasil kosong";
   if (b.length < a.length * 0.25) return "hasil terlalu pendek";
   if (b.length > a.length * 4) return "hasil terlalu panjang";
+  // istilah medis/ilmiah wajib utuh: lebih baik teks asli daripada istilah yang berubah makna
+  for (const tk of sciTokens(a)) if (!b.includes(tk)) return "istilah medis berubah: " + clip(tk, 60);
   if (lc(a) === lc(b) && !looksId(a)) return "teks tidak berubah (bukan terjemahan)";
   return "";
 }
