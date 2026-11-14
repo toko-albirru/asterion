@@ -59,5 +59,11 @@ t("HTML mentah di sekitar tabel di-escape", (() => {
   return /<table class='fm-tb'>/.test(x) && !/<img/.test(x) && x.includes("&lt;img");
 })());
 
+// Kapitalisasi judul nama obat.
+t("nama obat dikapitalisasi", md.cap("metformin") === "Metformin" && md.cap("atorvastatin kalsium") === "Atorvastatin Kalsium");
+t("singkatan & angka tidak dirusak", md.cap("HbA1c") === "HbA1c" && md.cap("HMG-CoA reduktase") === "HMG-CoA Reduktase" && md.cap("vitamin B12") === "Vitamin B12");
+t("tanda hubung ikut dikapitalisasi", md.cap("co-amoxiclav") === "Co-Amoxiclav");
+t("nilai kosong aman", md.cap(null) === "" && md.cap(undefined) === "");
+
 console.log((bad ? "GAGAL " : "") + "PASS teks label — " + ok + " lulus, " + bad + " gagal");
 process.exit(bad ? 1 : 0);

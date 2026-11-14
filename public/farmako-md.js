@@ -247,6 +247,12 @@
     return renderParagraph(L.join(" "));
   }
 
+  // Kapitalisasi judul nama obat: "metformin" -> "Metformin", "atorvastatin kalsium" -> "Atorvastatin Kalsium".
+  // Hanya huruf pertama tiap kata yang diubah; singkatan, angka, dan simbol ("HbA1c", "HMG-CoA", "B12") dibiarkan.
+  function cap(s) {
+    return String(s == null ? "" : s).replace(/(^|[\s\-\/(])([a-z\u00E0-\u00FF])/g, function (m, p, c) { return p + c.toUpperCase(); });
+  }
+
   function md(text) {
     var s = String(text == null ? "" : text).replace(/\r\n?/g, "\n");
     s = crossLists(s);
@@ -258,6 +264,7 @@
 
   md.esc = esc;
   md.titles = TITLES;
-  md.ver = 2;
+  md.cap = cap;
+  md.ver = 3;
   return md;
 });
