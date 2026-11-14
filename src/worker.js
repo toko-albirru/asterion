@@ -56,7 +56,10 @@ async function pbk(p, salt) {
 const GRP_EXC = { G0025182: "A" }; // pengecualian: username -> kelompok
 const grp = (u) => (/^G0025\d{3}$/.test(u) ? GRP_EXC[u] || (+u.slice(5) % 2 ? "A" : "B") : null);
 const isStu = (u) => /^G0025\d{3}$/.test(u) && +u.slice(5) >= 1 && +u.slice(5) <= 240;
-const K = (env) => "s|" + env.ADMIN_PASSWORD;
+// Rahasia penanda tangan sesi: ADMIN_PASSWORD bila diatur, jika tidak pakai kunci acak per-proses
+// (token lama gugur saat server mulai ulang, tetapi token admin tidak bisa dipalsukan).
+const BOOT_SECRET = "b|" + (globalThis.crypto?.randomUUID?.() || Math.random().toString(36).slice(2) + Date.now());
+const K = (env) => "s|" + (env.ADMIN_PASSWORD || BOOT_SECRET);
 async function mint(u, env) {
   const m = u + "." + (Date.now() + 30 * 864e5);
   return m + "." + (await hmac(K(env), m));
@@ -1065,7 +1068,6 @@ export default {
   async fetch(request, env) {
     const url = new URL(request.url);
     if (!url.pathname.startsWith("/api/")) return env.ASSETS.fetch(request);
-    if (!env.ADMIN_PASSWORD) return J({ err: "ADMIN_PASSWORD belum diatur" }, 500);
     const path = url.pathname.slice(5), M = request.method;
     if (path.startsWith("run/img/") && M === "GET") { // gambar soal (ID acak, tanpa kunci jawaban)
       const rdb = await runDb(env).catch(() => null), iid = path.slice(8);
@@ -1080,6 +1082,7 @@ export default {
     if (path === "login" && M === "POST") {
       const raw = String(body.u || "").trim(), p = String(body.p || "");
       if (raw.toLowerCase() === "admin") {
+        if (!env.ADMIN_PASSWORD) return J({ err: "Admin belum dikonfigurasi: atur ADMIN_PASSWORD pada pengaturan lingkungan." }, 503);
         if (p !== env.ADMIN_PASSWORD) return J({ err: 1 }, 401);
         return J({ token: await mint("admin", env), u: "admin", admin: true, mc: false });
       }

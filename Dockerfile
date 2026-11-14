@@ -10,7 +10,7 @@ ENV NODE_ENV=production \
 WORKDIR /app
 
 # perbaiki paket OS Alpine sebelum menjatuhkan hak akses
-RUN apk upgrade --no-cache
+RUN echo "os-refresh 2026-11-13" && apk upgrade --no-cache
 
 # tidak ada dependensi runtime (worker murni Web API), jadi tanpa npm install
 COPY package.json ./

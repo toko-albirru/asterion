@@ -507,9 +507,229 @@ async function trDo(db, env, ent, ref, field, o) {
   if (!trProvider(env)) return { err: "Terjemahan belum diaktifkan oleh admin.", s: 503 };
   if (!o.admin && !(await trQuota(db, env, o.u))) return { err: "Batas terjemahan harian tercapai. Coba lagi besok.", s: 429 };
   const ch = splitText(src); if (ch.length > 14) return { err: "Teks terlalu panjang untuk diterjemahkan.", s: 413 };
-  let txt = ""; for (const c of ch) { const tr = /[A-Za-z]{2}/.test(c.t) ? await trChunk(env, c.t) : c.t; txt += tr.trim() + c.sep; }
-  txt = txt.trim(); await trUp(db, ent, ref, field, h, txt, "auto", Date.now()); return { text: txt, status: "auto" };
+  let txt = "", low = "";
+  for (const c of ch) {
+    if (!/[A-Za-z]{2}/.test(c.t)) { txt += c.t + c.sep; continue; }
+    const mk = maskTerms(c.t), tr = await trChunk(env, mk.text), un = unmaskTerms(tr, mk.terms);
+    if (un.missing) low = "istilah baku hilang saat diterjemahkan";
+    txt += fixTr(un.text).trim() + c.sep;
+  }
+  txt = txt.trim();
+  const why = low || trCheck(src, txt);
+  if (why) { await trUp(db, ent, ref, field, h, "", "low", Date.now()); return { text: "", status: "low", warn: "Terjemahan mesin ditolak (" + why + "). Teks asli tetap ditampilkan." }; }
+  await trUp(db, ent, ref, field, h, txt, "auto", Date.now()); return { text: txt, status: "auto" };
 }
+
+
+// ---------- istilah baku yang DIPERTAHANKAN saat terjemahan ----------
+// Mesin terjemahan umum sering mengubah istilah farmakologi baku sehingga maknanya bergeser
+// (mis. "clearance", "agonist", "CYP3A4"). Istilah di daftar ini tidak diterjemahkan.
+export const KEEP_TERMS = ["CYP1A2", "CYP2C9", "CYP2C19", "CYP2D6", "CYP2E1", "CYP3A4", "CYP3A5", "UGT1A1", "UGT2B7", "OATP1B1", "OATP1B3", "P-gp", "P-glycoprotein", "BCRP", "MDR1", "MRP2", "5-HT", "QTc", "INR", "aPTT", "AUC", "Cmax", "Tmax", "t1/2", "IC50", "EC50", "Ki", "Km", "pKa", "InChIKey", "SMILES", "NSAID", "NSAIDs", "SSRI", "SNRI", "TCA", "MAOI", "ARB", "PPI", "COX-1", "COX-2", "HMG-CoA", "in vitro", "in vivo", "ex vivo", "first-pass", "placebo", "randomized controlled trial", "systematic review", "meta-analysis", "PubMed", "Cochrane", "FDA", "EMA", "WHO", "BPOM", "DDInter", "DrugBank", "PubChem", "RxNorm", "ChEMBL", "openFDA", "KEGG", "mg", "mcg", "mL", "kg", "mmol", "IU", "IV", "IM", "SC", "PO", "qd", "bid", "tid", "qid", "prn", "stat"];
+const escRe = (x) => x.replace(/[-/\\^$*+?.()|[\]{}]/g, "\\// ---------- ekspor ke handler ----------");
+const KEEP_RE = new RegExp("\\b(?:" + KEEP_TERMS.slice().sort((a, b) => b.length - a.length).map(escRe).join("|") + ")\\b", "g");
+function maskTerms(text) { const terms = []; const out = String(text).replace(KEEP_RE, (m) => { terms.push(m); return "⟦" + (terms.length - 1) + "⟧"; }); return { text: out, terms }; }
+function unmaskTerms(text, terms) {
+  let missing = false;
+  const out = String(text).replace(/[⟦\[«]\s*(\d+)\s*[⟧\]»]/g, (m, i) => { const v = terms[+i]; if (v == null) { missing = true; return m; } return v; });
+  if (/[⟦\[«]\s*\d+\s*[⟧\]»]/.test(out)) missing = true;
+  return { text: out, missing };
+}
+// koreksi istilah yang sudah baku di Indonesia (mesin sering memilih padanan yang mengubah makna)
+const TR_FIX = [
+  [/\bmekanisme tindakan\b/gi, "mekanisme kerja"],
+  [/\bwaktu setengah hidup\b/gi, "waktu paruh"],
+  [/\bparuh waktu\b/gi, "waktu paruh"],
+  [/\binteraksi obat-obatan\b/gi, "interaksi obat"],
+  [/\bobat-obatan\b/gi, "obat"],
+  [/\btindakan obat\b/gi, "kerja obat"],
+  [/\btingkat keparahan\b/gi, "keparahan"],
+  [/\bjalur pemberian\b/gi, "rute pemberian"],
+  [/\bpenyerapan\b/gi, "absorpsi"],
+  [/\bketersediaan hayati\b/gi, "bioavailabilitas"],
+];
+function fixTr(t) { let o = String(t); for (const p of TR_FIX) o = o.replace(p[0], p[1]); return o; }
+// tolak hasil mesin yang tidak layak dipakai: lebih baik teks asli daripada terjemahan yang salah
+function trCheck(src, out) {
+  const a = String(src).trim(), b = String(out).trim();
+  if (!b) return "hasil kosong";
+  if (b.length < a.length * 0.25) return "hasil terlalu pendek";
+  if (b.length > a.length * 4) return "hasil terlalu panjang";
+  if (lc(a) === lc(b) && !looksId(a)) return "teks tidak berubah (bukan terjemahan)";
+  return "";
+}
+
+// ---------- impor massal: SETIAP baris langsung tersimpan, hemat kuota D1 ----------
+// Paket gratis D1 membatasi jumlah kueri per permintaan (±50) dan 100 parameter per pernyataan.
+// Karena itu baris dikirim bertahap oleh klien dan ditulis dengan satu pernyataan multi-baris.
+function multiIns(db, table, cols, rows, opt) {
+  const out = [], per = Math.max(1, Math.floor(100 / cols.length));
+  for (const part of chunk(rows, per)) {
+    const ph = part.map(() => "(" + cols.map(() => "?").join(",") + ")").join(",");
+    out.push(db.prepare((opt || "INSERT OR IGNORE") + " INTO " + table + " (" + cols.join(",") + ") VALUES " + ph).bind(...part.flat()));
+  }
+  return out;
+}
+const catList = (v) => Array.isArray(v) ? v : (typeof v === "string" ? v.split("|").map((x) => { const i = x.indexOf(":"); return i > 0 ? { kind: x.slice(0, i).trim(), name: x.slice(i + 1).trim() } : null; }).filter(Boolean) : []);
+const targetOf = (v) => v === "published" || v === "publish" ? "published" : v === true || v === "pending" ? "pending" : "draft";
+
+// Kategori dibuat berjenjang (akar → anak) dan dipakai ulang lintas sumber, agar taksonomi
+// dari berkas (mis. path ["Sistem Saraf", "Antikonvulsan"]) tidak kehilangan induknya.
+async function ensureCats(db, cats, src, t) {
+  const ids = new Map();
+  if (!cats.size) return ids;
+  const depthOf = (key) => { let d = 0, k = key, g = 0; while (k && g++ < 12) { d++; const c = cats.get(k); k = c ? c.parentKey : ""; } return d; };
+  const levels = new Map();
+  for (const key of cats.keys()) { const d = depthOf(key); if (!levels.has(d)) levels.set(d, []); levels.get(d).push(key); }
+  const idx = new Map();
+  const load = async (keys) => {
+    const names = uniq(keys.map((k) => lc(cats.get(k).name)));
+    for (const part of chunk(names, 90)) for (const x of (await db.prepare("SELECT id, kind, name_lc, parent_id FROM fm_categories WHERE name_lc IN (" + inList(part.length) + ")").bind(...part).all()).results) { const ik = x.kind + "|" + x.name_lc + "|" + (x.parent_id || 0); if (!idx.has(ik)) idx.set(ik, x.id); }
+  };
+  await load([...cats.keys()]);
+  for (const d of [...levels.keys()].sort((a, b) => a - b)) {
+    const pend = [];
+    for (const k of levels.get(d)) {
+      const c = cats.get(k), pid = c.parentKey ? ids.get(c.parentKey) || 0 : 0;
+      const hit = idx.get(c.kind + "|" + lc(c.name) + "|" + pid);
+      if (hit) ids.set(k, hit); else pend.push([k, c, pid]);
+    }
+    if (!pend.length) continue;
+    await db.batch(multiIns(db, "fm_categories", ["kind", "name", "name_lc", "parent_id", "src", "sid", "created"], pend.map((x) => [x[1].kind, x[1].name, lc(x[1].name), x[2], src, "", t])));
+    await load(pend.map((x) => x[0]));
+    for (const x of pend) { const hit = idx.get(x[1].kind + "|" + lc(x[1].name) + "|" + x[2]); if (hit) ids.set(x[0], hit); }
+  }
+  return ids;
+}
+
+async function bulkDrugs(db, rows, src, u, target, t) {
+  const list = rows.map((r) => ({ r, generic: clip(r.generic, 160) })).filter((x) => x.generic);
+  const skipped = [], nskip0 = rows.length - list.length;
+  if (nskip0) skipped.push(nskip0 + " baris tanpa kolom generic dilewati.");
+  const seen = new Map();
+  for (const x of list) if (!seen.has(lc(x.generic))) seen.set(lc(x.generic), x);
+  const names = [...seen.keys()], idOf = new Map();
+  for (const part of chunk(names, 90)) for (const x of (await db.prepare("SELECT id, generic_lc FROM fm_drugs WHERE generic_lc IN (" + inList(part.length) + ")").bind(...part).all()).results) if (!idOf.has(x.generic_lc)) idOf.set(x.generic_lc, x.id);
+  const neu = [...seen.values()].filter((x) => !idOf.has(lc(x.generic)));
+  if (neu.length) {
+    const vals = neu.map((x) => [x.generic, lc(x.generic), clip(x.r.pharm_class, 160), clip(x.r.ther_class, 160), clip(x.r.classification, 160), clip(x.r.summary, 4000), target, 1, src, t, t]);
+    await db.batch(multiIns(db, "fm_drugs", ["generic", "generic_lc", "pharm_class", "ther_class", "classification", "summary", "status", "active", "src", "created", "updated"], vals));
+    for (const part of chunk(neu.map((x) => lc(x.generic)), 90)) for (const x of (await db.prepare("SELECT id, generic_lc FROM fm_drugs WHERE generic_lc IN (" + inList(part.length) + ")").bind(...part).all()).results) if (!idOf.has(x.generic_lc)) idOf.set(x.generic_lc, x.id);
+  }
+  const ids = [...seen.values()].map((x) => ({ id: idOf.get(lc(x.generic)) || 0, r: x.r })).filter((x) => x.id);
+  const nm = [], fx = [], cats = new Map(), links = [];
+  for (const it of ids) {
+    const id = it.id, r = it.r;
+    nm.push([id, clip(r.generic, 160), lc(r.generic), "generic", src]);
+    const addN = (v, kind) => { for (const b of (Array.isArray(v) ? v : String(v == null ? "" : v).split("|"))) { const n = clip(b, 160); if (n) nm.push([id, n, lc(n), kind, src]); } };
+    addN(r.brands, "brand"); addN(r.synonyms, "synonym");
+    const f = {};
+    for (const k of Object.keys(FIELDS)) if (r[k] != null && String(r[k]).trim()) f[k] = r[k];
+    if (r.facts && typeof r.facts === "object") for (const k of Object.keys(r.facts)) if (FIELDS[k] && r.facts[k] != null && String(r.facts[k]).trim()) f[k] = r.facts[k];
+    for (const k of Object.keys(f)) fx.push([id, k, clip(f[k], 8000), src, clip(r.source_id || "", 80), t]);
+    const addC = (kind, name, parentKey) => { const n = clip(name, 160); if (!n) return ""; const kd = CAT_KINDS[kind] ? kind : "other"; const key = kd + "|" + lc(n) + "|" + (parentKey || ""); if (!cats.has(key)) cats.set(key, { kind: kd, name: n, parentKey: parentKey || "" }); return key; };
+    for (const c of catList(r.categories)) {
+      const chain = Array.isArray(c.path) && c.path.length ? c.path : [c.name];
+      let pk = "";
+      for (const nm of chain) pk = addC(c.kind || "other", nm, pk) || pk;
+      if (pk) links.push([id, pk]);
+    }
+    for (const f of [["pharm_class", r.pharm_class], ["ther_class", r.ther_class], ["classification", r.classification]]) { const k = addC(f[0], f[1]); if (k) links.push([id, k]); }
+  }
+  // fakta: simpan baru; perbarui bila obat belum terbit; catat sebagai TERTUNDA bila obat sudah terbit
+  const fxNew = [], fxUpd = [];
+  if (fx.length) {
+    const dIds = uniq(fx.map((x) => x[0])), ex = new Map(), pub = new Set();
+    for (const part of chunk(dIds, 90)) for (const x of (await db.prepare("SELECT id, drug_id, field, src, value FROM fm_drug_facts WHERE drug_id IN (" + inList(part.length) + ")").bind(...part).all()).results) ex.set(x.drug_id + "|" + x.field + "|" + x.src, x);
+    for (const part of chunk(dIds, 90)) for (const x of (await db.prepare("SELECT id FROM fm_drugs WHERE status = 'published' AND id IN (" + inList(part.length) + ")").bind(...part).all()).results) pub.add(x.id);
+    const seenK = new Set();
+    for (const f of fx) {
+      const k = f[0] + "|" + f[1] + "|" + f[3];
+      if (seenK.has(k)) continue;
+      seenK.add(k);
+      const cur = ex.get(k);
+      if (!cur) { fxNew.push(f); continue; }
+      if (cur.value === f[2]) continue;
+      fxUpd.push({ id: cur.id, val: f[2], sid: f[4], pend: pub.has(f[0]) });
+    }
+  }
+  const st = [...multiIns(db, "fm_drug_names", ["drug_id", "name", "name_lc", "kind", "src"], nm), ...multiIns(db, "fm_drug_facts", ["drug_id", "field", "value", "src", "sid", "updated"], fxNew)];
+  if (st.length) await db.batch(st);
+  if (fxUpd.length) await db.batch(fxUpd.map((u) => u.pend
+    ? db.prepare("UPDATE fm_drug_facts SET pending = ?, updated = ? WHERE id = ?").bind(u.val, t, u.id)
+    : db.prepare("UPDATE fm_drug_facts SET value = ?, pending = NULL, sid = ?, updated = ? WHERE id = ?").bind(u.val, u.sid, t, u.id)));
+  if (links.length) {
+    const cmap = await ensureCats(db, cats, src, t);
+    const lk = links.map((x) => [x[0], cmap.get(x[1])]).filter((x) => x[1]);
+    if (lk.length) await db.batch(multiIns(db, "fm_drug_cat", ["drug_id", "cat_id"], lk));
+  }
+  return { nin: neu.length, nup: ids.length - neu.length, nskip: nskip0, skipped };
+}
+
+async function bulkInters(db, rows, src, u, target, t, autoDrugs) {
+  const norm = rows.map((r) => {
+    const itype = ITYPES[r.type || r.itype] ? (r.type || r.itype) : "ddi";
+    return {
+      itype,
+      a: clip(r.a || r.drug_a || r.Drug_A || r.DrugA, 160),
+      b: clip(r.b || r.drug_b || r.Drug_B || r.DrugB, 160),
+      severity: clip(r.severity || r.Severity || r.Level || r.level, 40),
+      mechanism: clip(r.mechanism, 3000), effect: clip(r.effect, 3000), management: clip(r.management, 3000), evidence: clip(r.evidence, 3000),
+      sid: clip(r.source_id || (r.DDInterID_A && r.DDInterID_B ? r.DDInterID_A + "~" + r.DDInterID_B : ""), 80),
+    };
+  }).filter((r) => r.a);
+  const skipped = [];
+  const names = uniq(norm.map((r) => (r.itype === "ddi" ? [lc(r.a), lc(r.b)] : [lc(r.a)])).flat().filter(Boolean));
+  const map = new Map();
+  for (const part of chunk(names, 90)) for (const x of (await db.prepare("SELECT n.name_lc, n.drug_id FROM fm_drug_names n JOIN fm_drugs d ON d.id = n.drug_id WHERE d.active = 1 AND n.name_lc IN (" + inList(part.length) + ")").bind(...part).all()).results) if (!map.has(x.name_lc)) map.set(x.name_lc, x.drug_id);
+  // Obat yang belum ada di Pustaka dibuat otomatis dari berkas interaksi, agar TIDAK ADA data yang hilang.
+  const missing = autoDrugs ? names.filter((n) => !map.has(n)) : [];
+  if (missing.length) {
+    await db.batch(multiIns(db, "fm_drugs", ["generic", "generic_lc", "status", "active", "src", "created", "updated"], missing.map((n) => [n, n, target, 1, src, t, t])));
+    for (const part of chunk(missing, 90)) for (const x of (await db.prepare("SELECT id, generic_lc FROM fm_drugs WHERE generic_lc IN (" + inList(part.length) + ")").bind(...part).all()).results) if (!map.has(x.generic_lc)) map.set(x.generic_lc, x.id);
+    const nm = [];
+    for (const r of norm) for (const raw of [r.a, r.itype === "ddi" ? r.b : ""]) { const k = lc(raw), id = k ? map.get(k) : 0; if (id) nm.push([id, clip(raw, 160), k, "generic", src]); }
+    if (nm.length) await db.batch(multiIns(db, "fm_drug_names", ["drug_id", "name", "name_lc", "kind", "src"], nm));
+  }
+  const vals = [];
+  let nskip = 0;
+  for (const r of norm) {
+    let da = map.get(lc(r.a)) || 0, db2 = r.itype === "ddi" ? map.get(lc(r.b)) || 0 : 0;
+    const subject = r.itype === "ddi" ? "" : clip(r.b, 300);
+    if (!da || (r.itype === "ddi" && (!db2 || da === db2))) { nskip++; if (skipped.length < 8) skipped.push("Obat tidak ditemukan: " + clip(r.a + " × " + r.b, 90)); continue; }
+    if (r.itype === "ddi" && da > db2) { const x = da; da = db2; db2 = x; }
+    vals.push([r.itype, da, db2, subject, r.severity, r.mechanism, r.effect, r.management, r.evidence, src, r.sid, target, t, t]);
+  }
+  const res = vals.length ? await db.batch(multiIns(db, "fm_inter", ["itype", "drug_a", "drug_b", "subject", "severity", "mechanism", "effect", "management", "evidence", "src", "sid", "status", "created", "updated"], vals)) : [];
+  const nin = res.reduce((n, r) => n + ((r && r.meta && r.meta.changes) || 0), 0);
+  return { nin, nup: vals.length - nin, nskip, skipped, created: missing.length };
+}
+
+async function bulkImport(db, body, u, t) {
+  const src = SRC_CODES.includes(body.src) ? body.src : "";
+  if (!src) return err("Pilih sumber data.");
+  const rows = Array.isArray(body.rows) ? body.rows.slice(0, 40) : [];
+  if (!rows.length) return err("Tidak ada baris.");
+  const kind = body.kind === "interactions" ? "interactions" : "drugs", target = targetOf(body.publish);
+  let r;
+  if (kind === "drugs") r = await bulkDrugs(db, rows, src, u, target, t);
+  else r = await bulkInters(db, rows, src, u, target, t, body.auto_drugs === true);
+  try { await db.prepare("UPDATE fm_sources SET last_sync = ? WHERE code = ?").bind(t, src).run(); } catch (e) { /* sumber tidak terdaftar */ }
+  dirty();
+  if (body.last) await db.prepare("INSERT INTO fm_sync_log (t, u, src, act, ok, n_in, n_up, n_skip, msg) VALUES (?, ?, ?, ?, 1, ?, ?, ?, ?)").bind(t, u, src, "impor " + kind, int(body.tot_in) + r.nin, int(body.tot_up) + r.nup, int(body.tot_skip) + r.nskip, "berkas: " + clip(body.file, 80)).run();
+  await audit(db, u, "impor." + kind, "import", 0, src + ": +" + r.nin + " ~" + r.nup + " x" + r.nskip + (r.created ? " obat-baru:" + r.created : ""));
+  return J({ nin: r.nin, nup: r.nup, nskip: r.nskip, created: r.created || 0, target, skipped: (r.skipped || []).slice(0, 10) });
+}
+
+// ---------- semua teknologi/layanan yang dipakai: tanpa biaya ----------
+export const FREE_TECH = [
+  ["Cloudflare Workers + D1", "Paket gratis; data obat & interaksi tersimpan permanen di D1 (tanpa impor ulang)."],
+  ["Cloudflare Workers AI (m2m100)", "Termasuk kuota gratis; hanya untuk menerjemahkan, hasil selalu berlabel mesin dan teks asli tetap ditampilkan."],
+  ["DDInter 2.0", "CSV gratis untuk penggunaan non-komersial (CC BY-NC-SA 4.0); wajib mencantumkan sumber."],
+  ["PubChem PUG REST / RxNorm (NLM) / openFDA / ChEMBL", "API gratis, tanpa biaya dan tanpa kunci wajib."],
+  ["KEGG", "Gratis untuk penggunaan akademik/non-komersial."],
+  ["DrugBank", "Hanya halaman publik yang gratis; unduhan data lengkap berlisensi berbayar — impor hanya dari berkas yang Anda miliki izinnya."],
+  ["LibreTranslate (opsional)", "Perangkat lunak bebas, dapat dijalankan sendiri tanpa biaya."],
+];
 
 // ---------- ekspor ke handler ----------
 const drugRow = (d, names) => ({ id: d.id, generic: d.generic, pharm_class: d.pharm_class, ther_class: d.ther_class, classification: d.classification, summary: d.summary, status: d.status, brands: (names || []).filter((n) => n.kind === "brand").map((n) => n.name).slice(0, 4) });
@@ -522,7 +742,7 @@ export async function farmakoApi(request, env, a, path, url, body, M) {
   try {
     if (path.startsWith("admin/")) { if (!a.admin) return err("Khusus admin.", 403); return await admin(db, a, path.slice(6), qp, body, M, t, env); }
 
-    if (path === "meta") return J({ fields: FIELDS, kinds: CAT_KINDS, itypes: ITYPES, modes: Object.fromEntries(Object.entries(MODES).map(([k, v]) => [k, { n: v.n, d: v.d }])), diffs: DIFF, status: STATUS_ID, sections: SECTIONS });
+    if (path === "meta") return J({ fields: FIELDS, kinds: CAT_KINDS, itypes: ITYPES, modes: Object.fromEntries(Object.entries(MODES).map(([k, v]) => [k, { n: v.n, d: v.d }])), diffs: DIFF, status: STATUS_ID, sections: SECTIONS, free: FREE_TECH });
 
     if (path === "home") {
       const one = async (s, ...p) => (await db.prepare(s).bind(...p).first()) || {};
@@ -583,8 +803,18 @@ export async function farmakoApi(request, env, a, path, url, body, M) {
       const related = rel.size ? await byIds(db, (q) => `SELECT id, generic FROM fm_drugs d WHERE ${pubWhere} AND id IN (${q}) ORDER BY generic`, [...rel].slice(0, 40)) : [];
       const bm = await db.prepare("SELECT 1 x FROM fm_bookmarks WHERE u = ? AND kind = 'drug' AND ref = ?").bind(u, id).first();
       await db.prepare("INSERT INTO fm_recent (u, kind, ref, t) VALUES (?, 'drug', ?, ?) ON CONFLICT(u, kind, ref) DO UPDATE SET t = excluded.t").bind(u, id, t).run();
-      const ni = await db.prepare("SELECT COUNT(*) n FROM fm_inter WHERE status = 'published' AND (drug_a = ? OR drug_b = ?)").bind(id, id).first();
-      return J({ drug: { id: d.id, generic: d.generic, pharm_class: d.pharm_class, ther_class: d.ther_class, classification: d.classification, summary: d.summary, status: d.status, updated: d.updated, verified_at: d.verified_at }, names, cats, facts, xref, same, similar, related: related.slice(0, 12), bookmarked: !!bm, interactions: ni.n });
+      const irows = (await db.prepare("SELECT * FROM fm_inter WHERE status = 'published' AND (drug_a = ? OR drug_b = ?) ORDER BY updated DESC LIMIT 400").bind(id, id).all()).results;
+      const oid = uniq(irows.map((r) => (r.drug_a === id ? r.drug_b : r.drug_a)).filter((x) => x > 0)), om = new Map();
+      for (const part of chunk(oid, 90)) for (const x of (await db.prepare("SELECT id, generic FROM fm_drugs WHERE id IN (" + inList(part.length) + ")").bind(...part).all()).results) om.set(x.id, x.generic);
+      const inter = { total: irows.length, ddi: [], food: [], disease: [], alcohol: [], by_sev: {} };
+      for (const r of irows) {
+        const other = r.drug_a === id ? r.drug_b : r.drug_a;
+        (inter[r.itype] || inter.ddi).push({ ...iOut(r), other: r.itype === "ddi" && other ? { id: other, name: om.get(other) || "" } : null, subject: r.subject });
+        if (r.severity) inter.by_sev[r.severity] = (inter.by_sev[r.severity] || 0) + 1;
+      }
+      inter.ddi.sort((x, y) => sevRank(x.severity) - sevRank(y.severity));
+      const ni = irows.length;
+      return J({ drug: { id: d.id, generic: d.generic, pharm_class: d.pharm_class, ther_class: d.ther_class, classification: d.classification, summary: d.summary, status: d.status, updated: d.updated, verified_at: d.verified_at }, names, cats, facts, xref, same, similar, related: related.slice(0, 12), bookmarked: !!bm, interactions: ni, inter });
     }
     if (path === "compare") {
       const ids = [int(qp("a")), int(qp("b"))], out = [];
@@ -862,45 +1092,24 @@ async function admin(db, a, p, qp, body, M, t, env) {
     dirty(); await audit(db, u, "status.massal", body.ent, 0, `${n} data → ${to}`); return J({ n });
   }
 
-  // impor: klien memecah berkas menjadi potongan kecil. Tidak ada yang dihapus; data terbit tidak ditimpa.
-  if (p === "import" && M === "POST") {
-    const src = SRC_CODES.includes(body.src) ? body.src : ""; if (!src) return err("Pilih sumber data.");
-    const rows = Array.isArray(body.rows) ? body.rows.slice(0, 60) : []; if (!rows.length) return err("Tidak ada baris.");
-    const kind = body.kind === "interactions" ? "interactions" : "drugs", target = body.publish ? "pending" : "draft"; let nin = 0, nup = 0, nskip = 0; const skipped = [];
-    if (kind === "drugs") {
-      for (const r of rows) {
-        try {
-          const facts = {}; for (const f of Object.keys(FIELDS)) if (r[f] != null && String(r[f]).trim()) facts[f] = r[f]; if (r.facts && typeof r.facts === "object") Object.assign(facts, r.facts);
-          const cats = Array.isArray(r.categories) ? r.categories : (typeof r.categories === "string" ? r.categories.split("|").map((x) => { const i = x.indexOf(":"); return i > 0 ? { kind: x.slice(0, i).trim(), name: x.slice(i + 1).trim() } : null; }).filter(Boolean) : []);
-          const res = await saveDrug(db, { generic: r.generic, brands: r.brands, synonyms: r.synonyms, pharm_class: r.pharm_class, ther_class: r.ther_class, classification: r.classification, summary: r.summary, facts, xref: r.xref, source_id: r.source_id, categories: cats }, u, src, true);
-          if (res.err) { nskip++; skipped.push(res.err); continue; }
-          if (res.created) { nin++; if (target === "pending") await db.prepare("UPDATE fm_drugs SET status = 'pending' WHERE id = ?").bind(res.id).run(); } else nup++;
-        } catch (e) { nskip++; skipped.push(clip(e.message, 100)); }
-      }
-    } else {
-      const names = uniq(rows.flatMap((r) => [lc(r.a || r.drug_a || r.Drug_A), lc(r.b || r.drug_b || r.Drug_B)]).filter(Boolean)), map = new Map();
-      for (const part of chunk(names, 80)) for (const x of (await db.prepare(`SELECT n.name_lc, n.drug_id FROM fm_drug_names n JOIN fm_drugs d ON d.id = n.drug_id WHERE d.active = 1 AND n.name_lc IN (${inList(part.length)})`).bind(...part).all()).results) if (!map.has(x.name_lc)) map.set(x.name_lc, x.drug_id);
-      for (const r of rows) {
-        const itype = ITYPES[r.type || r.itype] ? (r.type || r.itype) : "ddi", sn = lc(r.a || r.drug_a || r.Drug_A), sb = lc(r.b || r.drug_b || r.Drug_B);
-        let da = map.get(sn) || 0, db_ = itype === "ddi" ? map.get(sb) || 0 : 0; const subject = itype === "ddi" ? "" : clip(r.subject || r.b || r.drug_b, 300), sev = clip(r.severity || r.Level || r.level, 40);
-        if (!da || (itype === "ddi" && (!db_ || da === db_))) { nskip++; if (skipped.length < 10) skipped.push("Obat tidak ditemukan di Pustaka: " + clip((r.a || r.drug_a || r.Drug_A) + " × " + (r.b || r.drug_b || r.Drug_B), 80)); continue; }
-        if (itype !== "ddi" && !subject) { nskip++; continue; } if (da > db_ && itype === "ddi") [da, db_] = [db_, da];
-        const dsid = clip(r.source_id || (r.DDInterID_A && r.DDInterID_B ? r.DDInterID_A + "~" + r.DDInterID_B : ""), 80);
-        const val = { severity: sev, mechanism: clip(r.mechanism, 3000), effect: clip(r.effect, 3000), management: clip(r.management, 3000), evidence: clip(r.evidence, 3000), sid: dsid };
-        const ex = await db.prepare("SELECT * FROM fm_inter WHERE itype = ? AND drug_a = ? AND drug_b = ? AND subject = ? AND src = ?").bind(itype, da, db_, subject, src).first();
-        if (!ex) { await db.prepare("INSERT INTO fm_inter (itype, drug_a, drug_b, subject, severity, mechanism, effect, management, evidence, src, sid, status, created, updated) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)").bind(itype, da, db_, subject, val.severity, val.mechanism, val.effect, val.management, val.evidence, src, val.sid, target, t, t).run(); nin++; }
-        else if (["severity", "mechanism", "effect", "management", "evidence"].some((k) => (val[k] || "") !== (ex[k] || "") && val[k])) {
-          if (ex.status === "published") await db.prepare("UPDATE fm_inter SET pending = ?, updated = ? WHERE id = ?").bind(JSON.stringify({ ...ex, ...Object.fromEntries(Object.entries(val).filter(([, v]) => v)) }), t, ex.id).run(); // menunggu persetujuan
-          else await db.prepare("UPDATE fm_inter SET severity = COALESCE(NULLIF(?, ''), severity), mechanism = COALESCE(NULLIF(?, ''), mechanism), effect = COALESCE(NULLIF(?, ''), effect), management = COALESCE(NULLIF(?, ''), management), evidence = COALESCE(NULLIF(?, ''), evidence), updated = ? WHERE id = ?").bind(val.severity, val.mechanism, val.effect, val.management, val.evidence, t, ex.id).run();
-          nup++;
-        } else nskip++;
-      }
+  // impor: klien mengirim berkas dalam potongan kecil; SETIAP baris langsung tersimpan (obat & interaksi).
+  if (p === "import" && M === "POST") return await bulkImport(db, body, u, t);
+
+  // publikasi massal: satu tindakan untuk SELURUH obat & interaksi (bukan satu per satu)
+  if (p === "publish-all" && M === "POST") {
+    const ent = (Array.isArray(body.ent) && body.ent.length ? body.ent : ["drug", "inter"]).map((x) => clip(x, 12));
+    const out = {};
+    for (const e of ent) {
+      const tb = { drug: "fm_drugs", inter: "fm_inter", material: "fm_materials", q: "fm_questions" }[e];
+      if (!tb) continue;
+      const ver = tb === "fm_drugs" || tb === "fm_inter" ? ", verified_at = COALESCE(verified_at, ?)" : "";
+      const r = await db.prepare("UPDATE " + tb + " SET status = 'published', updated = ?" + ver + " WHERE status <> 'published'").bind(...(ver ? [t, t] : [t])).run();
+      out[e] = r.meta.changes;
     }
-    await db.prepare("UPDATE fm_sources SET last_sync = ? WHERE code = ?").bind(t, src).run(); dirty();
-    if (body.last) await db.prepare("INSERT INTO fm_sync_log (t, u, src, act, ok, n_in, n_up, n_skip, msg) VALUES (?, ?, ?, ?, 1, ?, ?, ?, ?)").bind(t, u, src, "impor " + kind, int(body.tot_in) + nin, int(body.tot_up) + nup, int(body.tot_skip) + nskip, "berkas: " + clip(body.file, 80)).run();
-    await audit(db, u, "impor." + kind, "import", 0, `${src}: +${nin} ~${nup} ⨯${nskip}`);
-    return J({ nin, nup, nskip, skipped: skipped.slice(0, 10) });
+    dirty(); await audit(db, u, "publikasi.massal", "all", 0, JSON.stringify(out));
+    return J({ ok: 1, n: out, at: t });
   }
+
   // sinkronisasi lewat API publik untuk obat yang sudah ada (maks 8 per permintaan)
   if (p === "sync" && M === "POST") {
     const src = body.src; if (!SYNCERS[src]) return err("Sinkronisasi langsung tersedia untuk: " + Object.keys(SYNCERS).join(", ") + ". DrugBank, DDInter, dan KEGG diimpor dari berkas.");
