@@ -67,7 +67,7 @@ t("fixTr: waktu setengah hidup → waktu paruh", fixTr("waktu setengah hidup").i
 t("fixTr: siklooksigenase → Cyclooxygenase", fixTr("siklooksigenase").includes("Cyclooxygenase"));
 
 // 7) Teks farmakokinetik (kasus yang dilaporkan pengguna): istilah baku tidak ikut diterjemahkan.
-const PK_SRC = "Simvastatin is a lactone that is readily hydrolyzed in vivo to the corresponding β-hydroxyacid. Pharmacokinetics (PK) of simvastatin and its metabolites was originally characterized using inhibition of HMG-CoA reductase activity following base hydrolysis of plasma samples, as specific bioanalytical methods were not available.";
+const PK_SRC = "Simvastatin is a lactone that is readily hydrolyzed in vivo to the corresponding β-hydroxyacid. Pharmacokinetics (PK) of simvastatin and its metabolites was originally characterized using inhibition of HMG-CoA reductase activity following base hydrolysis of plasma samples, as specific bioanalytical methods were not available. Inhibition of the enzyme activity (equivalent to the level of total inhibitors) represented the combination";
 const PK_KEEP = ["lactone", "hydrolyzed", "in vivo", "hydroxyacid", "Pharmacokinetics", "metabolites", "HMG-CoA reductase", "hydrolysis", "plasma", "bioanalytical", "inhibitors"];
 const pkMask = maskTerms(PK_SRC);
 for (const term of PK_KEEP) t("istilah PK dilindungi: " + term, pkMask.text.toLowerCase().indexOf(term.toLowerCase()) < 0);
