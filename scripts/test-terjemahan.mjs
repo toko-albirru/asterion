@@ -66,5 +66,13 @@ t("teks istilah murni tidak menyisakan kata Inggris", !/[A-Za-z]{2}/.test(pure.t
 t("fixTr: waktu setengah hidup → waktu paruh", fixTr("waktu setengah hidup").includes("waktu paruh"));
 t("fixTr: siklooksigenase → Cyclooxygenase", fixTr("siklooksigenase").includes("Cyclooxygenase"));
 
+// 7) Teks farmakokinetik (kasus yang dilaporkan pengguna): istilah baku tidak ikut diterjemahkan.
+const PK_SRC = "Simvastatin is a lactone that is readily hydrolyzed in vivo to the corresponding β-hydroxyacid. Pharmacokinetics (PK) of simvastatin and its metabolites was originally characterized using inhibition of HMG-CoA reductase activity following base hydrolysis of plasma samples, as specific bioanalytical methods were not available.";
+const PK_KEEP = ["lactone", "hydrolyzed", "in vivo", "hydroxyacid", "Pharmacokinetics", "metabolites", "HMG-CoA reductase", "hydrolysis", "plasma", "bioanalytical", "inhibitors"];
+const pkMask = maskTerms(PK_SRC);
+for (const term of PK_KEEP) t("istilah PK dilindungi: " + term, pkMask.text.toLowerCase().indexOf(term.toLowerCase()) < 0);
+t("istilah PK kembali utuh setelah unmask", PK_KEEP.every((x) => unmaskTerms(fakeMT(pkMask.text), pkMask.terms).text.includes(x)));
+t("tolak terjemahan yang menghilangkan istilah PK", trCheck(PK_SRC, "Simvastatin adalah laktosa yang mudah terhidrolisis di dalam tubuh menjadi asam hidroksi.") !== "");
+
 console.log((bad ? "GAGAL " : "") + ok + " lulus, " + bad + " gagal");
 process.exit(bad ? 1 : 0);
