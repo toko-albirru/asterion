@@ -46,11 +46,11 @@
   // Blok panjang dipecah pada batas kalimat supaya tidak menjadi satu paragraf raksasa.
   function paragraphs(txt) {
     var s = String(txt).trim();
-    if (s.length <= 460) return [s];
+    if (s.length <= 320) return [s];
     var parts = s.match(/[^.!?]+[.!?]+["')\]]*\s*|[^.!?]+$/g) || [s], out = [], cur = "";
     for (var i = 0; i < parts.length; i++) {
       var p = parts[i];
-      if (cur && (cur.length + p.length) > 380) { out.push(cur.trim()); cur = ""; }
+      if (cur && (cur.length + p.length) > 300) { out.push(cur.trim()); cur = ""; }
       cur += p;
     }
     if (cur.trim()) out.push(cur.trim());
