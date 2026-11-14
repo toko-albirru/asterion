@@ -144,6 +144,34 @@ if (config) {
   }
 }
 
+// 6. Larangan global scope Cloudflare (error 10021 saat upload versi).
+//    Pembuatan nilai acak, I/O, dan timer tidak boleh dijalankan saat modul dievaluasi;
+//    semuanya harus dipindahkan ke dalam handler/fungsi.
+const BANNED_GLOBAL = [
+  [/\bMath\.random\s*\(/, "Math.random()"],
+  [/\brandomUUID\s*\(/, "crypto.randomUUID()"],
+  [/\bgetRandomValues\s*\(/, "crypto.getRandomValues()"],
+  [/(^|[^.\w])fetch\s*\(/, "fetch()"],
+  [/\bset(?:Timeout|Interval)\s*\(/, "setTimeout()/setInterval()"],
+];
+const srcFiles = existsSync(srcDir) ? readdirSync(srcDir).filter((f) => /\.(m?js)$/.test(f)) : [];
+for (const name of srcFiles) {
+  const lines = readFileSync(join(srcDir, name), "utf8").split("\n");
+  lines.forEach((raw, i) => {
+    if (/^\s/.test(raw)) return; // hanya pernyataan level atas (global scope)
+    const line = raw.trim();
+    if (!line || line.startsWith("//") || line.startsWith("*") || line.startsWith("/*")) return;
+    if (/^(import|export)\b/.test(line)) return;
+    if (line.includes("=>") || /^(async\s+)?function\b/.test(line)) return; // definisi, bukan eksekusi
+    for (const [re, label] of BANNED_GLOBAL) {
+      if (re.test(line)) {
+        fail(`${name}:${i + 1} memanggil ${label} di global scope (Cloudflare error 10021) — pindahkan ke dalam handler`);
+      }
+    }
+  });
+}
+ok.push(`global scope ${srcFiles.length} modul diperiksa (aturan error 10021)`);
+
 if (problems.length) {
   console.error("\nBUILD GAGAL:");
   for (const p of problems) console.error(` - ${p}`);
