@@ -66,7 +66,7 @@
     Karena: 1, Untuk: 1, Pada: 1, Dalam: 1, Dengan: 1, Dari: 1, Yang: 1, Jika: 1, Bila: 1, Saat: 1,
     Ini: 1, Itu: 1, Semua: 1, Sebagian: 1, Pasien: 1, Data: 1, Hasil: 1
   };
-  function markGeneric(t) {
+  function markGenericPlain(t) {
     var out = "", i = 0, n = t.length, lastCh = "";
     while (i < n) {
       var num = /^(\d{1,2}(?:\.\d{1,2}){1,3})\s+/.exec(t.slice(i, i + 20));
@@ -90,6 +90,22 @@
       i++;
     }
     return out;
+  }
+
+  // Penanda @@…@@ tidak boleh ditandai ulang: dulu "6.1 Clinical Trials Experience" jadi rusak
+  // karena nomornya ditandai dua kali. Sekarang bagian bertanda dilewati.
+  function markGeneric(t) {
+    return String(t).split(/(@@[^@\n]*@@)/).map(function (part) {
+      return /^@@/.test(part) ? part : markGenericPlain(part);
+    }).join("");
+  }
+
+  // Judul baku yang berdiri sendiri di satu baris (tanpa nomor), mis. "Mechanism of Action".
+  function titleLines(t) {
+    return String(t).split(/\n/).map(function (ln) {
+      var x = ln.trim(), m = TITLE_LINE_RE.exec(x);
+      return m ? "\n\n@@H:" + m[1] + "@@\n\n" : ln;
+    }).join("\n");
   }
 
   // ---------- 3. judul studi tanpa nomor: "Treating to New Targets Study (TNT) In TNT, …" ----------
@@ -256,6 +272,7 @@
   function md(text) {
     var s = String(text == null ? "" : text).replace(/\r\n?/g, "\n");
     s = crossLists(s);
+    s = titleLines(s);
     s = s.replace(MARK_RE, function (m, num, title) { return "\n\n@@H:" + num + " " + title + "@@\n\n"; });
     s = markGeneric(s);
     s = studies(s);
