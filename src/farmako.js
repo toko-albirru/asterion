@@ -220,7 +220,7 @@ async function suggest(db, a, q, scope) {
   const adm = a.admin && scope.admin, vis = adm ? "d.active IN (0,1)" : pubWhere;
   if (["all", "drug"].includes(scope.s)) {
     let rows = (await db.prepare(`SELECT n.drug_id, n.name, n.kind, d.generic, d.pharm_class, d.summary, d.status FROM fm_drug_names n JOIN fm_drugs d ON d.id = n.drug_id WHERE ${vis} AND n.name_lc >= ? AND n.name_lc < ? ORDER BY (n.kind = 'generic') DESC, length(n.name) LIMIT 40`).bind(s, upto).all()).results;
-    if (rows.length < 10 && s.length >= 2) rows = rows.concat((await db.prepare(`SELECT n.drug_id, n.name, n.kind, d.generic, d.pharm_class, d.summary, d.status FROM fm_drug_names n JOIN fm_drugs d ON d.id = n.drug_id WHERE ${vis} AND n.name_lc LIKE ? ESCAPE '\\' ORDER BY (n.kind = 'generic') DESC, length(n.name) LIMIT 30`).bind("%" + likeEsc(s) + "%").all()).results);
+    if (rows.length < 10 && s.length >= 2) rows = rows.concat((await db.prepare(`SELECT n.drug_id, n.name, n.kind, d.generic, d.pharm_class, d.summary, d.status FROM fm_drug_names n JOIN fm_drugs d ON d.id = n.drug_id WHERE ${vis} AND instr(n.name_lc, ?) > 0 ORDER BY (n.kind = 'generic') DESC, length(n.name) LIMIT 30`).bind(s).all()).results);
     for (const r of rows) { if (seen.has("d" + r.drug_id)) continue; seen.add("d" + r.drug_id); items.push({ t: "drug", id: r.drug_id, name: r.generic, matched: r.name.toLowerCase() === r.generic.toLowerCase() ? "" : r.name, via: r.kind, sub: r.pharm_class, descr: r.summary, status: r.status }); if (items.length >= 12) break; }
   }
   if (["all", "cat", "game"].includes(scope.s)) {
@@ -230,7 +230,7 @@ async function suggest(db, a, q, scope) {
     for (const c of hit.slice(0, 6)) items.push({ t: "cat", id: c.id, name: c.name, sub: CAT_KINDS[c.kind] || c.kind, descr: c.all.size + " obat" });
   }
   if (["all", "material"].includes(scope.s)) {
-    const rows = (await db.prepare(`SELECT id, title FROM fm_materials WHERE ${adm ? "1=1" : "status = 'published'"} AND lower(title) LIKE ? ESCAPE '\\' ORDER BY (lower(title) LIKE ? ESCAPE '\\') DESC LIMIT 5`).bind("%" + likeEsc(s) + "%", likeEsc(s) + "%").all()).results;
+    const rows = (await db.prepare(`SELECT id, title FROM fm_materials WHERE ${adm ? "1=1" : "status = 'published'"} AND instr(lower(title), ?) > 0 ORDER BY (instr(lower(title), ?) = 1) DESC LIMIT 5`).bind(s, s).all()).results;
     for (const r of rows) items.push({ t: "material", id: r.id, name: r.title, sub: "Materi" });
   }
   return { items };
@@ -783,7 +783,7 @@ export async function farmakoApi(request, env, a, path, url, body, M) {
       let ids = null;
       if (cat) { const c = idx.get(cat); ids = c ? [...c.all] : []; }
       let where = pubWhere, bind = [];
-      if (q) { where += " AND d.id IN (SELECT drug_id FROM fm_drug_names WHERE name_lc LIKE ? ESCAPE '\\')"; bind.push("%" + likeEsc(q) + "%"); }
+      if (q) { where += " AND d.id IN (SELECT drug_id FROM fm_drug_names WHERE instr(name_lc, ?) > 0)"; bind.push(q); }
       if (cls) { where += " AND lower(d.pharm_class) = ?"; bind.push(cls); }
       let rows = (await db.prepare(`SELECT d.id, d.generic, d.pharm_class, d.ther_class, d.summary, d.status FROM fm_drugs d WHERE ${where} ORDER BY d.generic LIMIT 2000`).bind(...bind).all()).results;
       if (ids) { const s = new Set(ids); rows = rows.filter((r) => s.has(r.id)); }
@@ -798,7 +798,7 @@ export async function farmakoApi(request, env, a, path, url, body, M) {
       const xref = (await db.prepare("SELECT src, sid, synced FROM fm_drug_xref WHERE drug_id = ? ORDER BY src").bind(id).all()).results;
       const same = d.pharm_class ? (await db.prepare(`SELECT id, generic FROM fm_drugs d WHERE ${pubWhere} AND id <> ? AND lower(pharm_class) = ? ORDER BY generic LIMIT 12`).bind(id, lc(d.pharm_class)).all()).results : [];
       const moa = facts.find((f) => f.field === "moa"); let similar = [];
-      if (moa) { const s = short(moa.value); if (s) similar = (await db.prepare(`SELECT DISTINCT d.id, d.generic FROM fm_drug_facts f JOIN fm_drugs d ON d.id = f.drug_id WHERE ${pubWhere} AND f.field = 'moa' AND d.id <> ? AND f.value LIKE ? ESCAPE '\\' LIMIT 8`).bind(id, likeEsc(s.slice(0, 60)) + "%").all()).results.filter((x) => !same.some((y) => y.id === x.id)); }
+      if (moa) { const s = short(moa.value); if (s) similar = (await db.prepare(`SELECT DISTINCT d.id, d.generic FROM fm_drug_facts f JOIN fm_drugs d ON d.id = f.drug_id WHERE ${pubWhere} AND f.field = 'moa' AND d.id <> ? AND instr(f.value, ?) = 1 LIMIT 8`).bind(id, s.slice(0, 60)).all()).results.filter((x) => !same.some((y) => y.id === x.id)); }
       const rel = new Set(); for (const c of cats.filter((c) => c.kind !== "classification").slice(0, 3)) { const x = (await catIndex(db)).get(c.id); if (x) x.all.forEach((i) => { if (i !== id && !same.some((y) => y.id === i)) rel.add(i); }); }
       const related = rel.size ? await byIds(db, (q) => `SELECT id, generic FROM fm_drugs d WHERE ${pubWhere} AND id IN (${q}) ORDER BY generic`, [...rel].slice(0, 40)) : [];
       const bm = await db.prepare("SELECT 1 x FROM fm_bookmarks WHERE u = ? AND kind = 'drug' AND ref = ?").bind(u, id).first();
@@ -936,7 +936,7 @@ async function admin(db, a, p, qp, body, M, t, env) {
   // obat
   if (p === "drugs" && M === "GET") {
     const q = lc(qp("q")), st = qp("st"), src = qp("src"), cat = int(qp("cat")); let w = "1=1"; const b = [];
-    if (q) { w += " AND d.id IN (SELECT drug_id FROM fm_drug_names WHERE name_lc LIKE ? ESCAPE '\\')"; b.push("%" + likeEsc(q) + "%"); }
+    if (q) { w += " AND d.id IN (SELECT drug_id FROM fm_drug_names WHERE instr(name_lc, ?) > 0)"; b.push(q); }
     if (STATUS.includes(st)) { w += " AND d.status = ?"; b.push(st); } if (qp("off") === "1") w += " AND d.active = 0";
     if (src) { w += " AND (d.src = ? OR d.id IN (SELECT drug_id FROM fm_drug_xref WHERE src = ?))"; b.push(src, src); }
     if (cat) { w += " AND d.id IN (SELECT drug_id FROM fm_drug_cat WHERE cat_id = ?)"; b.push(cat); }
@@ -1001,7 +1001,7 @@ async function admin(db, a, p, qp, body, M, t, env) {
     return J({ done: 1, id: nx.id, status: r.status, remaining: rem });
   }
   if (p === "dups") {
-    const d1 = (await db.prepare("SELECT a.id aid, a.generic ag, b.id bid, b.generic bg FROM fm_drugs a JOIN fm_drugs b ON a.id < b.id AND (b.generic_lc LIKE a.generic_lc || ' %' OR a.generic_lc LIKE b.generic_lc || ' %') LIMIT 100").all()).results.map((r) => ({ ...r, why: "nama berawalan sama" }));
+    const d1 = (await db.prepare("SELECT a.id aid, a.generic ag, b.id bid, b.generic bg FROM fm_drugs a JOIN fm_drugs b ON a.id < b.id AND (instr(b.generic_lc, a.generic_lc || ' ') = 1 OR instr(a.generic_lc, b.generic_lc || ' ') = 1) LIMIT 100").all()).results.map((r) => ({ ...r, why: "nama berawalan sama" }));
     const d2 = (await db.prepare("SELECT x.id aid, x.generic ag, y.id bid, y.generic bg FROM fm_drug_names n1 JOIN fm_drug_names n2 ON n1.name_lc = n2.name_lc AND n1.drug_id < n2.drug_id AND n1.kind = 'generic' JOIN fm_drugs x ON x.id = n1.drug_id JOIN fm_drugs y ON y.id = n2.drug_id LIMIT 100").all()).results.map((r) => ({ ...r, why: "nama generik sama" }));
     return J({ rows: d2.concat(d1) });
   }
@@ -1048,7 +1048,7 @@ async function admin(db, a, p, qp, body, M, t, env) {
   // interaksi
   if (p === "inters" && M === "GET") {
     const st = qp("st"), q = lc(qp("q")); let w = "1=1"; const b = [];
-    if (STATUS.includes(st)) { w += " AND i.status = ?"; b.push(st); } if (q) { w += " AND (lower(a.generic) LIKE ? ESCAPE '\\' OR lower(c.generic) LIKE ? ESCAPE '\\')"; b.push("%" + likeEsc(q) + "%", "%" + likeEsc(q) + "%"); }
+    if (STATUS.includes(st)) { w += " AND i.status = ?"; b.push(st); } if (q) { w += " AND (instr(lower(a.generic), ?) > 0 OR instr(lower(c.generic), ?) > 0)"; b.push(q, q); }
     const total = (await db.prepare(`SELECT COUNT(*) n FROM fm_inter i LEFT JOIN fm_drugs a ON a.id = i.drug_a LEFT JOIN fm_drugs c ON c.id = i.drug_b WHERE ${w}`).bind(...b).first()).n;
     const rows = (await db.prepare(`SELECT i.*, a.generic AS ga, c.generic AS gb FROM fm_inter i LEFT JOIN fm_drugs a ON a.id = i.drug_a LEFT JOIN fm_drugs c ON c.id = i.drug_b WHERE ${w} ORDER BY i.updated DESC LIMIT ${PS} OFFSET ${pg * PS}`).bind(...b).all()).results;
     return J({ total, rows, ps: PS });

@@ -957,7 +957,8 @@ async function runApi(request, env, a, path, url, body, M) {
     }
     if (ap === "q" && M === "GET") {
       const s = qp("s"), act = qp("active"), pg = Math.max(0, parseInt(qp("page"), 10) || 0), w = ["cat_id = ?"], bind = [+qp("cat") || 0];
-      if (s) { w.push("(q LIKE ? OR a LIKE ? OR b LIKE ? OR c LIKE ? OR d LIKE ? OR e LIKE ?)"); for (let i = 0; i < 6; i++) bind.push("%" + s.replace(/[%_]/g, "") + "%"); }
+      // D1 membatasi panjang pola LIKE (50 byte); pakai instr() agar kata kunci panjang tidak error.
+      if (s) { w.push("(instr(lower(q), ?) > 0 OR instr(lower(a), ?) > 0 OR instr(lower(b), ?) > 0 OR instr(lower(c), ?) > 0 OR instr(lower(d), ?) > 0 OR instr(lower(e), ?) > 0)"); const sq = s.toLowerCase(); for (let i = 0; i < 6; i++) bind.push(sq); }
       if (act === "1" || act === "0") { w.push("active = ?"); bind.push(+act); }
       const total = (await db.prepare("SELECT COUNT(*) n FROM run_questions WHERE " + w.join(" AND ")).bind(...bind).first()).n;
       const rows = (await db.prepare("SELECT " + RUN_QCOLS + " FROM run_questions WHERE " + w.join(" AND ") + " ORDER BY num IS NULL, num, id LIMIT 50 OFFSET ?").bind(...bind, pg * 50).all()).results;
