@@ -58,8 +58,14 @@ const grp = (u) => (/^G0025\d{3}$/.test(u) ? GRP_EXC[u] || (+u.slice(5) % 2 ? "A
 const isStu = (u) => /^G0025\d{3}$/.test(u) && +u.slice(5) >= 1 && +u.slice(5) <= 240;
 // Rahasia penanda tangan sesi: ADMIN_PASSWORD bila diatur, jika tidak pakai kunci acak per-proses
 // (token lama gugur saat server mulai ulang, tetapi token admin tidak bisa dipalsukan).
-const BOOT_SECRET = "b|" + (globalThis.crypto?.randomUUID?.() || Math.random().toString(36).slice(2) + Date.now());
-const K = (env) => "s|" + (env.ADMIN_PASSWORD || BOOT_SECRET);
+// Cloudflare menolak pembuatan nilai acak di global scope (error 10021), jadi rahasia
+// boot dibuat malas (lazy) pada permintaan pertama, bukan saat modul dievaluasi.
+let BOOT_SECRET = null;
+const bootSecret = () => {
+  if (!BOOT_SECRET) BOOT_SECRET = "b|" + (globalThis.crypto?.randomUUID?.() || Math.random().toString(36).slice(2) + Date.now());
+  return BOOT_SECRET;
+};
+const K = (env) => "s|" + (env.ADMIN_PASSWORD || bootSecret());
 async function mint(u, env) {
   const m = u + "." + (Date.now() + 30 * 864e5);
   return m + "." + (await hmac(K(env), m));
