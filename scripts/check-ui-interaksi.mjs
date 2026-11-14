@@ -1,5 +1,6 @@
 // Verifikasi UI: Detail Obat harus MENAMPILKAN daftar interaksi, bukan hanya jumlah.
-import { chromium } from "/opt/appjet/browser/node_modules/playwright/index.js";
+import pw from "/opt/appjet/browser/node_modules/playwright/index.js";
+const { chromium } = pw;
 
 const BASE = process.env.BASE || "http://127.0.0.1:3120";
 const DRUG = process.env.DRUG || "1";
