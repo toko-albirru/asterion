@@ -135,7 +135,7 @@
     return new Promise(function (res, rej) {
       var go = function () { if (alive(k)) window.FMAdmin(P, k, { set: setF, alive: alive }).then(res, rej); else res(); };
       if (window.FMAdmin) return go();
-      var s = document.createElement("script"); s.src = "farmako-admin.js"; s.onload = go; s.onerror = function () { rej(new Error("farmako-admin.js tidak ditemukan")); }; document.head.appendChild(s);
+      var s = document.createElement("script"); s.src = "farmako-admin.js?v=12"; s.onload = go; s.onerror = function () { rej(new Error("farmako-admin.js tidak ditemukan")); }; document.head.appendChild(s);
     });
   }
   var bigCard = function (href, ico, t, sub) { return "<a class='card g' href='" + href + "'><span class='i'>" + ico + "</span><span class='t'>" + esc(t) + "<small>" + esc(sub) + "</small></span><span class='a'>›</span></a>"; };

@@ -220,7 +220,7 @@ async function suggest(db, a, q, scope) {
   const adm = a.admin && scope.admin, vis = adm ? "d.active IN (0,1)" : pubWhere;
   if (["all", "drug"].includes(scope.s)) {
     let rows = (await db.prepare(`SELECT n.drug_id, n.name, n.kind, d.generic, d.pharm_class, d.summary, d.status FROM fm_drug_names n JOIN fm_drugs d ON d.id = n.drug_id WHERE ${vis} AND n.name_lc >= ? AND n.name_lc < ? ORDER BY (n.kind = 'generic') DESC, length(n.name) LIMIT 40`).bind(s, upto).all()).results;
-    if (rows.length < 10 && s.length >= 2) rows = rows.concat((await db.prepare(`SELECT n.drug_id, n.name, n.kind, d.generic, d.pharm_class, d.summary, d.status FROM fm_drug_names n JOIN fm_drugs d ON d.id = n.drug_id WHERE ${vis} AND n.name_lc LIKE ? ESCAPE '\\' ORDER BY (n.kind = 'generic') DESC, length(n.name) LIMIT 30`).bind("%" + likeEsc(s) + "%").all()).results);
+    if (rows.length < 10 && s.length >= 2) rows = rows.concat((await db.prepare(`SELECT n.drug_id, n.name, n.kind, d.generic, d.pharm_class, d.summary, d.status FROM fm_drug_names n JOIN fm_drugs d ON d.id = n.drug_id WHERE ${vis} AND instr(n.name_lc, ?) > 0 ORDER BY (n.kind = 'generic') DESC, length(n.name) LIMIT 30`).bind(s).all()).results);
     for (const r of rows) { if (seen.has("d" + r.drug_id)) continue; seen.add("d" + r.drug_id); items.push({ t: "drug", id: r.drug_id, name: r.generic, matched: r.name.toLowerCase() === r.generic.toLowerCase() ? "" : r.name, via: r.kind, sub: r.pharm_class, descr: r.summary, status: r.status }); if (items.length >= 12) break; }
   }
   if (["all", "cat", "game"].includes(scope.s)) {
@@ -230,7 +230,7 @@ async function suggest(db, a, q, scope) {
     for (const c of hit.slice(0, 6)) items.push({ t: "cat", id: c.id, name: c.name, sub: CAT_KINDS[c.kind] || c.kind, descr: c.all.size + " obat" });
   }
   if (["all", "material"].includes(scope.s)) {
-    const rows = (await db.prepare(`SELECT id, title FROM fm_materials WHERE ${adm ? "1=1" : "status = 'published'"} AND lower(title) LIKE ? ESCAPE '\\' ORDER BY (lower(title) LIKE ? ESCAPE '\\') DESC LIMIT 5`).bind("%" + likeEsc(s) + "%", likeEsc(s) + "%").all()).results;
+    const rows = (await db.prepare(`SELECT id, title FROM fm_materials WHERE ${adm ? "1=1" : "status = 'published'"} AND instr(lower(title), ?) > 0 ORDER BY (instr(lower(title), ?) = 1) DESC LIMIT 5`).bind(s, s).all()).results;
     for (const r of rows) items.push({ t: "material", id: r.id, name: r.title, sub: "Materi" });
   }
   return { items };
@@ -507,14 +507,18 @@ async function trDo(db, env, ent, ref, field, o) {
   if (!trProvider(env)) return { err: "Terjemahan belum diaktifkan oleh admin.", s: 503 };
   if (!o.admin && !(await trQuota(db, env, o.u))) return { err: "Batas terjemahan harian tercapai. Coba lagi besok.", s: 429 };
   const ch = splitText(src); if (ch.length > 14) return { err: "Teks terlalu panjang untuk diterjemahkan.", s: 413 };
-  let txt = "", low = "";
+  let txt = "", low = "", need = 0;
   for (const c of ch) {
     if (!/[A-Za-z]{2}/.test(c.t)) { txt += c.t + c.sep; continue; }
-    const mk = maskTerms(c.t), tr = await trChunk(env, mk.text), un = unmaskTerms(tr, mk.terms);
+    const mk = maskTerms(c.t);
+    if (!/[A-Za-z]{2}/.test(mk.text)) { txt += c.t.trim() + c.sep; continue; } // seluruhnya istilah baku → biarkan apa adanya
+    need++;
+    const tr = await trChunk(env, mk.text), un = unmaskTerms(tr, mk.terms);
     if (un.missing) low = "istilah baku hilang saat diterjemahkan";
     txt += fixTr(un.text).trim() + c.sep;
   }
   txt = txt.trim();
+  if (!need) { await trUp(db, ent, ref, field, h, "", "id", Date.now()); return { status: "id", text: "" }; }
   const why = low || trCheck(src, txt);
   if (why) { await trUp(db, ent, ref, field, h, "", "low", Date.now()); return { text: "", status: "low", warn: "Terjemahan mesin ditolak (" + why + "). Teks asli tetap ditampilkan." }; }
   await trUp(db, ent, ref, field, h, txt, "auto", Date.now()); return { text: txt, status: "auto" };
@@ -525,10 +529,29 @@ async function trDo(db, env, ent, ref, field, o) {
 // Mesin terjemahan umum sering mengubah istilah farmakologi baku sehingga maknanya bergeser
 // (mis. "clearance", "agonist", "CYP3A4"). Istilah di daftar ini tidak diterjemahkan.
 export const KEEP_TERMS = ["CYP1A2", "CYP2C9", "CYP2C19", "CYP2D6", "CYP2E1", "CYP3A4", "CYP3A5", "UGT1A1", "UGT2B7", "OATP1B1", "OATP1B3", "P-gp", "P-glycoprotein", "BCRP", "MDR1", "MRP2", "5-HT", "QTc", "INR", "aPTT", "AUC", "Cmax", "Tmax", "t1/2", "IC50", "EC50", "Ki", "Km", "pKa", "InChIKey", "SMILES", "NSAID", "NSAIDs", "SSRI", "SNRI", "TCA", "MAOI", "ARB", "PPI", "COX-1", "COX-2", "HMG-CoA", "in vitro", "in vivo", "ex vivo", "first-pass", "placebo", "randomized controlled trial", "systematic review", "meta-analysis", "PubMed", "Cochrane", "FDA", "EMA", "WHO", "BPOM", "DDInter", "DrugBank", "PubChem", "RxNorm", "ChEMBL", "openFDA", "KEGG", "mg", "mcg", "mL", "kg", "mmol", "IU", "IV", "IM", "SC", "PO", "qd", "bid", "tid", "qid", "prn", "stat"];
-const escRe = (x) => x.replace(/[-/\\^$*+?.()|[\]{}]/g, "\\// ---------- ekspor ke handler ----------");
-const KEEP_RE = new RegExp("\\b(?:" + KEEP_TERMS.slice().sort((a, b) => b.length - a.length).map(escRe).join("|") + ")\\b", "g");
-function maskTerms(text) { const terms = []; const out = String(text).replace(KEEP_RE, (m) => { terms.push(m); return "⟦" + (terms.length - 1) + "⟧"; }); return { text: out, terms }; }
-function unmaskTerms(text, terms) {
+const escRe = (x) => x.replace(/[-/\\^$*+?.()|[\]{}]/g, "\\$&");
+// Istilah medis/farmakologi baku yang DIPERTAHANKAN apa adanya: menerjemahkannya menggeser makna.
+const KEEP_EXTRA = ["Homo sapiens", "Homo sapiens sapiens", "Mus musculus", "Rattus norvegicus", "Escherichia coli", "Saccharomyces cerevisiae", "Candida albicans", "Drosophila melanogaster", "Danio rerio", "Sus scrofa", "Bos taurus", "Macaca mulatta", "Oryctolagus cuniculus", "Xenopus laevis", "clearance", "half-life", "steady state", "steady-state", "bioavailability", "volume of distribution", "therapeutic index", "first-pass metabolism", "prodrug", "metabolite", "glucuronidation", "sulfation", "acetylation", "hydrolysis", "oxidation", "reduction", "efflux", "uptake", "affinity", "efficacy", "potency", "agonist", "antagonist", "partial agonist", "inverse agonist", "ligand", "substrate", "inducer", "isoform", "polymorphism", "genotype", "phenotype", "allele", "nocebo", "peak", "trough", "loading dose", "maintenance dose", "titration", "therapeutic drug monitoring", "serum concentration", "adverse drug reaction", "contraindication", "precaution", "prophylaxis", "toxicity", "overdose", "receptor", "enzyme", "transporter", "channel", "cyclooxygenase", "prostaglandin", "thromboxane", "leukotriene", "angiotensin", "bradykinin", "renin", "aldosterone", "cortisol", "insulin", "glucagon", "serotonin", "dopamine", "norepinephrine", "epinephrine", "acetylcholine", "histamine", "GABA", "glutamate", "opioid", "cannabinoid", "cytokine", "interleukin", "tumor necrosis factor", "monoamine oxidase", "acetylcholinesterase", "carbonic anhydrase", "HMG-CoA reductase", "DNA gyrase", "dihydrofolate reductase", "topoisomerase", "beta-lactam", "penicillin-binding protein"];
+const ALL_KEEP = KEEP_TERMS.concat(KEEP_EXTRA);
+const KEEP_RE = new RegExp("\\b(?:" + ALL_KEEP.slice().sort((a, b) => b.length - a.length).map(escRe).join("|") + ")\\b", "g");
+// Pola nama ilmiah: enzim/protein/gen, genus–spesies, akronim, simbol gen, senyawa berkode.
+const SCI_PATTERNS = [
+  /\b[A-Z][a-z]+(?:\s+[a-z]+){1,2}\b(?=\s*\()/g,
+  /\(\s*[A-Z][a-z]+(?:\s+[a-z]+){1,2}\s*\)/g,
+  /\b[A-Z][a-z]+(?:-[a-z0-9]+)+\b/g,
+  /\b[A-Za-z-]*(?:ATPase|kinase|reductase|oxidase|synthase|transferase|hydrolase|ligase|isomerase|phosphatase|dehydrogenase|hydroxylase|esterase|peptidase|polymerase|topoisomerase|lipoxygenase|oxygenase|protease|transporter|receptor|channel|subunit)\b/g,
+  /\b[A-Z]{2,}[a-z0-9]*\b/g,
+  /\b[A-Za-z]{1,6}\d+[A-Za-z0-9]*\b/g,
+  /\b[A-Z]-[A-Za-z0-9]+\b/g,
+];
+export function sciTokens(text) { const out = new Set(), s = String(text == null ? "" : text); for (const re of SCI_PATTERNS) { re.lastIndex = 0; for (const m of s.match(re) || []) out.add(m.trim()); } return out; }
+export function maskTerms(text) {
+  const terms = [], put = (m) => { terms.push(m); return "⟦" + (terms.length - 1) + "⟧"; };
+  let out = String(text).replace(KEEP_RE, put);
+  for (const re of SCI_PATTERNS) { re.lastIndex = 0; out = out.replace(re, put); }
+  return { text: out, terms };
+}
+export function unmaskTerms(text, terms) {
   let missing = false;
   const out = String(text).replace(/[⟦\[«]\s*(\d+)\s*[⟧\]»]/g, (m, i) => { const v = terms[+i]; if (v == null) { missing = true; return m; } return v; });
   if (/[⟦\[«]\s*\d+\s*[⟧\]»]/.test(out)) missing = true;
@@ -546,14 +569,21 @@ const TR_FIX = [
   [/\bjalur pemberian\b/gi, "rute pemberian"],
   [/\bpenyerapan\b/gi, "absorpsi"],
   [/\bketersediaan hayati\b/gi, "bioavailabilitas"],
+  [/\bpengangkutan kalium atpase\b/gi, "Potassium-transporting ATPase"],
+  [/\batpase pengangkutan kalium\b/gi, "Potassium-transporting ATPase"],
+  [/\bsiklooksigenase\b/gi, "Cyclooxygenase"],
+  [/\bmanusia \(homo sapiens\)\b/gi, "(Homo sapiens)"],
+  [/\bwaktu paruh eliminasi\b/gi, "half-life"],
 ];
-function fixTr(t) { let o = String(t); for (const p of TR_FIX) o = o.replace(p[0], p[1]); return o; }
+export function fixTr(t) { let o = String(t); for (const p of TR_FIX) o = o.replace(p[0], p[1]); return o; }
 // tolak hasil mesin yang tidak layak dipakai: lebih baik teks asli daripada terjemahan yang salah
-function trCheck(src, out) {
+export function trCheck(src, out) {
   const a = String(src).trim(), b = String(out).trim();
   if (!b) return "hasil kosong";
   if (b.length < a.length * 0.25) return "hasil terlalu pendek";
   if (b.length > a.length * 4) return "hasil terlalu panjang";
+  // istilah medis/ilmiah wajib utuh: lebih baik teks asli daripada istilah yang berubah makna
+  for (const tk of sciTokens(a)) if (!b.includes(tk)) return "istilah medis berubah: " + clip(tk, 60);
   if (lc(a) === lc(b) && !looksId(a)) return "teks tidak berubah (bukan terjemahan)";
   return "";
 }
@@ -783,7 +813,7 @@ export async function farmakoApi(request, env, a, path, url, body, M) {
       let ids = null;
       if (cat) { const c = idx.get(cat); ids = c ? [...c.all] : []; }
       let where = pubWhere, bind = [];
-      if (q) { where += " AND d.id IN (SELECT drug_id FROM fm_drug_names WHERE name_lc LIKE ? ESCAPE '\\')"; bind.push("%" + likeEsc(q) + "%"); }
+      if (q) { where += " AND d.id IN (SELECT drug_id FROM fm_drug_names WHERE instr(name_lc, ?) > 0)"; bind.push(q); }
       if (cls) { where += " AND lower(d.pharm_class) = ?"; bind.push(cls); }
       let rows = (await db.prepare(`SELECT d.id, d.generic, d.pharm_class, d.ther_class, d.summary, d.status FROM fm_drugs d WHERE ${where} ORDER BY d.generic LIMIT 2000`).bind(...bind).all()).results;
       if (ids) { const s = new Set(ids); rows = rows.filter((r) => s.has(r.id)); }
@@ -798,7 +828,7 @@ export async function farmakoApi(request, env, a, path, url, body, M) {
       const xref = (await db.prepare("SELECT src, sid, synced FROM fm_drug_xref WHERE drug_id = ? ORDER BY src").bind(id).all()).results;
       const same = d.pharm_class ? (await db.prepare(`SELECT id, generic FROM fm_drugs d WHERE ${pubWhere} AND id <> ? AND lower(pharm_class) = ? ORDER BY generic LIMIT 12`).bind(id, lc(d.pharm_class)).all()).results : [];
       const moa = facts.find((f) => f.field === "moa"); let similar = [];
-      if (moa) { const s = short(moa.value); if (s) similar = (await db.prepare(`SELECT DISTINCT d.id, d.generic FROM fm_drug_facts f JOIN fm_drugs d ON d.id = f.drug_id WHERE ${pubWhere} AND f.field = 'moa' AND d.id <> ? AND f.value LIKE ? ESCAPE '\\' LIMIT 8`).bind(id, likeEsc(s.slice(0, 60)) + "%").all()).results.filter((x) => !same.some((y) => y.id === x.id)); }
+      if (moa) { const s = short(moa.value); if (s) similar = (await db.prepare(`SELECT DISTINCT d.id, d.generic FROM fm_drug_facts f JOIN fm_drugs d ON d.id = f.drug_id WHERE ${pubWhere} AND f.field = 'moa' AND d.id <> ? AND instr(f.value, ?) = 1 LIMIT 8`).bind(id, s.slice(0, 60)).all()).results.filter((x) => !same.some((y) => y.id === x.id)); }
       const rel = new Set(); for (const c of cats.filter((c) => c.kind !== "classification").slice(0, 3)) { const x = (await catIndex(db)).get(c.id); if (x) x.all.forEach((i) => { if (i !== id && !same.some((y) => y.id === i)) rel.add(i); }); }
       const related = rel.size ? await byIds(db, (q) => `SELECT id, generic FROM fm_drugs d WHERE ${pubWhere} AND id IN (${q}) ORDER BY generic`, [...rel].slice(0, 40)) : [];
       const bm = await db.prepare("SELECT 1 x FROM fm_bookmarks WHERE u = ? AND kind = 'drug' AND ref = ?").bind(u, id).first();
@@ -936,7 +966,7 @@ async function admin(db, a, p, qp, body, M, t, env) {
   // obat
   if (p === "drugs" && M === "GET") {
     const q = lc(qp("q")), st = qp("st"), src = qp("src"), cat = int(qp("cat")); let w = "1=1"; const b = [];
-    if (q) { w += " AND d.id IN (SELECT drug_id FROM fm_drug_names WHERE name_lc LIKE ? ESCAPE '\\')"; b.push("%" + likeEsc(q) + "%"); }
+    if (q) { w += " AND d.id IN (SELECT drug_id FROM fm_drug_names WHERE instr(name_lc, ?) > 0)"; b.push(q); }
     if (STATUS.includes(st)) { w += " AND d.status = ?"; b.push(st); } if (qp("off") === "1") w += " AND d.active = 0";
     if (src) { w += " AND (d.src = ? OR d.id IN (SELECT drug_id FROM fm_drug_xref WHERE src = ?))"; b.push(src, src); }
     if (cat) { w += " AND d.id IN (SELECT drug_id FROM fm_drug_cat WHERE cat_id = ?)"; b.push(cat); }
@@ -1001,7 +1031,7 @@ async function admin(db, a, p, qp, body, M, t, env) {
     return J({ done: 1, id: nx.id, status: r.status, remaining: rem });
   }
   if (p === "dups") {
-    const d1 = (await db.prepare("SELECT a.id aid, a.generic ag, b.id bid, b.generic bg FROM fm_drugs a JOIN fm_drugs b ON a.id < b.id AND (b.generic_lc LIKE a.generic_lc || ' %' OR a.generic_lc LIKE b.generic_lc || ' %') LIMIT 100").all()).results.map((r) => ({ ...r, why: "nama berawalan sama" }));
+    const d1 = (await db.prepare("SELECT a.id aid, a.generic ag, b.id bid, b.generic bg FROM fm_drugs a JOIN fm_drugs b ON a.id < b.id AND (instr(b.generic_lc, a.generic_lc || ' ') = 1 OR instr(a.generic_lc, b.generic_lc || ' ') = 1) LIMIT 100").all()).results.map((r) => ({ ...r, why: "nama berawalan sama" }));
     const d2 = (await db.prepare("SELECT x.id aid, x.generic ag, y.id bid, y.generic bg FROM fm_drug_names n1 JOIN fm_drug_names n2 ON n1.name_lc = n2.name_lc AND n1.drug_id < n2.drug_id AND n1.kind = 'generic' JOIN fm_drugs x ON x.id = n1.drug_id JOIN fm_drugs y ON y.id = n2.drug_id LIMIT 100").all()).results.map((r) => ({ ...r, why: "nama generik sama" }));
     return J({ rows: d2.concat(d1) });
   }
@@ -1048,7 +1078,7 @@ async function admin(db, a, p, qp, body, M, t, env) {
   // interaksi
   if (p === "inters" && M === "GET") {
     const st = qp("st"), q = lc(qp("q")); let w = "1=1"; const b = [];
-    if (STATUS.includes(st)) { w += " AND i.status = ?"; b.push(st); } if (q) { w += " AND (lower(a.generic) LIKE ? ESCAPE '\\' OR lower(c.generic) LIKE ? ESCAPE '\\')"; b.push("%" + likeEsc(q) + "%", "%" + likeEsc(q) + "%"); }
+    if (STATUS.includes(st)) { w += " AND i.status = ?"; b.push(st); } if (q) { w += " AND (instr(lower(a.generic), ?) > 0 OR instr(lower(c.generic), ?) > 0)"; b.push(q, q); }
     const total = (await db.prepare(`SELECT COUNT(*) n FROM fm_inter i LEFT JOIN fm_drugs a ON a.id = i.drug_a LEFT JOIN fm_drugs c ON c.id = i.drug_b WHERE ${w}`).bind(...b).first()).n;
     const rows = (await db.prepare(`SELECT i.*, a.generic AS ga, c.generic AS gb FROM fm_inter i LEFT JOIN fm_drugs a ON a.id = i.drug_a LEFT JOIN fm_drugs c ON c.id = i.drug_b WHERE ${w} ORDER BY i.updated DESC LIMIT ${PS} OFFSET ${pg * PS}`).bind(...b).all()).results;
     return J({ total, rows, ps: PS });
