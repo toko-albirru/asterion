@@ -1,11 +1,11 @@
 // Preload uji: menggantikan fetch ke PubChem/RxNav/ChEMBL/openFDA dengan respons palsu BERBENTUK dokumentasi (bukan data nyata).
-// Hanya memeriksa logika kode (parsing, pemilihan, penyimpanan, penanganan galat) — BUKAN bukti layanan asli bekerja.
+// Hanya memeriksa logika kode (parsing, pemilihan, penyimpanan, penanganan galat) â€” BUKAN bukti layanan asli bekerja.
 const real = globalThis.fetch;
 const J = (x, s = 200) => new Response(JSON.stringify(x), { status: s, headers: { "content-type": "application/json" } });
 let libreN = 0;
 globalThis.fetch = async (url, o) => {
   const u = decodeURIComponent(String(url));
-  if (u.includes("libre.test")) { const q = JSON.parse(o.body).q; if (q.includes("ZZ-LIBRE-FAIL")) return J({}, 500); return J({ translatedText: "[ID#" + (++libreN) + "] " + q }); }
+  if (u.includes("libre.test")) { const q = JSON.parse(o.body).q; if (/libre-fail/i.test(q)) return J({}, 500); return J({ translatedText: "[ID#" + (++libreN) + "] " + q }); }
   if (u.includes("pubchem")) {
     if (u.includes("ZZ-FAIL") || u.includes("ZZ-UJI Beta")) return J({}, 500);
     if (u.includes("ZZ-UJI Gamma")) return J({ Fault: {} }, 404);
