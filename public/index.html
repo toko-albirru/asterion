@@ -469,9 +469,18 @@ var esc=function(s){return String(s==null?"":s).replace(/[&<>"']/g,function(c){r
 var S={t:localStorage.getItem("tk")||"",data:null,u:"",admin:false};
 /* detak "sedang online": dikirim tiap 90 dtk selama tab terlihat (admin tidak dihitung) */
 var BT=0;
-function beat(){if(!S.t||S.admin||document.hidden)return;api("ping",{m:"POST"}).catch(function(){})}
+/* analytics: halaman dibuka, materi dibuka, dan lama aktif (hanya saat tab terlihat). Ditumpuk di memori lalu ikut
+   detak online paling cepat tiap ±5 menit (atau saat tab ditutup/disembunyikan), supaya hemat kuota tulis D1. */
+var AN={sec:0,pv:{},it:{},last:Date.now(),sent:Date.now()};
+function anTick(f){var n=Date.now();if(f||!document.hidden)AN.sec+=Math.min(120,(n-AN.last)/1e3);AN.last=n}
+function anPv(tab){if(S.admin||!S.t)return;AN.pv[tab]=(AN.pv[tab]||0)+1}
+function anIt(x){if(S.admin||!x||!x.n)return;var k=mKey(x).slice(0,120),o=AN.it[k];AN.it[k]=[String(x.n).slice(0,160),(o?o[1]:0)+1]}
+function anTake(force){anTick(force);var has=AN.sec>=1||Object.keys(AN.pv).length||Object.keys(AN.it).length;if(!has||(!force&&Date.now()-AN.sent<27e4))return null;
+  var p={sec:Math.round(AN.sec),pv:AN.pv,it:AN.it,dev:/Mobi|Android|iPhone|iPad/i.test(navigator.userAgent)?"m":"d"};AN.sec=0;AN.pv={};AN.it={};AN.sent=Date.now();return p}
+function beat(){if(!S.t||S.admin||document.hidden)return;var an=anTake(false);api("ping",{m:"POST",b:an?{an:an}:undefined}).catch(function(){})}
 function beatStart(){if(BT||S.admin||!S.t)return;beat();BT=setInterval(beat,9e4)}
-document.addEventListener("visibilitychange",function(){if(!document.hidden)beat()});
+document.addEventListener("visibilitychange",function(){if(!document.hidden){AN.last=Date.now();beat();return}
+  if(!S.t||S.admin)return;var an=anTake(true);if(an)try{fetch("/api/ping",{method:"POST",keepalive:true,headers:{"content-type":"application/json",authorization:"Bearer "+S.t},body:JSON.stringify({an:an})})}catch(e){}});
 function myName(){var u=String(S.u||"").toUpperCase();return S.admin?"Admin":((window.MHS||{})[u]||S.u)}
 function toast(m,kind){var t=$("toast"),s=String(m==null?"":m);if(!kind){kind=/gagal|error|tidak valid|tidak boleh|belum diisi|kosong|salah/i.test(s)?"bad":(/✓|✅|🎉|tersimpan|dihapus|terkirim|berhasil|disalin/i.test(s)?"good":"")}t.className=kind||"";t.innerHTML="<span class='ti'>"+(kind==="bad"?"⚠️":kind==="good"?"✅":"💬")+"</span><span>"+esc(s)+"</span>";t.classList.add("on");clearTimeout(toast.h);toast.h=setTimeout(function(){t.classList.remove("on")},2600)}
 /* ---------- dialog kustom: pengganti alert/confirm/prompt bawaan browser ---------- */
@@ -575,7 +584,7 @@ function folderRef(u){var m=(u||"").match(/drive\.google\.com\/drive\/(?:u\/\d+\
 function ytList(u){var m=(u||"").match(/[?&]list=([\w-]+)/);return /youtube\.com|youtu\.be/.test(u||"")&&m?m[1]:""}
 function fileIco(n){var e=(String(n).split(".").pop()||"").toLowerCase();return{pdf:"📕",doc:"📘",docx:"📘",ppt:"📙",pptx:"📙",xls:"📗",xlsx:"📗",csv:"📗",png:"🖼️",jpg:"🖼️",jpeg:"🖼️",gif:"🖼️",mp4:"🎞️",mkv:"🎞️",mp3:"🎵",zip:"🗜️",rar:"🗜️"}[e]||"📄"}
 function viewer(x,ex){
-  mMark(x);ex=ex||[];var sub=ex[ex.length-1];sub=/^[\w-]+$/.test(sub||"")?sub:"";
+  mMark(x);anIt(x);ex=ex||[];var sub=ex[ex.length-1];sub=/^[\w-]+$/.test(sub||"")?sub:"";
   var h="<div class='sec' id='ft'>"+esc(x.n)+"</div>",e=x.u&&embed(x.u),pl=ytList(x.u),fr=folderRef(x.u),ou=x.u;
   if(x.h||x.hid){hOpen(x);return h+"<div class='pn g empty'>Materi dibuka di layar penuh.</div>"}
   else if(pl&&e){h=h.replace("class='sec' id='ft'","class='sec' id='ft' style='margin:8px 2px 10px'");h+="<div class='pw'><div class='vw' id='pv'><iframe id='pf' src=\""+esc(e.s)+"\" allowfullscreen allow='fullscreen; autoplay; encrypted-media; picture-in-picture'></iframe></div><div class='plw'><button class='pa l g' data-pa='-1' disabled aria-label='Sebelumnya'>‹</button><div id='pl'><div class='empty'>Memuat daftar video…</div></div><button class='pa r g' data-pa='1' aria-label='Berikutnya'>›</button></div></div>";setTimeout(function(){plFill(pl,x.u)},0)}
@@ -1453,7 +1462,7 @@ function pHome(){
   "<p class='hint' style='text-align:center;font-size:14px'>Halo, <b>"+esc(myName())+"</b> 👋<br>Seluruh rekaman, rangkuman, soal, dan materi kuliah ada disini, semangat belajarnya 🤩✨</p>"+
   "<div id='cd'></div><div class='sec'>HARI INI</div><div id='today'>"+skel(2)+"</div><div id='next'></div>"+
   "<div class='sec'>MENU</div>"+cards(uiList("menu").filter(function(x){return !x.h}).map(function(x){return["#/"+x.id,x.i,x.n,x.s]}))+
-  (S.admin?"<div class='sec'>ADMIN</div>"+cards([["#/atur","🧭","Atur Menu, Navbar & Kategori","Ubah urutan, nama, dan ikon"],["#/run/admin","🛠️","Kelola GAME KUIS","Kategori · soal & PDF · leaderboard"],["#/farmako/admin","💊","Kelola Pharmacology Session","Obat · kategori · materi · interaksi · impor data"],["#/dokter/admin","📋","Pengajuan Dokter","Cek, edit, lalu setujui usulan"],["#/akun","👥","Status Akun Mahasiswa","Siapa yang online, sudah buka web & ganti password"]])+"<div class='pn g'><b>Reset password mahasiswa</b><div class='hint'>Mengembalikan password ke username (mahasiswa wajib membuat password baru saat login).</div><input id='rU' class='in' placeholder='G0025001'><button class='btn' data-a='reset'>Reset</button></div>":"")}
+  (S.admin?"<div class='sec'>ADMIN</div>"+cards([["#/atur","🧭","Atur Menu, Navbar & Kategori","Ubah urutan, nama, dan ikon"],["#/run/admin","🛠️","Kelola GAME KUIS","Kategori · soal & PDF · leaderboard"],["#/farmako/admin","💊","Kelola Pharmacology Session","Obat · kategori · materi · interaksi · impor data"],["#/dokter/admin","📋","Pengajuan Dokter","Cek, edit, lalu setujui usulan"],["#/akun","👥","Status Akun Mahasiswa","Siapa yang online, sudah buka web & ganti password"],["#/analytics","📊","Analytics","Siapa aktif, berapa lama, halaman & materi terpopuler"]])+"<div class='pn g'><b>Reset password mahasiswa</b><div class='hint'>Mengembalikan password ke username (mahasiswa wajib membuat password baru saat login).</div><input id='rU' class='in' placeholder='G0025001'><button class='btn' data-a='reset'>Reset</button></div>":"")}
 function skel(n){n=n||3;var h="";for(var i=0;i<n;i++)h+="<div class='sk skc'></div>";return h}
 function jkt(){return new Date().toLocaleDateString("en-CA",{timeZone:"Asia/Jakarta"})}
 function pickTab(tabs){return tabs[Math.min(S.def||0,tabs.length-1)]||tabs[0]}
@@ -1944,8 +1953,30 @@ function pAkun(){
 $("main").addEventListener("click",function(e){var b=e.target.closest("[data-ak]");if(!b)return;if(b.dataset.ak==="reload"){akLoad(true);return}S.akf=b.dataset.ak;akDraw()});
 $("main").addEventListener("input",function(e){if(e.target.id!=="akQ")return;S.akq=e.target.value;akDraw()});
 
+/* ---------- analytics (admin) ---------- */
+var AN_PG={home:"Beranda",materi:"Materi",rekaman:"Rekaman",jadwal:"Jadwal",tutor:"Tutorial",run:"Game Kuis",farmako:"Farmakologi",dokter:"Kontak Dokter",profil:"Profil",atur:"Atur"};
+function anDur(s){s=Math.round(s||0);if(s<60)return s+" dtk";var m=Math.round(s/60);if(m<60)return m+" mnt";return Math.floor(m/60)+" j "+(m%60)+" mnt"}
+function pAnalytics(){
+  setTimeout(function(){anLoad(S.anD||7)},0);
+  return"<div class='sec'>ANALYTICS</div><div class='chips' id='anC'>"+[1,7,30,90].map(function(d){return"<button class='chip g"+((S.anD||7)===d?" on":"")+"' data-an='"+d+"'>"+(d===1?"Hari ini":d+" hari")+"</button>"}).join("")+"</div><div id='anL'><div class='pn g empty'>Memuat…</div></div>"}
+async function anLoad(d){
+  S.anD=d;[].forEach.call(document.querySelectorAll("[data-an]"),function(b){b.classList.toggle("on",+b.dataset.an===d)});
+  var el=$("anL");if(!el)return;var r=await api("analytics?d="+d);if(!$("anL"))return;
+  if(!r.ok||!r.j||!r.j.daily){el.innerHTML="<div class='pn g empty'>Gagal memuat"+(r.j&&r.j.err?": "+esc(r.j.err):"")+".</div>";return}
+  var j=r.j,M=window.MHS||{},tot={u:j.users.length,v:0,s:0};j.daily.forEach(function(x){tot.v+=x.views;tot.s+=x.sec});
+  var st=function(n,l){return"<div class='pn g' style='text-align:center;margin:0'><b style='font-size:22px'>"+n+"</b><div class='hint' style='margin:0'>"+l+"</div></div>"};
+  var mxU=Math.max.apply(null,j.daily.map(function(x){return x.users}).concat([1]));
+  var bars=function(rows,lab,max){max=max||Math.max.apply(null,rows.map(function(x){return x.views}).concat([1]));return rows.map(function(x){return"<div style='margin:6px 0'><div style='display:flex;justify-content:space-between;gap:8px;font-size:13px'><span style='overflow:hidden;text-overflow:ellipsis;white-space:nowrap'>"+esc(lab(x))+"</span><b>"+x.views+"×</b></div><div style='height:6px;border-radius:4px;background:rgba(255,255,255,.08)'><i style='display:block;height:100%;border-radius:4px;background:var(--gold,#d4a843);width:"+Math.round(x.views*100/max)+"%'></i></div></div>"}).join("")||"<div class='hint'>Belum ada data.</div>"};
+  el.innerHTML="<div style='display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:8px;margin-bottom:10px'>"+st(tot.u,"orang aktif")+st(Math.round(tot.u?tot.s/tot.u:0)>0?anDur(tot.s/tot.u):"0","rata-rata lama aktif / orang")+st(tot.v,"halaman dibuka")+st(j.users.filter(function(x){return x.mob*2>=x.days}).length+"/"+tot.u,"lebih sering pakai HP")+"</div>"+
+    (d>1?"<div class='sec'>ORANG AKTIF PER HARI</div><div class='pn g' style='display:flex;align-items:flex-end;gap:3px;height:110px;padding:10px'>"+(j.daily.map(function(x){return"<div title='"+x.day+": "+x.users+" orang, "+anDur(x.sec)+"' style='flex:1;display:flex;flex-direction:column;justify-content:flex-end;align-items:center;height:100%'><small style='font-size:10px;opacity:.7'>"+x.users+"</small><i style='display:block;width:100%;border-radius:3px 3px 0 0;background:var(--gold,#d4a843);height:"+Math.max(3,Math.round(x.users*80/mxU))+"%'></i></div>"}).join("")||"<div class='hint'>Belum ada data.</div>")+"</div>":"")+
+    "<div class='sec'>HALAMAN TERPOPULER</div><div class='pn g'>"+bars(j.pages,function(x){return AN_PG[x.k]||x.k})+"</div>"+
+    "<div class='sec'>MATERI PALING SERING DIBUKA</div><div class='pn g'>"+bars(j.items,function(x){return x.n||x.k})+"</div>"+
+    "<div class='sec'>PER MAHASISWA ("+tot.u+")</div><div class='hint'>Urut dari yang paling lama aktif. Lama aktif hanya dihitung saat tab web sedang terlihat.</div>"+
+    (j.users.map(function(x){return"<div class='ak g'><div class='n'><b>"+esc(M[x.u]||x.u)+"</b><small>"+esc(x.u)+" · aktif "+x.days+" hari · terakhir "+esc(x.last)+(x.mob*2>=x.days?" · 📱":" · 💻")+"</small></div><span class='stt on'>"+anDur(x.sec)+" · "+x.views+" hlm</span></div>"}).join("")||"<div class='pn g empty'>Belum ada data. Data mulai terkumpul sejak fitur ini dipasang.</div>")}
+$("main").addEventListener("click",function(e){var b=e.target.closest("[data-an]");if(!b)return;anLoad(+b.dataset.an)});
+
 /* ---------- router ---------- */
-var TT={atur:"ATUR MENU",home:"ASTERION",materi:"MATERI & RANGKUMAN",rekaman:"REKAMAN KULIAH",jadwal:"JADWAL KULIAH",tutor:"JADWAL TUTORIAL",run:"GAME KUIS",farmako:"FARMAKOLOGI",dokter:"KONTAK DOKTER",akun:"STATUS AKUN",profil:"PROFIL & PROGRES"};
+var TT={analytics:"ANALYTICS",atur:"ATUR MENU",home:"ASTERION",materi:"MATERI & RANGKUMAN",rekaman:"REKAMAN KULIAH",jadwal:"JADWAL KULIAH",tutor:"JADWAL TUTORIAL",run:"GAME KUIS",farmako:"FARMAKOLOGI",dokter:"KONTAK DOKTER",akun:"STATUS AKUN",profil:"PROFIL & PROGRES"};
 /* ---------- PENCARIAN: Materi, Rekaman, Jadwal (sampai ke dalam folder / playlist / tab lain) ---------- */
 var SQ={net:{},run:{},jc:{},jq:0};
 function sqNorm(s){var t=String(s==null?"":s).toLowerCase();try{t=t.normalize("NFD").replace(/[\u0300-\u036f]/g,"")}catch(e){}return t}
@@ -2073,8 +2104,8 @@ $("main").addEventListener("click",function(e){var b=e.target.closest&&e.target.
 function route(){
   if(!S.data)return;
   var P=location.hash.replace(/^#\/?/,"").split("/").filter(Boolean),tab=P[0]||"home",v;
-  if(tab==="materi")v=pMateri(P);else if(tab==="rekaman")v=pRekaman(P);else if(tab==="jadwal")v=pJadwal(P);else if(tab==="tutor")v=pTutor(P);else if(tab==="run"&&window.pRun)v=window.pRun(P);else if(tab==="farmako"&&window.pFarmako)v=window.pFarmako(P);else if(tab==="dokter")v=pDokter(P);else if(tab==="atur")v=pAtur();else if(tab==="akun")v=pAkun();else if(tab==="profil"&&window.pProfil)v=window.pProfil(P);else{tab="home";v=pHome()}
-  document.body.dataset.r=tab;renderNav();$("main").innerHTML=v;$("ttl").textContent=(tab!=="home"&&tab!=="atur"&&uiName(tab)?uiName(tab).toUpperCase():TT[tab]);
+  if(tab==="materi")v=pMateri(P);else if(tab==="rekaman")v=pRekaman(P);else if(tab==="jadwal")v=pJadwal(P);else if(tab==="tutor")v=pTutor(P);else if(tab==="run"&&window.pRun)v=window.pRun(P);else if(tab==="farmako"&&window.pFarmako)v=window.pFarmako(P);else if(tab==="dokter")v=pDokter(P);else if(tab==="atur")v=pAtur();else if(tab==="akun")v=pAkun();else if(tab==="analytics"&&S.admin)v=pAnalytics();else if(tab==="profil"&&window.pProfil)v=window.pProfil(P);else{tab="home";v=pHome()}
+  anPv(tab);document.body.dataset.r=tab;renderNav();$("main").innerHTML=v;$("ttl").textContent=(tab!=="home"&&tab!=="atur"&&uiName(tab)?uiName(tab).toUpperCase():TT[tab]);
   $("back").hidden=P.length<2;$("back").href="#/"+P.slice(0,-1).join("/");
   [].forEach.call(document.querySelectorAll(".nav a"),function(a){a.classList.toggle("on",a.dataset.t===tab)});
   if(tab!=="jadwal")window.scrollTo(0,0)}

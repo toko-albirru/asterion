@@ -458,7 +458,19 @@ export async function farmakoCron(env, u = "cron") {
     if (out.length >= batch) break; // batch = total sinkron per putaran (semua sumber)
     if ((await getMeta(db, "auto:" + src, "0")) !== "1") continue;
     const en = await db.prepare("SELECT enabled FROM fm_sources WHERE code = ?").bind(src).first(); if (!en || !en.enabled) continue;
-    const due = (await db.prepare("SELECT d.id, d.generic FROM fm_drugs d LEFT JOIN fm_sync_state s ON s.drug_id = d.id AND s.src = ? WHERE d.active = 1 AND (s.t IS NULL OR s.t < ? - (CASE WHEN s.ok = 0 THEN ? ELSE ? END)) ORDER BY COALESCE(s.t, 0) LIMIT ?").bind(src, t, DAY, days * DAY, batch - out.length).all()).results;
+    // hemat baca D1: antrean obat disimpan di fm_meta dan diisi ulang dengan SATU scan (maks 500 obat) hanya saat kosong.
+    // Bila scan tidak menemukan apa pun, scan berikutnya ditunda 6 jam — kecuali ada obat baru (MAX(id) berubah).
+    const qk = "cron_q:" + src; let q = null; try { q = JSON.parse(await getMeta(db, qk, "null")); } catch (e) { q = null; }
+    if (!q || !Array.isArray(q.ids) || !q.ids.length) {
+      const mx = (await db.prepare("SELECT MAX(id) m FROM fm_drugs").first()).m || 0;
+      if (q && q.idle > t && q.mx === mx) continue;
+      const ids = (await db.prepare("SELECT d.id FROM fm_drugs d LEFT JOIN fm_sync_state s ON s.drug_id = d.id AND s.src = ? WHERE d.active = 1 AND (s.t IS NULL OR s.t < ? - (CASE WHEN s.ok = 0 THEN ? ELSE ? END)) ORDER BY COALESCE(s.t, 0) LIMIT 500").bind(src, t, DAY, days * DAY).all()).results.map((x) => x.id);
+      q = ids.length ? { ids } : { ids: [], idle: t + 6 * 3600e3, mx };
+      if (!ids.length) { await setMeta(db, qk, JSON.stringify(q)); continue; }
+    }
+    const take = q.ids.splice(0, batch - out.length);
+    await setMeta(db, qk, JSON.stringify(q));
+    const due = take.length ? (await byIds(db, (x) => `SELECT id, generic FROM fm_drugs WHERE active = 1 AND id IN (${x})`, take)) : [];
     let n = 0, bad = 0; for (const d of due) { const r = await syncOne(db, env, d, src, u); n++; if (r.ok === 0) bad++; out.push({ src, ...r }); }
     if (n) { await db.prepare("UPDATE fm_sources SET last_sync = ? WHERE code = ?").bind(Date.now(), src).run(); await db.prepare("INSERT INTO fm_sync_log (t, u, src, act, ok, n_in, n_up, n_skip, msg) VALUES (?, ?, ?, 'sinkron terjadwal', ?, 0, ?, ?, ?)").bind(Date.now(), u, src, bad ? 0 : 1, n - bad, bad, clip(due.map((d) => d.generic).join(", "), 300)).run(); }
   }

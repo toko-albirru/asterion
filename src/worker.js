@@ -78,6 +78,18 @@ async function auth(req, env) {
   return { u, admin, mc: !admin && !(await env.LINKS.get("u:" + u)) };
 }
 // catat kapan mahasiswa membuka web: a:NIM (metadata f = pertama, l = terakhir). Tulis paling sering 1x/12 jam agar hemat kuota KV.
+// analytics: paket dari klien → beberapa upsert harian (dibatasi agar murah di kuota tulis D1). Hari = tanggal WIB.
+function anStmts(db, u, an) {
+  if (!an || typeof an !== "object") return [];
+  const day = new Date(Date.now() + 7 * 36e5).toISOString().slice(0, 10), out = [], cl = (v, n) => String(v == null ? "" : v).slice(0, n);
+  const sec = Math.min(900, Math.max(0, Math.round(+an.sec || 0))), pv = an.pv && typeof an.pv === "object" ? an.pv : {}, it = an.it && typeof an.it === "object" ? an.it : {};
+  const pk = Object.keys(pv).filter((k) => /^[\w-]{1,24}$/.test(k)).slice(0, 10), views = pk.reduce((s, k) => s + Math.min(200, Math.max(0, +pv[k] || 0)), 0);
+  if (!sec && !views && !Object.keys(it).length) return [];
+  out.push(db.prepare("INSERT INTO an_user (day, u, sec, views, dev) VALUES (?, ?, ?, ?, ?) ON CONFLICT(day, u) DO UPDATE SET sec = sec + excluded.sec, views = views + excluded.views, dev = excluded.dev").bind(day, u, sec, views, an.dev === "m" ? "m" : "d"));
+  for (const k of pk) { const n = Math.min(200, Math.max(0, +pv[k] || 0)); if (n) out.push(db.prepare("INSERT INTO an_page (day, k, views) VALUES (?, ?, ?) ON CONFLICT(day, k) DO UPDATE SET views = views + excluded.views").bind(day, k, n)); }
+  for (const k of Object.keys(it).slice(0, 10)) { const x = it[k]; if (!Array.isArray(x)) continue; const n = Math.min(50, Math.max(0, +x[1] || 0)); if (n) out.push(db.prepare("INSERT INTO an_item (day, k, n, views) VALUES (?, ?, ?, ?) ON CONFLICT(day, k) DO UPDATE SET views = views + excluded.views, n = excluded.n").bind(day, cl(k, 120), cl(x[0], 160), n)); }
+  return out;
+}
 async function seen(env, u, force) {
   if (u === "admin") return;
   try {
@@ -395,6 +407,10 @@ async function htmlImgGc(env, siteRaw) {
 // menjawab 503 — seluruh fitur lama tetap berjalan. Skema: migrations/0001_asterion_run.sql (dibuat otomatis
 // bila belum ada, aman dijalankan berulang).
 const RUN_DDL = [
+  // analytics pemakaian web (dikirim klien bersama detak online, ±5 menit sekali per orang; data harian, disimpan 90 hari)
+  "CREATE TABLE IF NOT EXISTS an_user (day TEXT NOT NULL, u TEXT NOT NULL, sec INTEGER NOT NULL DEFAULT 0, views INTEGER NOT NULL DEFAULT 0, dev TEXT NOT NULL DEFAULT '', PRIMARY KEY (day, u))",
+  "CREATE TABLE IF NOT EXISTS an_page (day TEXT NOT NULL, k TEXT NOT NULL, views INTEGER NOT NULL DEFAULT 0, PRIMARY KEY (day, k))",
+  "CREATE TABLE IF NOT EXISTS an_item (day TEXT NOT NULL, k TEXT NOT NULL, n TEXT NOT NULL DEFAULT '', views INTEGER NOT NULL DEFAULT 0, PRIMARY KEY (day, k))",
   "CREATE TABLE IF NOT EXISTS run_cats ( id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL, descr TEXT NOT NULL DEFAULT '', active INTEGER NOT NULL DEFAULT 1, per_session INTEGER NOT NULL DEFAULT 20, q_time INTEGER NOT NULL DEFAULT 60, show_explain INTEGER NOT NULL DEFAULT 1, sort INTEGER NOT NULL DEFAULT 0, created INTEGER NOT NULL )",
   "CREATE TABLE IF NOT EXISTS run_questions ( id INTEGER PRIMARY KEY AUTOINCREMENT, cat_id INTEGER NOT NULL, num INTEGER, q TEXT NOT NULL, a TEXT NOT NULL DEFAULT '', b TEXT NOT NULL DEFAULT '', c TEXT NOT NULL DEFAULT '', d TEXT NOT NULL DEFAULT '', e TEXT NOT NULL DEFAULT '', ans TEXT NOT NULL, expl TEXT NOT NULL DEFAULT '', diff INTEGER NOT NULL DEFAULT 2, img TEXT NOT NULL DEFAULT '', active INTEGER NOT NULL DEFAULT 1, verified INTEGER NOT NULL DEFAULT 0, src TEXT NOT NULL DEFAULT '', hash TEXT NOT NULL, imported INTEGER NOT NULL, updated INTEGER NOT NULL, UNIQUE (cat_id, hash) )",
   "CREATE INDEX IF NOT EXISTS ix_rq_cat ON run_questions (cat_id, active, verified)",
@@ -1147,7 +1163,7 @@ async function handle(request, env) {
     }
     if (a.mc) return J({ mc: true }, 403);
     if (path === "ping" && M === "POST") { // detak "sedang online" dari klien (admin tidak dicatat)
-      if (!a.admin) { try { const pdb = await runDb(env); if (pdb) await pdb.prepare("INSERT INTO run_presence (u, t) VALUES (?, ?) ON CONFLICT(u) DO UPDATE SET t = excluded.t").bind(a.u, Date.now()).run(); } catch {} }
+      if (!a.admin) { try { const pdb = await runDb(env); if (pdb) await pdb.batch([pdb.prepare("INSERT INTO run_presence (u, t) VALUES (?, ?) ON CONFLICT(u) DO UPDATE SET t = excluded.t").bind(a.u, Date.now()), ...anStmts(pdb, a.u, body && body.an)]); } catch {} }
       return J({ ok: 1 });
     }
     if (path.startsWith("run/")) return runApi(request, env, a, path.slice(4), url, body, M);
@@ -1198,6 +1214,20 @@ async function handle(request, env) {
         await env.LINKS.put("h:" + id, h, { metadata: { t: Date.now() } });
         return J({ id });
       }
+    }
+    if (path === "analytics" && M === "GET") { // admin: ringkasan pemakaian web
+      if (!a.admin) return J({ err: "admin" }, 403);
+      const adb = await runDb(env); if (!adb) return J({ err: "D1 belum terpasang" }, 503);
+      const days = Math.min(90, Math.max(1, +url.searchParams.get("d") || 7)), from = new Date(Date.now() + 7 * 36e5 - (days - 1) * 864e5).toISOString().slice(0, 10);
+      const q = async (s) => (await adb.prepare(s).bind(from).all()).results;
+      const [daily, pages, items, users] = await Promise.all([
+        q("SELECT day, COUNT(*) users, SUM(views) views, SUM(sec) sec FROM an_user WHERE day >= ? GROUP BY day ORDER BY day"),
+        q("SELECT k, SUM(views) views FROM an_page WHERE day >= ? GROUP BY k ORDER BY views DESC LIMIT 20"),
+        q("SELECT k, MAX(n) n, SUM(views) views FROM an_item WHERE day >= ? GROUP BY k ORDER BY views DESC LIMIT 25"),
+        q("SELECT u, COUNT(*) days, SUM(sec) sec, SUM(views) views, MAX(day) last, SUM(dev = 'm') mob FROM an_user WHERE day >= ? GROUP BY u ORDER BY sec DESC"),
+      ]);
+      if (Math.random() < 0.05) { const old = new Date(Date.now() - 90 * 864e5).toISOString().slice(0, 10); await adb.batch(["an_user", "an_page", "an_item"].map((t) => adb.prepare("DELETE FROM " + t + " WHERE day < ?").bind(old))); }
+      return J({ days, from, daily, pages, items, users });
     }
     if (path === "users" && M === "GET") { // admin: status akun mahasiswa (buka web / ganti password)
       if (!a.admin) return J({ err: "admin" }, 403);
