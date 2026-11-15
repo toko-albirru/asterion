@@ -3,6 +3,7 @@
 // selalu membawa sumber (src + sid), status (draft → pending → verified → published) dan tanggal pembaruan.
 // Mahasiswa HANYA melihat data berstatus "published".
 
+import { usage, blockMsg } from "./d1meter.js";
 const J = (o, s = 200) => new Response(JSON.stringify(o), { status: s, headers: { "content-type": "application/json", "cache-control": "no-store" } });
 const err = (m, s = 400, x = {}) => J({ err: m, ...x }, s);
 const clip = (v, n) => String(v == null ? "" : v).replace(/\u0000/g, "").trim().slice(0, n);
@@ -449,6 +450,7 @@ async function syncOne(db, env, d, src, u) {
 // Dipanggil Cloudflare Cron (scheduled) atau tombol admin. Hanya sumber yang diaktifkan admin ("otomatis"); batch kecil per sumber agar tidak melewati batas subrequest.
 export async function farmakoCron(env, u = "cron") {
   const db = await fmDb(env); if (!db) return { skipped: "D1 belum terpasang" };
+  const d1 = await usage(db, env); if (d1.blocked) return { skipped: blockMsg(d1) };
   const batch = Math.min(10, Math.max(1, int(await getMeta(db, "cron_batch", "1"), 1))), days = Math.max(1, int(await getMeta(db, "refresh_days", "30"), 30)), out = [], t = Date.now();
   for (const src of Object.keys(SYNCERS)) {
     if (out.length >= batch) break; // batch = total sinkron per putaran (semua sumber)
@@ -1004,6 +1006,9 @@ export async function farmakoApi(request, env, a, path, url, body, M) {
 // ---------- ADMIN ----------
 async function admin(db, a, p, qp, body, M, t, env) {
   const u = a.u, pg = Math.max(0, int(qp("pg"))), PS = 30;
+  // rem pemakaian D1: proses besar (sinkron/impor/terjemahan massal) berhenti di 50% batas harian
+  if (M === "POST" && ["sync", "sync-all", "cron-run", "import", "tr/batch", "seed-names"].includes(p)) { const d1 = await usage(db, env); if (d1.blocked) return err(blockMsg(d1), 423, { d1 }); }
+  if (p === "d1") return J(await usage(db, env));
   const stOf = (v, d = "draft") => (STATUS.includes(v) ? v : d);
   if (p === "stats") {
     const one = async (s) => (await db.prepare(s).first()) || {};
@@ -1013,7 +1018,7 @@ async function admin(db, a, p, qp, body, M, t, env) {
     const st = (await db.prepare("SELECT src, COUNT(*) n, SUM(ok = 1) good, SUM(ok = 2) nf, SUM(ok = 0) bad FROM fm_sync_state GROUP BY src").all()).results, act = (await db.prepare("SELECT COUNT(*) n FROM fm_drugs WHERE active = 1").first()).n;
     const metas = Object.fromEntries((await db.prepare("SELECT k, v FROM fm_meta WHERE k LIKE 'auto:%' OR k IN ('cron_batch','refresh_days')").all()).results.map((x) => [x.k, x.v]));
     for (const s2 of src) { const z = st.find((x) => x.src === s2.code); s2.can_sync = !!SYNCERS[s2.code]; s2.auto = metas["auto:" + s2.code] === "1"; s2.synced = z ? z.n : 0; s2.good = z ? z.good : 0; s2.notfound = z ? z.nf : 0; s2.bad = z ? z.bad : 0; }
-    return J({ drugs: d, other: q, sources: src, active: act, cron: { batch: int(metas.cron_batch, 1), days: int(metas.refresh_days, 30) } });
+    return J({ d1: await usage(db, env), drugs: d, other: q, sources: src, active: act, cron: { batch: int(metas.cron_batch, 1), days: int(metas.refresh_days, 30) } });
   }
   if (p === "sources" && M === "POST") { await db.prepare("UPDATE fm_sources SET enabled = ?, note = ? WHERE code = ?").bind(body.enabled ? 1 : 0, clip(body.note, 300), clip(body.code, 20)).run(); await audit(db, u, "sumber.ubah", "source", 0, body.code); return J({ ok: 1 }); }
   if (p === "log") return J({ sync: (await db.prepare("SELECT * FROM fm_sync_log ORDER BY id DESC LIMIT 40").all()).results, audit: (await db.prepare("SELECT * FROM fm_audit ORDER BY id DESC LIMIT 80").all()).results });

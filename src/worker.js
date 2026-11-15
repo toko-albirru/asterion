@@ -1,5 +1,6 @@
 // ASTERION dashboard - Cloudflare Worker (login, data, jadwal)
 import { farmakoApi, farmakoCron } from "./farmako.js";
+import { meter, flushUsage } from "./d1meter.js";
 const SHEET_ID = "1D3ZaMWmvgEmWs1eKBVPs4FYY3y3_KnYUglsJz1qdYEw";
 const YT = (n, id) => ({ n, u: "https://www.youtube.com/playlist?list=" + id });
 const BLOK = ["1.1", "1.2", "1.3", "2.1", "2.2", "2.3", "3.1", "3.2", "3.3"];
@@ -1087,7 +1088,16 @@ async function runApi(request, env, a, path, url, body, M) {
 // ===== ASTERION RUN (selesai) ===================================================
 
 export default {
-  async fetch(request, env) {
+  async fetch(request, env, ctx) { // env.DB dihitung pemakaiannya (lihat d1meter.js)
+    if (!env.DB) return handle(request, env);
+    const e2 = { ...env, DB: meter(env.DB) };
+    try { return await handle(request, e2); }
+    finally { const f = flushUsage(e2.DB); if (ctx && ctx.waitUntil) ctx.waitUntil(f); else await f; }
+  },
+  async scheduled(event, env, ctx) { const e2 = env.DB ? { ...env, DB: meter(env.DB) } : env; ctx.waitUntil(farmakoCron(e2, "cron").catch((e) => console.error("farmako cron", e)).finally(() => flushUsage(e2.DB))); },
+};
+async function handle(request, env) {
+  {
     const url = new URL(request.url);
     if (!url.pathname.startsWith("/api/")) return env.ASSETS.fetch(request);
     const path = url.pathname.slice(5), M = request.method;
@@ -1281,10 +1291,8 @@ export default {
       return J(days);
     }
     return J({ err: "not found" }, 404);
-  },
-  // Cron Trigger (lihat wrangler.jsonc): sinkron berkala Pharmacology Session untuk sumber yang diaktifkan admin
-  async scheduled(event, env, ctx) { ctx.waitUntil(farmakoCron(env, "cron").catch((e) => console.error("farmako cron", e))); },
-};
+  }
+}
 
 
 // ===== TAMPILAN ASLI SLIDE: PPTX -> Google Slides (salinan sementara) -> PDF -> di-cache =====
