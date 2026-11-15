@@ -201,14 +201,20 @@
     try {
       if (a === "src-save") { var r0 = await fapi("admin/sources", { m: "POST", b: { code: id, enabled: g("se-" + id).checked, note: v("sn-" + id) } }); toast(r0.ok ? "Tersimpan ✓" : "Gagal"); }
       else if (a === "sa-go") {
-        var out3 = g("saOut"), stop3 = g("saStop"); b.disabled = true; stop3.hidden = false; A.stop = false; var t3 = { ok: 0, nf: 0, fail: 0 }, first = null, log3 = [];
-        while (!A.stop) {
-          var rs3 = await fapi("admin/sync-all", { m: "POST", b: { srcs: ["chembl", "openfda"], n: g("saFast") && g("saFast").checked ? 4 : 1 } });
+        var out3 = g("saOut"), stop3 = g("saStop"); b.disabled = true; stop3.hidden = false; A.stop = false; var t3 = { ok: 0, nf: 0, fail: 0 }, log3 = [], srcs3 = ["chembl", "openfda"], step3 = g("saFast") && g("saFast").checked ? 4 : 1;
+        out3.innerHTML = "<div class='hint'>⏳ Menyusun daftar obat…</div>";
+        var pl3 = await fapi("admin/sync-plan", { m: "POST", b: { srcs: srcs3 } }); // daftar diambil sekali saja (hemat kuota baca D1)
+        if (!pl3.ok) { out3.innerHTML = "<div class='fm-warn'>" + esc((pl3.j && pl3.j.err) || "Gagal") + "</div>"; b.disabled = false; stop3.hidden = true; return; }
+        var all3 = pl3.j.items, first = all3.length, pos3 = 0;
+        if (!first) out3.innerHTML = "<div class='fm-sec g'><b>✅ Semua obat sudah segar.</b> Tidak ada yang perlu disinkron.</div>";
+        while (!A.stop && pos3 < first) {
+          var part3 = all3.slice(pos3, pos3 + step3), last3 = pos3 + step3 >= first;
+          var rs3 = await fapi("admin/sync-all", { m: "POST", b: { items: part3, srcs: srcs3, last: last3, tot: last3 ? t3 : null } });
           if (!rs3.ok) { out3.innerHTML = "<div class='fm-warn'>" + esc((rs3.j && rs3.j.err) || "Gagal") + "</div>"; break; }
-          var j3 = rs3.j; if (first == null) first = j3.remaining + j3.done; t3.ok += j3.ok; t3.nf += j3.notfound; t3.fail += j3.fail; j3.out.forEach(function (o) { log3.unshift(FM.srcName(o.src) + " · " + o.generic + ": " + o.r); });
-          var pct3 = first ? Math.round((first - j3.remaining) * 100 / first) : 100;
-          out3.innerHTML = "<div class='fm-prog'><i style='width:" + pct3 + "%'></i></div><div class='hint'>" + pct3 + "% · berhasil " + t3.ok + " · tidak ditemukan " + t3.nf + " · gagal " + t3.fail + " · sisa " + j3.remaining + "</div><div class='hint' style='max-height:150px;overflow:auto'>" + log3.slice(0, 12).map(esc).join("<br>") + "</div>";
-          if (!j3.done || !j3.remaining) { out3.innerHTML += "<div class='fm-sec g'><b>✅ Selesai.</b> Langkah berikut: buka tab <a style='color:var(--gold)' href='#/farmako/admin/obat'>Obat</a>, periksa beberapa obat, lalu ubah statusnya ke Dipublikasikan.</div>"; break; }
+          var j3 = rs3.j; pos3 += part3.length; t3.ok += j3.ok; t3.nf += j3.notfound; t3.fail += j3.fail; j3.out.forEach(function (o) { log3.unshift(FM.srcName(o.src) + " · " + o.generic + ": " + o.r); });
+          var pct3 = Math.round(pos3 * 100 / first);
+          out3.innerHTML = "<div class='fm-prog'><i style='width:" + pct3 + "%'></i></div><div class='hint'>" + pct3 + "% · berhasil " + t3.ok + " · tidak ditemukan " + t3.nf + " · gagal " + t3.fail + " · sisa " + (first - pos3) + "</div><div class='hint' style='max-height:150px;overflow:auto'>" + log3.slice(0, 12).map(esc).join("<br>") + "</div>";
+          if (pos3 >= first) out3.innerHTML += "<div class='fm-sec g'><b>✅ Selesai.</b> Langkah berikut: buka tab <a style='color:var(--gold)' href='#/farmako/admin/obat'>Obat</a>, periksa beberapa obat, lalu ubah statusnya ke Dipublikasikan.</div>";
         }
         if (A.stop) out3.innerHTML += "<div class='hint'>Dihentikan. Klik lagi untuk melanjutkan.</div>"; b.disabled = false; stop3.hidden = true;
       }

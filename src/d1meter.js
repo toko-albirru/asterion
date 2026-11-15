@@ -12,7 +12,8 @@ function num(v, d) { const n = Number(v); return Number.isFinite(n) && n > 0 ? n
 const day = () => new Date().toISOString().slice(0, 10);
 let pend = { day: day(), r: 0, w: 0 }, sizeB = 0, ready = false;
 
-function rec(res, isFirst) {
+let TRACE = false;
+function rec(res, isFirst, sql) {
   const d = day(); if (pend.day !== d) pend = { day: d, r: 0, w: 0 };
   const m = (res && res.meta) || {};
   if (m.rows_read != null) pend.r += Number(m.rows_read) || 0;
@@ -20,23 +21,24 @@ function rec(res, isFirst) {
   if (m.rows_written != null) pend.w += Number(m.rows_written) || 0;
   else pend.w += Number(m.changes) || 0;
   if (m.size_after) sizeB = Number(m.size_after) || sizeB;
+  if (TRACE) console.log("[d1]", m.rows_read ?? (isFirst ? 1 : (res && res.results || []).length), m.rows_written ?? m.changes ?? 0, String(sql || "").slice(0, 110));
 }
-function wrapStmt(st) {
+function wrapStmt(st, sql) {
   return {
-    bind: (...a) => wrapStmt(st.bind(...a)),
-    all: async () => { const r = await st.all(); rec(r); return r; },
-    run: async () => { const r = await st.run(); rec(r); return r; },
-    first: async (c) => { const r = await st.first(c); rec(null, true); return r; },
+    bind: (...a) => wrapStmt(st.bind(...a), sql),
+    all: async () => { const r = await st.all(); rec(r, false, sql); return r; },
+    run: async () => { const r = await st.run(); rec(r, false, sql); return r; },
+    first: async (c) => { const r = await st.first(c); rec(null, true, sql); return r; },
     raw: async (o) => { const r = await st.raw(o); pend.r += Array.isArray(r) ? r.length : 0; return r; },
-    _raw: st,
+    _raw: st, _sql: sql,
   };
 }
-export function meter(db) {
-  if (!db || db._metered) return db;
+export function meter(db, trace) {
+  if (!db || db._metered) return db; if (trace) TRACE = true;
   return {
     _metered: true, _db: db,
-    prepare: (s) => wrapStmt(db.prepare(s)),
-    batch: async (list) => { const r = await db.batch(list.map((x) => (x && x._raw) || x)); (r || []).forEach((x) => rec(x)); return r; },
+    prepare: (s) => wrapStmt(db.prepare(s), s),
+    batch: async (list) => { const r = await db.batch(list.map((x) => (x && x._raw) || x)); (r || []).forEach((x, i) => rec(x, false, list[i] && list[i]._sql)); return r; },
     exec: (s) => db.exec(s),
     dump: db.dump && (() => db.dump()),
   };
@@ -49,12 +51,12 @@ async function ensure(db) {
 }
 // disimpan di akhir permintaan; satu baris tulis saja
 export async function flushUsage(db) {
-  db = base(db); if (!db || (!pend.r && !pend.w)) return;
+  db = base(db); if (!db || (!pend.w && pend.r < 300)) return; // baca kecil ditumpuk dulu di memori: tidak menulis 1 baris per kunjungan
   const p = pend; pend = { day: day(), r: 0, w: 0 };
   try {
     await ensure(db);
     await db.prepare("INSERT INTO d1_usage (day, r, w, size) VALUES (?, ?, ?, ?) ON CONFLICT(day) DO UPDATE SET r = r + excluded.r, w = w + excluded.w, size = MAX(size, excluded.size)").bind(p.day, p.r, p.w + 1, sizeB).run();
-    await db.prepare("DELETE FROM d1_usage WHERE day < ?").bind(new Date(Date.now() - 30 * 864e5).toISOString().slice(0, 10)).run();
+    if (Math.random() < 0.02) await db.prepare("DELETE FROM d1_usage WHERE day < ?").bind(new Date(Date.now() - 30 * 864e5).toISOString().slice(0, 10)).run();
   } catch (e) { console.error("d1 usage", e); }
 }
 export async function usage(db, env) {

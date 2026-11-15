@@ -1090,11 +1090,11 @@ async function runApi(request, env, a, path, url, body, M) {
 export default {
   async fetch(request, env, ctx) { // env.DB dihitung pemakaiannya (lihat d1meter.js)
     if (!env.DB) return handle(request, env);
-    const e2 = { ...env, DB: meter(env.DB) };
+    const e2 = { ...env, DB: meter(env.DB, env.D1_TRACE === "1") };
     try { return await handle(request, e2); }
     finally { const f = flushUsage(e2.DB); if (ctx && ctx.waitUntil) ctx.waitUntil(f); else await f; }
   },
-  async scheduled(event, env, ctx) { const e2 = env.DB ? { ...env, DB: meter(env.DB) } : env; ctx.waitUntil(farmakoCron(e2, "cron").catch((e) => console.error("farmako cron", e)).finally(() => flushUsage(e2.DB))); },
+  async scheduled(event, env, ctx) { const e2 = env.DB ? { ...env, DB: meter(env.DB, env.D1_TRACE === "1") } : env; ctx.waitUntil(farmakoCron(e2, "cron").catch((e) => console.error("farmako cron", e)).finally(() => flushUsage(e2.DB))); },
 };
 async function handle(request, env) {
   {
