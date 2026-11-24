@@ -613,13 +613,39 @@ function pickHtml(){return new Promise(function(ok){var i=document.createElement
 function hClose(){var o=$("hov");if(o)o.remove();HCUR="";document.documentElement.classList.remove("hov-on")}
 function hOpen(x){
   hClose();HCUR=mKey(x);var pos=lsJ("ast.hpos")[HCUR]||"",o=document.createElement("div");o.id="hov";
-  o.innerHTML="<div class='hvbar'><button type='button' class='g' data-hv='back' aria-label='Kembali'>‹</button><b></b><button type='button' class='g' data-hv='fs' aria-label='Layar penuh'>⛶</button></div><iframe id='hf' sandbox='allow-scripts'></iframe>";
+  o.innerHTML="<div class='hvbar'><button type='button' class='g' data-hv='back' aria-label='Kembali'>‹</button><b></b><button type='button' class='g' data-hv='dl' aria-label='Unduh rangkuman' title='Unduh rangkuman (.html)'>⬇</button><button type='button' class='g' data-hv='fs' aria-label='Layar penuh'>⛶</button></div><iframe id='hf' sandbox='allow-scripts'></iframe>";
   o.querySelector("b").textContent=x.n||"";
   o.addEventListener("click",function(ev){var b=ev.target.closest("[data-hv]");if(!b)return;
     if(b.dataset.hv==="back"){var bk=$("back")&&$("back").getAttribute("href");location.hash=bk&&bk!=="#/"?bk:"#/materi"} // bukan history.back(): riwayat tab di dalam materi ikut tercatat
+    else if(b.dataset.hv==="dl")hDownload(x,b);
     else{try{if(document.fullscreenElement)document.exitFullscreen();else o.requestFullscreen()}catch(e){}}});
   document.body.appendChild(o);document.documentElement.classList.add("hov-on");
   if(x.h)o.querySelector("iframe").srcdoc=hPrep(x.h,pos);else hFill(x.hid,pos)}
+// ---- unduh rangkuman: jadi satu file .html mandiri (foto disematkan, bisa dibuka offline) ----
+async function hInline(h){
+  var re=/(?:https?:\/\/[^"'\s)<>]*)?\/api\/html\/img\/([\w-]{6,40})/g,ids={},m;
+  while((m=re.exec(h)))ids[m[1]]=1;
+  var list=Object.keys(ids),map={},i=0;
+  async function work(){while(i<list.length){var id=list[i++];
+    try{var r=await fetch("/api/html/img/"+id);if(!r.ok)continue;var bl=await r.blob();
+      map[id]=await new Promise(function(ok,no){var fr=new FileReader();fr.onload=function(){ok(fr.result)};fr.onerror=no;fr.readAsDataURL(bl)})}catch(e){}}}
+  await Promise.all([work(),work(),work(),work()]);
+  return h.replace(re,function(all,id){return map[id]||all})}
+async function hDownload(x,btn){
+  if(!x||(!x.h&&!x.hid)){toast("Rangkuman ini bukan file HTML, tidak bisa diunduh langsung");return}
+  if(btn){if(btn.dataset.busy)return;btn.dataset.busy="1";btn.style.opacity=".5"}
+  try{
+    toast("Menyiapkan unduhan…","");
+    var h=x.h;
+    if(!h){var r=await api("html?id="+encodeURIComponent(x.hid));if(!r.ok||!r.j||typeof r.j.h!=="string")throw 0;h=r.j.h}
+    h=await hInline(h);
+    var nm=String(x.n||"rangkuman").replace(/[\\\/:*?"<>|\x00-\x1f]+/g," ").replace(/\s+/g," ").trim().slice(0,80)||"rangkuman";
+    var a=document.createElement("a"),u=URL.createObjectURL(new Blob([h],{type:"text/html;charset=utf-8"}));
+    a.href=u;a.download=nm+".html";document.body.appendChild(a);a.click();a.remove();
+    setTimeout(function(){URL.revokeObjectURL(u)},4e3);
+    toast("✓ Rangkuman diunduh: "+nm+".html")
+  }catch(e){toast("Gagal mengunduh rangkuman")}
+  finally{if(btn){delete btn.dataset.busy;btn.style.opacity=""}}}
 // skrip kecil yang disisipkan ke materi HTML (iframe sandbox tanpa origin):
 // - link "#tab" pindah di dalam materi, bukan membuka web utama di dalam iframe
 // - localStorage/sessionStorage diganti versi memori bila diblokir sandbox
@@ -1358,6 +1384,9 @@ async function pvOpen(id,name,k){
 document.addEventListener("keydown",function(e){if(e.key==="Escape")pvClose()});
 window.addEventListener("hashchange",pvClose);
 $("main").addEventListener("click",function(e){
+  var d=e.target.closest("[data-dl]");if(!d)return;e.preventDefault();e.stopPropagation();
+  var q=d.dataset.dl.split("|"),arr=arrAt(q[0].split("/")),x=arr&&arr[+q[1]];if(x)hDownload(x,d)});
+$("main").addEventListener("click",function(e){
   var a=e.target.closest("[data-pv]");if(!a)return;
   var n=a.dataset.pn||"",k=a.dataset.pk||"";
   if(!(a.dataset.force||pvKind(n,k)))return;
@@ -1391,6 +1420,7 @@ function listPage(P,ico,withHtml){
     var a="<a class='card g' href='#/"+base+"/"+i+"'>";
     var rd=mRead(x);
     h+="<div class='row'>"+a+"<span class='i'>"+(x.h||x.hid?"📄":ico)+"</span><span class='t'>"+esc(x.n)+(mNew(x)?" <span class='badge nw'>BARU</span>":"")+(rd?"<small class='rd'>✓ sudah dibuka</small>":"")+"</span><span class='a'>›</span></a>";
+    if(x.h||x.hid)h+="<div class='ctl'><button data-dl='"+esc(base)+"|"+i+"' title='Unduh rangkuman (.html)' aria-label='Unduh rangkuman'>⬇</button></div>";
     if(S.admin)h+=ctl(i,"",x);
     h+="</div>"});
   if(S.admin)h+="<div class='pn g'><b>＋ Tambah</b>"+(withHtml?"<div class='dz' id='dz'>📂 Seret &amp; lepas file .html ke sini<small>atau ketuk untuk memilih · bisa banyak file sekaligus · foto di dalam file otomatis dipisah · teks maks 5 MB per file</small></div><input type='file' id='fI' accept='.html,.htm,text/html' multiple hidden>":"")+"<label>Judul</label><input id='aN'><label>URL (YouTube, Drive, Docs, dll.)</label><input id='aU' placeholder='https://...'>"+(withHtml?"<label>Atau tempel kode HTML materi (opsional, dipakai jika URL kosong)</label><textarea id='aH' rows='4'></textarea>":"")+"<button class='btn' data-a='add'>Tambah</button><div class='hint'>Item baru muncul paling atas. Urutkan dengan tombol ↑ ↓.</div></div>";
