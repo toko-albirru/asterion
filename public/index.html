@@ -680,9 +680,9 @@ function ttsFill(){var s=$("ttsVoice");if(!s||!ttsOK())return;var vs=speechSynth
   vs.forEach(function(v){h+="<option value=\""+esc(v.voiceURI)+"\""+(v.voiceURI===p.v?" selected":"")+">"+esc(v.name+" · "+v.lang)+"</option>"});
   s.innerHTML=h;var r=$("ttsRate");if(r){r.value=String(p.r);if(r.value!==String(p.r))r.value="1.3"}}
 if(ttsOK())try{speechSynthesis.addEventListener("voiceschanged",ttsFill)}catch(e){}
-function ttsSplit(t){ // potongan pendek (≤130 huruf): suara Chrome/Android mati sendiri bila satu ucapan terlalu panjang
-  var MAX=130,a=t.split(/(?<=[.!?;:])\s+/),o=[],c="";
-  function cut(x){while(x.length>MAX){var k=x.lastIndexOf(", ",MAX);if(k<40)k=x.lastIndexOf(" ",MAX);if(k<40)k=MAX;o.push(x.slice(0,k+1).trim());x=x.slice(k+1).trim()}return x}
+function ttsSplit(t){ // potongan pendek (≤80 huruf): ucapan panjang sering terputus/terlewat di Chrome & Android
+  var MAX=80,a=t.split(/(?<=[.!?;:])\s+/),o=[],c="";
+  function cut(x){while(x.length>MAX){var k=x.lastIndexOf(", ",MAX);if(k<20)k=x.lastIndexOf(" dan ",MAX);if(k<20)k=x.lastIndexOf(" yang ",MAX);if(k<20)k=x.lastIndexOf(" ",MAX);if(k<20)k=MAX;o.push(x.slice(0,k+1).trim());x=x.slice(k+1).trim()}return x}
   a.forEach(function(x){x=cut(x);if(c&&(c+" "+x).length>MAX){o.push(c);c=x}else c=c?c+" "+x:x});
   if(c)o.push(c);return o.filter(Boolean)}
 function ttsSay(){
@@ -691,30 +691,45 @@ function ttsSay(){
   if(TTS.i>=TTS.items.length){ttsStop();toast("✓ Selesai dibacakan");return}
   ttsSend({astts:"hl",i:TTS.i});ttsUI();
   var parts=ttsSplit(TTS.items[TTS.i]),k=0,pr=ttsPref();
-  (function nx(){
+  function next(){
     if(g!==TTS.gen)return;
-    clearTimeout(TTS.wd2);
     if(k>=parts.length){TTS.i++;ttsSay();return}
-    var txt=parts[k++],u=new SpeechSynthesisUtterance(txt),v=ttsVoice(),done=false;
-    function fin(){if(done||g!==TTS.gen)return;done=true;clearTimeout(TTS.wd2);nx()}
+    one(parts[k],0)}
+  // satu potongan: tidak dilewati begitu saja — kalau gagal/macet diulang (suara sama, lalu suara bawaan) sebelum menyerah
+  function one(txt,att){
+    if(g!==TTS.gen)return;
+    var u=new SpeechSynthesisUtterance(txt),v=att<2?ttsVoice():null,done=false,t0=Date.now();
+    function wd(ms){clearTimeout(TTS.wd2);TTS.wd2=setTimeout(function(){if(!done&&g===TTS.gen)bad()},ms)}
+    function ok(){if(done||g!==TTS.gen)return;done=true;clearTimeout(TTS.wd2);TTS.fail=0;k++;next()}
+    function bad(){
+      if(done||g!==TTS.gen)return;done=true;clearTimeout(TTS.wd2);try{speechSynthesis.cancel()}catch(e){}
+      if(att<2){setTimeout(function(){one(txt,att+1)},300);return}
+      TTS.fail=(TTS.fail||0)+1;
+      if(TTS.fail>=3){ttsStop();toast("Suara gagal dibacakan di perangkat ini. Coba pilih suara lain di panel 🔊");return}
+      k++;next()}
     u.lang="id-ID";u.rate=pr.r;if(v){u.voice=v;u.lang=v.lang}
-    TTS.u=u; // simpan referensi: utterance yang dibersihkan garbage collector tidak pernah memicu onend → bacaan berhenti
-    u.onend=fin;u.onerror=function(e){if(g!==TTS.gen)return;if(e&&(e.error==="canceled"||e.error==="interrupted"))return;fin()};
-    // penjaga: bila onend tak kunjung datang (bug browser), paksa lanjut ke potongan berikutnya
-    TTS.wd2=setTimeout(function(){if(done||g!==TTS.gen)return;try{speechSynthesis.cancel()}catch(e){}fin()},Math.max(3500,txt.length*70/pr.r+2000));
+    TTS.u=u; // simpan referensi agar tidak dibersihkan garbage collector
+    u.onstart=function(){wd(txt.length*100/pr.r+4000)};
+    u.onboundary=function(){wd(txt.length*100/pr.r+4000)}; // ada kemajuan → perpanjang penjaga
+    u.onend=function(){ // selesai terlalu cepat = suara tidak benar-benar berbunyi → ulangi, jangan dilewati
+      if(done||g!==TTS.gen)return;
+      if(txt.length>12&&Date.now()-t0<txt.length*12/pr.r)bad();else ok()};
+    u.onerror=function(e){if(g!==TTS.gen)return;if(e&&(e.error==="canceled"||e.error==="interrupted"))return;bad()};
+    wd(7000); // penjaga awal: suara tak kunjung mulai
     try{if(speechSynthesis.paused)speechSynthesis.resume()}catch(e){}
-    speechSynthesis.speak(u)})()}
+    speechSynthesis.speak(u)}
+  next()}
 function ttsLock(on){try{if(on){if(navigator.wakeLock&&!TTS.wl)navigator.wakeLock.request("screen").then(function(l){TTS.wl=l;l.addEventListener("release",function(){TTS.wl=null})}).catch(function(){})}
   else if(TTS.wl){TTS.wl.release();TTS.wl=null}}catch(e){}}
 document.addEventListener("visibilitychange",function(){if(!document.hidden&&TTS.on&&!TTS.pause)ttsLock(true)});
-function ttsGo(n){if(!ttsOK())return;TTS.gen++;clearTimeout(TTS.wd2);speechSynthesis.cancel();TTS.i=n;TTS.pause=0;TTS.on=1;ttsLock(true);ttsSay()}
+function ttsGo(n){if(!ttsOK())return;var g0=++TTS.gen;clearTimeout(TTS.wd2);speechSynthesis.cancel();TTS.i=n;TTS.pause=0;TTS.on=1;TTS.fail=0;ttsLock(true);setTimeout(function(){if(g0===TTS.gen)ttsSay()},250)} // jeda setelah cancel: Chrome kadang membuang ucapan yang langsung menyusul
 function ttsStop(){
   if(!TTS.on&&!TTS.items.length)return;
   TTS.gen++;clearTimeout(TTS.wd2);TTS.on=0;TTS.pause=0;TTS.items=[];TTS.i=0;ttsLock(false);
   try{speechSynthesis.cancel()}catch(e){}
   ttsSend({astts:"clear"});ttsUI();ttsSt("")}
 function ttsStart(){ // mulai dari bagian yang sedang tampak di layar
-  if(!ttsOK())return;TTS.gen++;speechSynthesis.cancel();TTS.on=1;TTS.pause=0;ttsSt("Menyiapkan teks…");ttsUI();
+  if(!ttsOK())return;TTS.gen++;speechSynthesis.cancel();TTS.on=1;TTS.pause=0;TTS.fail=0;ttsLock(true);ttsSt("Menyiapkan teks…");ttsUI();
   if(!speechSynthesis.getVoices().some(function(v){return/^id([-_]|$)/i.test(v.lang)})&&!TTS.warned){TTS.warned=1;toast("Suara Bahasa Indonesia belum terpasang di perangkat ini — memakai suara bawaan","")}
   ttsSend({astts:"collect"});
   clearTimeout(TTS.wd);TTS.wd=setTimeout(function(){if(TTS.on&&!TTS.items.length){TTS.on=0;ttsUI();ttsSt("");toast("Materi ini belum bisa dibacakan")}},2500)}
