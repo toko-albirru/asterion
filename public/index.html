@@ -28,13 +28,13 @@
 /* ---------- MODE FOKUS MENGAMBANG ---------- */
 .fx{position:fixed;right:14px;bottom:calc(84px + env(safe-area-inset-bottom,0));z-index:9997;display:flex;align-items:center;gap:6px;padding:10px 14px;border-radius:999px;border:1px solid rgba(245,192,74,.5);font:700 12px Inter,sans-serif;cursor:pointer;color:#241a3f;background:linear-gradient(135deg,#f5c04a,#e08a2e);box-shadow:0 8px 24px rgba(8,4,24,.35)}
 .fx.on{background:linear-gradient(135deg,#4ade80,#22c55e);border-color:rgba(34,197,94,.6);color:#0b2415}
-.fxp{position:fixed;right:14px;bottom:calc(140px + env(safe-area-inset-bottom,0));z-index:9999;width:min(330px,calc(100vw - 28px));padding:14px;border-radius:18px;color:#fff}
+.fxp{position:fixed;right:14px;bottom:calc(140px + env(safe-area-inset-bottom,0));z-index:10004;width:min(330px,calc(100vw - 28px));padding:14px;border-radius:18px;color:#fff}
 :root[data-theme="light"] .fxp{color:#241a3f}
 .fxp b{display:block;margin-bottom:8px;font-size:14px}
 .fxp .fxr{display:flex;gap:6px;flex-wrap:wrap;margin:8px 0}
 .fxp .fxr button{flex:1;min-width:52px;padding:8px 0;border-radius:10px;border:1px solid var(--line);background:rgba(255,255,255,.08);color:inherit;font:600 12px Inter,sans-serif;cursor:pointer}
 :root[data-theme="light"] .fxp .fxr button{background:rgba(48,28,88,.08)}
-.fxo{position:fixed;left:14px;bottom:calc(138px + env(safe-area-inset-bottom,0));z-index:9998;display:flex;flex-direction:column;align-items:flex-start;gap:4px;background:linear-gradient(135deg,rgba(36,26,63,.97),rgba(58,42,102,.97));border:1px solid rgba(245,192,74,.55);border-radius:16px;padding:10px 14px;color:#fff;box-shadow:0 12px 32px rgba(8,4,24,.45);max-width:calc(100vw - 28px);text-align:left}
+.fxo{position:fixed;left:14px;bottom:calc(138px + env(safe-area-inset-bottom,0));z-index:10003;display:flex;flex-direction:column;align-items:flex-start;gap:4px;background:linear-gradient(135deg,rgba(36,26,63,.97),rgba(58,42,102,.97));border:1px solid rgba(245,192,74,.55);border-radius:16px;padding:10px 14px;color:#fff;box-shadow:0 12px 32px rgba(8,4,24,.45);max-width:calc(100vw - 28px);text-align:left}
 .fxo h2{margin:0;font:700 9px Inter,sans-serif;letter-spacing:.16em;text-transform:uppercase;color:var(--gold)}
 .fxT{font:800 26px Inter,sans-serif;font-variant-numeric:tabular-nums;letter-spacing:.02em;line-height:1.1;color:#fff}
 .fxo .hint{display:none}
@@ -115,6 +115,7 @@ h1{margin:0;display:inline-block;padding:0 .12em;font-family:Cinzel,Georgia,seri
 #hov .ttsp select option{color:#111}
 #hov .ttsp .st{flex:1 1 100%;color:#f5c04a;font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 #hov .hvbar button.on{border-color:#f5c04a;color:#f5c04a}
+#hov .hvbar button{font-size:16px}
 .hov-on body{overflow:hidden}
 .badge.nw{margin-left:4px;vertical-align:2px;font-size:9px;letter-spacing:.06em}
 .card .t small.rd{color:var(--ok,#4ade80)}
@@ -159,7 +160,7 @@ a.tag{text-decoration:none}
 .fxg input{width:100%;padding:8px;border-radius:10px;border:1px solid var(--line);background:rgba(10,6,28,.5);color:#fff;font:400 14px Inter,sans-serif}
 :root[data-theme="light"] .fxg input{background:#fff;color:#241a3f;border-color:rgba(48,28,88,.22)}
 .fxo.brk{border-color:rgba(74,222,128,.7)}
-#toast{position:fixed;left:50%;top:calc(16px + env(safe-area-inset-top,0));transform:translate(-50%,-90px);z-index:10001;display:flex;align-items:center;gap:8px;max-width:min(440px,calc(100vw - 28px));padding:11px 18px;border-radius:999px;background:rgba(30,22,56,.97);border:1px solid rgba(245,192,74,.34);color:#fff;font:600 13px Inter,sans-serif;box-shadow:0 12px 34px rgba(6,3,18,.5);opacity:0;transition:transform .28s cubic-bezier(.2,.9,.3,1.2),opacity .2s}
+#toast{position:fixed;left:50%;top:calc(16px + env(safe-area-inset-top,0));transform:translate(-50%,-90px);z-index:10007;display:flex;align-items:center;gap:8px;max-width:min(440px,calc(100vw - 28px));padding:11px 18px;border-radius:999px;background:rgba(30,22,56,.97);border:1px solid rgba(245,192,74,.34);color:#fff;font:600 13px Inter,sans-serif;box-shadow:0 12px 34px rgba(6,3,18,.5);opacity:0;transition:transform .28s cubic-bezier(.2,.9,.3,1.2),opacity .2s}
 #toast.on{transform:translate(-50%,0);opacity:1}
 #toast .ti{font-size:15px;flex:none;line-height:1}
 #toast.bad{border-color:rgba(248,113,113,.62)}
@@ -348,7 +349,7 @@ select.in option{background:#241a3f;color:#fff}
 .pp .nb.no{color:#b9aee0}
 .pp .ct,.pp .nh2{color:#b9aee0}
 /* ---------- DIALOG & TOAST KUSTOM ---------- */
-#dlg{position:fixed;inset:0;z-index:10000;display:flex;align-items:center;justify-content:center;padding:20px;background:rgba(12,8,26,.62);-webkit-backdrop-filter:blur(10px);backdrop-filter:blur(10px);opacity:0;pointer-events:none;transition:opacity .18s}
+#dlg{position:fixed;inset:0;z-index:10006;display:flex;align-items:center;justify-content:center;padding:20px;background:rgba(12,8,26,.62);-webkit-backdrop-filter:blur(10px);backdrop-filter:blur(10px);opacity:0;pointer-events:none;transition:opacity .18s}
 #dlg.on{opacity:1;pointer-events:auto}
 #dlg .dx{width:min(420px,100%);border-radius:22px;padding:20px 20px 16px;background:linear-gradient(160deg,rgba(40,29,70,.99),rgba(23,17,42,.99));border:1px solid rgba(245,192,74,.34);box-shadow:0 24px 60px rgba(4,2,14,.6);transform:translateY(12px) scale(.97);transition:transform .2s cubic-bezier(.2,.9,.3,1.15)}
 #dlg.on .dx{transform:none}
@@ -621,15 +622,24 @@ function pickHtml(){return new Promise(function(ok){var i=document.createElement
 function hClose(){ttsStop();var o=$("hov");if(o)o.remove();HCUR="";document.documentElement.classList.remove("hov-on")}
 function hOpen(x){
   hClose();HCUR=mKey(x);var pos=lsJ("ast.hpos")[HCUR]||"",o=document.createElement("div");o.id="hov";
-  o.innerHTML="<div class='hvbar'><button type='button' class='g' data-hv='back' aria-label='Kembali'>‹</button><b></b>"+(ttsOK()?"<button type='button' class='g' data-hv='tts' aria-label='Bacakan (text to speech)' title='Bacakan materi'>🔊</button>":"")+"<button type='button' class='g' data-hv='dl' aria-label='Unduh rangkuman' title='Unduh rangkuman (.html)'>⬇</button><button type='button' class='g' data-hv='fs' aria-label='Layar penuh'>⛶</button></div><div class='ttsp' id='ttsp' hidden><button type='button' data-tt='prev' aria-label='Sebelumnya'>⏮</button><button type='button' class='pri' data-tt='play' id='ttsPlay' aria-label='Putar'>▶</button><button type='button' data-tt='next' aria-label='Berikutnya'>⏭</button><button type='button' data-tt='stop' aria-label='Berhenti'>⏹</button><select id='ttsRate' aria-label='Kecepatan'><option value='0.75'>0.75×</option><option value='0.9'>0.9×</option><option value='1'>1×</option><option value='1.15'>1.15×</option><option value='1.3'>1.3×</option><option value='1.6'>1.6×</option><option value='2'>2×</option></select><select id='ttsVoice' aria-label='Suara'></select><div class='st' id='ttsSt'></div></div><iframe id='hf' sandbox='allow-scripts'></iframe>";
+  o.innerHTML="<div class='hvbar'><button type='button' class='g' data-hv='back' aria-label='Kembali'>‹</button><b></b>"+(ttsOK()?"<button type='button' class='g' data-hv='tts' aria-label='Bacakan (text to speech)' title='Bacakan materi'>🔊</button>":"")+"<button type='button' class='g' data-hv='fx' aria-label='Mode fokus / pomodoro' title='Mode fokus / pomodoro'>🎯</button><button type='button' class='g' data-hv='dl' aria-label='Unduh rangkuman' title='Unduh rangkuman (.html)'>⬇</button><button type='button' class='g' data-hv='fs' aria-label='Layar penuh'>⛶</button></div><div class='ttsp' id='ttsp' hidden><button type='button' data-tt='prev' aria-label='Sebelumnya'>⏮</button><button type='button' class='pri' data-tt='play' id='ttsPlay' aria-label='Putar'>▶</button><button type='button' data-tt='next' aria-label='Berikutnya'>⏭</button><button type='button' data-tt='stop' aria-label='Berhenti'>⏹</button><select id='ttsRate' aria-label='Kecepatan'><option value='1'>1×</option><option value='1.15'>1.15×</option><option value='1.3'>1.3×</option><option value='1.5'>1.5×</option><option value='1.75'>1.75×</option><option value='2'>2×</option><option value='2.5'>2.5×</option><option value='3'>3×</option></select><select id='ttsVoice' aria-label='Suara'></select><div class='st' id='ttsSt'></div></div><iframe id='hf' sandbox='allow-scripts'></iframe>";
   o.querySelector("b").textContent=x.n||"";
   o.addEventListener("click",function(ev){var b=ev.target.closest("[data-hv]");if(!b)return;
     if(b.dataset.hv==="back"){var bk=$("back")&&$("back").getAttribute("href");location.hash=bk&&bk!=="#/"?bk:"#/materi"} // bukan history.back(): riwayat tab di dalam materi ikut tercatat
     else if(b.dataset.hv==="dl")hDownload(x,b);
     else if(b.dataset.hv==="tts")ttsToggle(b);
-    else{try{if(document.fullscreenElement)document.exitFullscreen();else o.requestFullscreen()}catch(e){}}});
+    else if(b.dataset.hv==="fx")hvFocus();
+    else{if(FX.on){toast("Layar penuh dikunci selama mode fokus berjalan");return}try{if(document.fullscreenElement)document.exitFullscreen();else o.requestFullscreen()}catch(e){}}});
   document.body.appendChild(o);document.documentElement.classList.add("hov-on");
+  hvFxSync();
   if(x.h)o.querySelector("iframe").srcdoc=hPrep(x.h,pos);else hFill(x.hid,pos)}
+// ---- mode fokus / pomodoro dari dalam viewer materi (memakai fitur fokus yang sudah ada) ----
+function hvFxSync(){var b=document.querySelector("#hov [data-hv=fx]");if(b)b.classList.toggle("on",!!(FX.on||FX.bk))}
+function hvFocus(){
+  var p=$("fxP");
+  if(FX.on||FX.bk){var ov=$("fxOver");if(ov)ov.hidden=false;if(FX.on)fxFs().catch(function(){});return}
+  if(p&&p.hidden){p.style.left="";p.style.top="";p.style.right="";p.style.bottom="";p._moved=0;if($("fxMin"))$("fxMin").value=FX.min}
+  if(p)p.hidden=!p.hidden}
 // ---- unduh rangkuman: jadi satu file .html mandiri (foto disematkan, bisa dibuka offline) ----
 async function hInline(h){
   var re=/(?:https?:\/\/[^"'\s)<>]*)?\/api\/html\/img\/([\w-]{6,40})/g,ids={},m;
@@ -658,7 +668,7 @@ async function hDownload(x,btn){
 // ---- text to speech: suara dari browser (speechSynthesis), teks diambil dari dalam materi ----
 var TTS={on:0,pause:0,items:[],i:0,gen:0,warned:0};
 function ttsOK(){return"speechSynthesis"in window&&"SpeechSynthesisUtterance"in window}
-function ttsPref(){var p=lsJ("ast.tts");return{r:+p.r||1,v:p.v||""}}
+function ttsPref(){var p=lsJ("ast.tts");return{r:+p.r||1.3,v:p.v||""}}
 function ttsVoice(){if(!ttsOK())return null;var vs=speechSynthesis.getVoices(),p=ttsPref();
   return vs.filter(function(x){return x.voiceURI===p.v})[0]||vs.filter(function(x){return/^id([-_]|$)/i.test(x.lang)})[0]||null}
 function ttsSend(m){var f=$("hf");if(f&&f.contentWindow)try{f.contentWindow.postMessage(m,"*")}catch(e){}}
@@ -668,12 +678,12 @@ function ttsUI(){var b=$("ttsPlay");if(b){b.textContent=TTS.on&&!TTS.pause?"⏸"
   if(TTS.on&&TTS.items.length)ttsSt((TTS.pause?"Dijeda · ":"Membaca ")+(TTS.i+1)+"/"+TTS.items.length+" · "+(TTS.items[TTS.i]||"").slice(0,70))}
 function ttsFill(){var s=$("ttsVoice");if(!s||!ttsOK())return;var vs=speechSynthesis.getVoices().slice().sort(function(a,b){var A=/^id/i.test(a.lang)?0:1,B=/^id/i.test(b.lang)?0:1;return A-B||(a.name<b.name?-1:1)}),p=ttsPref(),h="<option value=''>Otomatis (Indonesia)</option>";
   vs.forEach(function(v){h+="<option value=\""+esc(v.voiceURI)+"\""+(v.voiceURI===p.v?" selected":"")+">"+esc(v.name+" · "+v.lang)+"</option>"});
-  s.innerHTML=h;var r=$("ttsRate");if(r)r.value=String(p.r)}
+  s.innerHTML=h;var r=$("ttsRate");if(r){r.value=String(p.r);if(r.value!==String(p.r))r.value="1.3"}}
 if(ttsOK())try{speechSynthesis.addEventListener("voiceschanged",ttsFill)}catch(e){}
-function ttsSplit(t){ // potong per kalimat (≤ ±200 huruf) agar tidak terputus di Chrome/Android
-  var a=t.split(/(?<=[.!?;:])\s+/),o=[],c="";
-  a.forEach(function(x){while(x.length>220){var k=x.lastIndexOf(", ",200);if(k<60)k=x.lastIndexOf(" ",200);if(k<60)k=200;if(c){o.push(c);c=""}o.push(x.slice(0,k+1));x=x.slice(k+1).trim()}
-    if(c&&(c+" "+x).length>200){o.push(c);c=x}else c=c?c+" "+x:x});
+function ttsSplit(t){ // potongan pendek (≤130 huruf): suara Chrome/Android mati sendiri bila satu ucapan terlalu panjang
+  var MAX=130,a=t.split(/(?<=[.!?;:])\s+/),o=[],c="";
+  function cut(x){while(x.length>MAX){var k=x.lastIndexOf(", ",MAX);if(k<40)k=x.lastIndexOf(" ",MAX);if(k<40)k=MAX;o.push(x.slice(0,k+1).trim());x=x.slice(k+1).trim()}return x}
+  a.forEach(function(x){x=cut(x);if(c&&(c+" "+x).length>MAX){o.push(c);c=x}else c=c?c+" "+x:x});
   if(c)o.push(c);return o.filter(Boolean)}
 function ttsSay(){
   var g=++TTS.gen;
@@ -683,15 +693,24 @@ function ttsSay(){
   var parts=ttsSplit(TTS.items[TTS.i]),k=0,pr=ttsPref();
   (function nx(){
     if(g!==TTS.gen)return;
+    clearTimeout(TTS.wd2);
     if(k>=parts.length){TTS.i++;ttsSay();return}
-    var u=new SpeechSynthesisUtterance(parts[k++]),v=ttsVoice();
+    var txt=parts[k++],u=new SpeechSynthesisUtterance(txt),v=ttsVoice(),done=false;
+    function fin(){if(done||g!==TTS.gen)return;done=true;clearTimeout(TTS.wd2);nx()}
     u.lang="id-ID";u.rate=pr.r;if(v){u.voice=v;u.lang=v.lang}
-    u.onend=nx;u.onerror=function(e){if(g!==TTS.gen)return;if(e&&(e.error==="canceled"||e.error==="interrupted"))return;nx()};
+    TTS.u=u; // simpan referensi: utterance yang dibersihkan garbage collector tidak pernah memicu onend → bacaan berhenti
+    u.onend=fin;u.onerror=function(e){if(g!==TTS.gen)return;if(e&&(e.error==="canceled"||e.error==="interrupted"))return;fin()};
+    // penjaga: bila onend tak kunjung datang (bug browser), paksa lanjut ke potongan berikutnya
+    TTS.wd2=setTimeout(function(){if(done||g!==TTS.gen)return;try{speechSynthesis.cancel()}catch(e){}fin()},Math.max(3500,txt.length*70/pr.r+2000));
+    try{if(speechSynthesis.paused)speechSynthesis.resume()}catch(e){}
     speechSynthesis.speak(u)})()}
-function ttsGo(n){if(!ttsOK())return;TTS.gen++;speechSynthesis.cancel();TTS.i=n;TTS.pause=0;TTS.on=1;ttsSay()}
+function ttsLock(on){try{if(on){if(navigator.wakeLock&&!TTS.wl)navigator.wakeLock.request("screen").then(function(l){TTS.wl=l;l.addEventListener("release",function(){TTS.wl=null})}).catch(function(){})}
+  else if(TTS.wl){TTS.wl.release();TTS.wl=null}}catch(e){}}
+document.addEventListener("visibilitychange",function(){if(!document.hidden&&TTS.on&&!TTS.pause)ttsLock(true)});
+function ttsGo(n){if(!ttsOK())return;TTS.gen++;clearTimeout(TTS.wd2);speechSynthesis.cancel();TTS.i=n;TTS.pause=0;TTS.on=1;ttsLock(true);ttsSay()}
 function ttsStop(){
   if(!TTS.on&&!TTS.items.length)return;
-  TTS.gen++;TTS.on=0;TTS.pause=0;TTS.items=[];TTS.i=0;
+  TTS.gen++;clearTimeout(TTS.wd2);TTS.on=0;TTS.pause=0;TTS.items=[];TTS.i=0;ttsLock(false);
   try{speechSynthesis.cancel()}catch(e){}
   ttsSend({astts:"clear"});ttsUI();ttsSt("")}
 function ttsStart(){ // mulai dari bagian yang sedang tampak di layar
@@ -707,7 +726,7 @@ window.addEventListener("message",function(e){var f=$("hf");if(!f||e.source!==f.
     TTS.i=Math.max(0,+e.data.start||0);ttsSay()}
   else if(e.data.astts==="reset"&&TTS.on)ttsStop()});
 document.addEventListener("click",function(e){var b=e.target.closest&&e.target.closest("#ttsp [data-tt]");if(!b)return;var a=b.dataset.tt;
-  if(a==="play"){if(!TTS.on||!TTS.items.length)ttsStart();else if(TTS.pause)ttsGo(TTS.i);else{TTS.gen++;speechSynthesis.cancel();TTS.pause=1;ttsUI()}}
+  if(a==="play"){if(!TTS.on||!TTS.items.length)ttsStart();else if(TTS.pause)ttsGo(TTS.i);else{TTS.gen++;clearTimeout(TTS.wd2);speechSynthesis.cancel();TTS.pause=1;ttsLock(false);ttsUI()}}
   else if(a==="stop")ttsStop();
   else if(a==="next"){if(TTS.on&&TTS.items.length)ttsGo(Math.min(TTS.items.length,TTS.i+1))}
   else if(a==="prev"){if(TTS.on&&TTS.items.length)ttsGo(Math.max(0,TTS.i-1))}});
@@ -1793,7 +1812,7 @@ function fxStart(n,po){
   if(!po){FX.pomo=null;FX.min=n;try{localStorage.setItem("fxMin",n)}catch(e){}}
   FX.dur=n;FX.on=true;FX.end=Date.now()+n*6e4;FX.left=false;fxHead();
   $("fxP").hidden=true;document.body.classList.add("fxon");
-  var o=$("fxOver");if(o)o.hidden=false;var b=$("fxBtn");if(b)b.classList.add("on");
+  var o=$("fxOver");if(o)o.hidden=false;var b=$("fxBtn");if(b)b.classList.add("on");hvFxSync();
   fxTick();clearInterval(FX.iv);FX.iv=setInterval(fxTick,250);
   fxFs().catch(function(){toast("Browser menolak layar penuh — mode fokus tetap berjalan.")})}
 function fxTick(){
@@ -1810,7 +1829,7 @@ async function fxEnd(early){
   var elapsed=early?Math.floor((Date.now()-(FX.end-FX.dur*6e4))/6e4):FX.dur,kind=FX.pomo?"pomodoro":"fokus",wasPo=!!FX.pomo;
   FX.on=false;clearInterval(FX.iv);FX.iv=0;
   document.body.classList.remove("fxon");
-  var o=$("fxOver");if(o)o.hidden=true;var b=$("fxBtn");if(b)b.classList.remove("on");
+  var o=$("fxOver");if(o)o.hidden=true;var b=$("fxBtn");if(b)b.classList.remove("on");hvFxSync();
   try{if(document.fullscreenElement&&document.exitFullscreen)document.exitFullscreen()}catch(e){}
   fxLog(elapsed,kind);
   if(wasPo&&!early){toast("Fokus selesai 🍅 — waktunya istirahat!");fxBreakStart();return}
