@@ -9,25 +9,22 @@ const int = (v, d = 0) => { const n = parseInt(v, 10); return Number.isFinite(n)
 const enc = encodeURIComponent;
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const REP = { prefer: "return=representation" }, MIN = { prefer: "return=minimal" };
-const CODE_RE = /AST-[A-HJ-NP-Z2-9]{5}/;
-const ADJ = ["Ceria", "Bijak", "Tangguh", "Teliti", "Sabar", "Cekatan", "Dermawan", "Gigih", "Tulus", "Ramah", "Cerdas", "Jujur"];
-const NOUN = ["Cemara", "Elang", "Bintang", "Kancil", "Mentari", "Pelangi", "Rajawali", "Anggrek", "Merpati", "Samudra", "Embun", "Kenari"];
-
-export function randName(seed) {
-  let h = 2166136261; for (const c of String(seed)) { h ^= c.charCodeAt(0); h = Math.imul(h, 16777619); }
-  h >>>= 0; return "Sahabat " + NOUN[h % NOUN.length] + " " + ADJ[(h >>> 8) % ADJ.length];
-}
-let NAMES = null;
+const CODE_RE = /AST[\s\-–—_.:]*([A-HJ-NP-Z2-9]{5})/i; // toleran: AST-286CM, ast 286cm, AST286CM, AST–286CM
+const CODE_ANY = /\bAST[\s\-–—_.:]*[A-Z0-9]{5}\b/gi; // untuk dibuang dari teks yang tampil (termasuk kode yang salah ketik)
+// Teks dari donatur (nama/pesan di Saweria, nama pilihan sendiri) tidak dipercaya: buang tautan, email, nomor panjang, kode donasi, tanda < >.
+export const cleanText = (v, n) => clip(String(v || "").replace(/https?:\/\/\S+|www\.\S+/gi, " ").replace(/\S+@\S+\.\S+/g, " ").replace(/\d[\d\s.-]{6,}\d/g, " ").replace(CODE_ANY, " ").replace(/[<>]/g, "").replace(/\s+/g, " "), n);
+const cleanName = (v) => cleanText(v, 30) || "Hamba Allah";
+let WALL = null, WALL_T = 0, NAMES = null;
 async function names(env) { // NIM → nama, dibaca dari public/mahasiswa.js (aset statis)
   if (NAMES) return NAMES;
   try { const r = await env.ASSETS.fetch(new Request("https://assets.local/mahasiswa.js")), t = await r.text(), m = {}; for (const x of t.matchAll(/"(G\d{7})"\s*:\s*"([^"]+)"/g)) m[x[1]] = x[2]; NAMES = m; } catch { NAMES = {}; }
   return NAMES;
 }
-async function displayFor(env, mode, u, seed) {
-  if (mode === "anon") return "Hamba Allah";
+async function displayFor(env, mode, u, free) {
   if (mode === "nim" && /^G\d{7}$/.test(u || "")) return u;
   if (mode === "nama" && /^G\d{7}$/.test(u || "")) return (await names(env))[u] || u;
-  return randName(seed);
+  if (mode === "bebas") return cleanName(free);
+  return "Hamba Allah";
 }
 const newCode = () => { const A = "ABCDEFGHJKMNPQRSTUVWXYZ23456789", b = crypto.getRandomValues(new Uint8Array(5)); return "AST-" + [...b].map((x) => A[x % A.length]).join(""); };
 const hex = (buf) => [...new Uint8Array(buf)].map((x) => x.toString(16).padStart(2, "0")).join("");
@@ -50,11 +47,11 @@ async function webhook(env, request, b) {
   if ((await sb(env, `don_items?sa_id=eq.${enc(saId)}&select=id`))[0]) return J({ ok: 1, dup: 1 }); // Saweria mengirim ulang → abaikan
   const ok = await sawSigOk(env, request, b), amount = int(b.amount_raw, 0), now = new Date().toISOString();
   const fields = { amount, sa_id: saId, raw_name: clip(b.donator_name, 80), message: clip(b.message, 300), sig_ok: ok, status: ok ? "paid" : "pending", paid_at: now };
-  const code = (clip(b.message, 300).toUpperCase().match(CODE_RE) || [])[0];
+  const cm = clip(b.message, 300).match(CODE_RE), code = cm ? "AST-" + cm[1].toUpperCase() : null;
   const pl = code ? (await sb(env, `don_items?code=eq.${code}&sa_id=is.null&status=in.(pledge,pending)&select=id`))[0] : null;
-  if (pl) { await sb(env, `don_items?id=eq.${pl.id}`, { m: "PATCH", h: MIN, b: fields }); return J({ ok: 1, matched: 1, verified: ok }); }
+  if (pl) { await sb(env, `don_items?id=eq.${pl.id}`, { m: "PATCH", h: MIN, b: fields }); WALL = null; return J({ ok: 1, matched: 1, verified: ok }); }
   if (!ok && (await sb(env, "don_items?status=eq.pending&select=id&limit=300")).length >= 300) return J({ ok: 1, full: 1 }); // batasi sampah dari pengirim tak terverifikasi
-  await sb(env, "don_items", { m: "POST", h: MIN, b: { ...fields, mode: "acak", show_amount: false, display: randName(saId) } });
+  await sb(env, "don_items", { m: "POST", h: MIN, b: { ...fields, mode: "bebas", show_amount: false, display: cleanName(b.donator_name) } }); WALL = null;
   return J({ ok: 1, matched: 0, verified: ok });
 }
 
@@ -64,15 +61,18 @@ export async function donApi(request, env, a, path, url, body, M) {
     if (path === "saweria") return M === "POST" ? await webhook(env, request, body) : err("method", 405);
     if (!a) return err("auth", 401);
     if (path === "info" && M === "GET") return J({ url: env.SAWERIA_URL || "", auto: !!env.SAWERIA_STREAM_KEY });
-    if (path === "wall" && M === "GET") {
-      const rows = await sb(env, "don_items?status=eq.paid&order=paid_at.desc&limit=80&select=display,amount,show_amount,paid_at");
-      return J({ items: rows.map((r) => ({ name: r.display, amount: r.show_amount ? r.amount : null, at: r.paid_at })) });
+    if (path === "wall" && M === "GET") { // untuk teks berjalan di beranda; cache 60 dtk
+      if (!WALL || Date.now() - WALL_T > 60000) {
+        const rows = await sb(env, "don_items?status=eq.paid&order=paid_at.desc&limit=40&select=display,amount,show_amount,message,paid_at");
+        WALL = rows.map((r) => ({ name: r.display, amount: r.show_amount ? r.amount : null, msg: cleanText(r.message, 140), at: r.paid_at })); WALL_T = Date.now();
+      }
+      return J({ items: WALL });
     }
     if (path === "pledge" && M === "POST") { // donatur memilih tampilan → dapat kode untuk ditulis di pesan Saweria
-      const mode = ["anon", "nim", "nama", "acak"].includes(body.mode) ? body.mode : "acak", realMode = a.admin && (mode === "nim" || mode === "nama") ? "acak" : mode;
+      const mode = ["anon", "nim", "nama", "bebas"].includes(body.mode) ? body.mode : "anon", realMode = a.admin && (mode === "nim" || mode === "nama") ? "anon" : mode;
       await sb(env, `don_items?u=eq.${enc(a.u)}&status=eq.pledge`, { m: "DELETE", h: MIN }); // satu kode aktif per akun
-      const code = newCode(), id = crypto.randomUUID();
-      await sb(env, "don_items", { m: "POST", h: MIN, b: { id, code, u: a.u, mode: realMode, show_amount: !!body.show_amount, display: await displayFor(env, realMode, a.u, id), status: "pledge" } });
+      const code = newCode(), id = crypto.randomUUID(); WALL = null;
+      await sb(env, "don_items", { m: "POST", h: MIN, b: { id, code, u: a.u, mode: realMode, show_amount: !!body.show_amount, display: await displayFor(env, realMode, a.u, body.name), status: "pledge" } });
       return J({ code, url: env.SAWERIA_URL || "", auto: !!env.SAWERIA_STREAM_KEY });
     }
     if (path.startsWith("admin/")) {
@@ -81,16 +81,16 @@ export async function donApi(request, env, a, path, url, body, M) {
       if (path === "admin/set" && M === "POST") {
         if (!UUID.test(String(body.id || ""))) return err("id");
         const p = {}; if (["paid", "pending", "hidden"].includes(body.status)) { p.status = body.status; if (body.status === "paid") p.paid_at = new Date().toISOString(); }
-        if (typeof body.display === "string" && body.display.trim()) p.display = clip(body.display, 60);
+        if (typeof body.display === "string" && body.display.trim()) p.display = cleanText(body.display, 60) || p.display;
         if (typeof body.show_amount === "boolean") p.show_amount = body.show_amount;
         if (!Object.keys(p).length) return err("tidak ada perubahan");
-        await sb(env, `don_items?id=eq.${body.id}`, { m: "PATCH", h: MIN, b: p }); return J({ ok: 1 });
+        await sb(env, `don_items?id=eq.${body.id}`, { m: "PATCH", h: MIN, b: p }); WALL = null; return J({ ok: 1 });
       }
       if (path === "admin/add" && M === "POST") { // catat donasi manual (mis. QRIS/transfer)
-        const display = clip(body.display, 60); if (!display) return err("nama kosong");
-        await sb(env, "don_items", { m: "POST", h: MIN, b: { mode: "acak", display, amount: int(body.amount, 0) || null, show_amount: !!body.show_amount && int(body.amount, 0) > 0, status: "paid", paid_at: new Date().toISOString() } }); return J({ ok: 1 });
+        const display = cleanText(body.display, 60); if (!display) return err("nama kosong");
+        await sb(env, "don_items", { m: "POST", h: MIN, b: { mode: "bebas", display, amount: int(body.amount, 0) || null, show_amount: !!body.show_amount && int(body.amount, 0) > 0, status: "paid", paid_at: new Date().toISOString() } }); WALL = null; return J({ ok: 1 });
       }
-      if (path === "admin/del" && M === "POST") { if (!UUID.test(String(body.id || ""))) return err("id"); await sb(env, `don_items?id=eq.${body.id}`, { m: "DELETE", h: MIN }); return J({ ok: 1 }); }
+      if (path === "admin/del" && M === "POST") { if (!UUID.test(String(body.id || ""))) return err("id"); await sb(env, `don_items?id=eq.${body.id}`, { m: "DELETE", h: MIN }); WALL = null; return J({ ok: 1 }); }
     }
     return err("not found", 404);
   } catch (e) { console.error("[don]", e && e.message); return err("Donasi error: " + clip(e && e.message, 120), 502); }

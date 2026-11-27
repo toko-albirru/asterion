@@ -1,5 +1,5 @@
 // Uji donasi (src/donasi.js) dengan Supabase palsu: node scripts/test-don.mjs
-import { donApi, randName } from "../src/donasi.js";
+import { donApi, cleanText } from "../src/donasi.js";
 import crypto from "node:crypto";
 let fails = 0; const ok = (c, m) => { if (!c) { fails++; console.error("  ✗", m); } else console.log("  ✓", m); };
 const T = []; let seq = 1;
@@ -29,9 +29,12 @@ ok(T[0].display === "Aditya Ikhsan Wicaksono", "mode nama → nama dari daftar m
 const code1 = r.code;
 await call("pledge", { m: "POST", body: { mode: "nim" } }); ok(T.filter((x) => x.u === "G0025001" && x.status === "pledge").length === 1, "satu kode aktif per akun");
 r = await (await call("pledge", { a: { u: "G0025002", admin: false }, m: "POST", body: { mode: "anon" } })).json(); ok(T.at(-1).display === "Hamba Allah", "mode anonim");
-r = await (await call("pledge", { a: { u: "G0025003", admin: false }, m: "POST", body: { mode: "acak" } })).json(); ok(/^Sahabat \w+ \w+$/.test(T.at(-1).display), "nama acak: " + T.at(-1).display);
+r = await (await call("pledge", { a: { u: "G0025003", admin: false }, m: "POST", body: { mode: "bebas", name: "Dr. Budi <b>Santoso</b> https://x.co 08123456789" } })).json(); ok(T.at(-1).display === "Dr. Budi bSantoso/b", "nama pilihan sendiri dibersihkan (tag, tautan, nomor telepon dibuang): " + T.at(-1).display);
 const code3 = r.code;
-ok(randName("abc") === randName("abc"), "nama acak deterministik");
+await call("pledge", { a: { u: "G0025004", admin: false }, m: "POST", body: { mode: "bebas", name: "  " } }); ok(T.at(-1).display === "Hamba Allah", "nama kosong → Hamba Allah");
+ok(cleanText("halo AST-7K2QX semangat wa 081234567890", 100) === "halo semangat wa", "pesan: kode donasi, nomor, tautan dibuang");
+for (const v of ["AST-286CM", "ast-286cm", "AST 286CM", "AST286CM", "AST–286CM", "ast_286cm"]) ok(cleanText("Semangat " + v + " kuliahnya", 100) === "Semangat kuliahnya", "kode '" + v + "' tidak ikut tampil di pesan");
+ok(cleanText("AST-286CM", 100) === "", "pesan yang hanya berisi kode → kosong (tidak tampil)");
 await call("pledge", { m: "POST", body: { mode: "nim", show_amount: false } }); const codeNim = T.find((x) => x.u === "G0025001" && x.status === "pledge");
 ok(codeNim.display === "G0025001", "mode NIM");
 
@@ -43,11 +46,16 @@ ok(wall.items.length === 1 && wall.items[0].name === "G0025001" && wall.items[0]
 r = await (await hook(b1)).json(); ok(r.dup === 1 && T.filter((x) => x.sa_id === "sa-1").length === 1, "kirim ulang tidak menggandakan");
 
 const b2 = { version: "2021.07", id: "sa-2", type: "donation", amount_raw: 20000, donator_name: "X", donator_email: "", message: "tanpa kode" };
-await hook(b2); wall = await (await call("wall")).json(); ok(wall.items.length === 2 && wall.items.some((x) => /^Sahabat/.test(x.name) && x.amount === null), "tanpa kode → nama acak, nominal tidak tampil");
+await hook(b2); await call("admin/set", { a: { u: "admin", admin: true }, m: "POST", body: { id: T.find((x) => x.sa_id === "sa-2").id, status: "paid" } }); // cache dinding dibersihkan
+wall = await (await call("wall")).json(); ok(wall.items.length === 2 && wall.items.some((x) => x.name === "X" && x.msg === "tanpa kode" && x.amount === null), "tanpa kode → nama dari yang diketik di Saweria, pesan ikut, nominal tidak tampil");
+ok(wall.items.find((x) => x.name === "G0025001").msg === "semangat", "pesan di dinding tidak memuat kode donasi");
 
+const bv = { version: "2021.07", id: "sa-v", type: "donation", amount_raw: 10000, donator_name: "Rina", donator_email: "", message: "semangat " + codeNim.code.slice(0, 3) + " " + codeNim.code.slice(4).toLowerCase() };
+await call("pledge", { a: { u: "G0025020", admin: false }, m: "POST", body: { mode: "nim" } }); const cv = T.find((x) => x.u === "G0025020").code;
+r = await (await hook({ ...bv, message: "yuk " + cv.replace("-", " ").toLowerCase() })).json(); ok(r.matched === 1, "kode dengan spasi/huruf kecil tetap dikenali");
 const b3 = { version: "2021.07", id: "sa-3", type: "donation", amount_raw: 99999, donator_name: "Palsu", donator_email: "", message: code3 };
 r = await (await hook(b3, "deadbeef")).json(); ok(r.verified === false, "tanda tangan salah → tidak terverifikasi");
-wall = await (await call("wall")).json(); ok(wall.items.length === 2, "donasi tak terverifikasi TIDAK tampil di dinding");
+wall = await (await call("wall")).json(); ok(wall.items.length === 3 && !wall.items.some((x) => x.name === "Palsu"), "donasi tak terverifikasi TIDAK tampil di dinding");
 r = await (await hook({ ...b3, id: "sa-4" }, "")).json(); ok(r.verified === false, "tanpa header tanda tangan → pending");
 
 console.log("admin");
