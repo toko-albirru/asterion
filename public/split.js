@@ -50,8 +50,9 @@
     ":root[data-theme=light].spon{background:#e4dff0!important}",
     /* aplikasi yang sedang berjalan DIKECILKAN jadi panel 1 (bukan dimuat ulang), jadi kuis/materi/scroll tetap utuh.
        transform pada body membuat semua elemen fixed (nav, materi layar penuh, kuis) ikut terkurung di dalamnya */
-    "html.spon body{position:fixed!important;left:var(--p0x);top:var(--p0y);width:var(--p0w);height:var(--p0h);min-height:0!important;overflow:auto;overscroll-behavior:contain;transform:translateZ(0);border-radius:0 0 12px 12px;background-color:#2a1d4e;background-image:linear-gradient(180deg,#1b1430 0,#2b1f52 34%,#4a2f86 68%,#6d43bd 100%);background-attachment:scroll;padding-bottom:0}",
+    "html.spon body{position:fixed!important;left:var(--p0x);top:var(--p0y);width:var(--p0w);height:var(--p0h);min-height:0!important;overflow:hidden;transform:translateZ(0);border-radius:0 0 12px 12px;background-color:#2a1d4e;background-image:linear-gradient(180deg,#1b1430 0,#2b1f52 34%,#4a2f86 68%,#6d43bd 100%);background-attachment:scroll;padding-bottom:0}",
     ":root[data-theme=light].spon body{background-color:#F7F5FA;background-image:linear-gradient(180deg,var(--bg0) 0,var(--bg1) 40%,var(--bg2) 100%)}",
+    "html.spon #shell{position:absolute;inset:0;overflow-y:auto;overflow-x:hidden;overscroll-behavior:contain}", /* #shell yang menggulir; body diam supaya menu bawah (fixed) tidak ikut terguling */
     "html.spon.p0off body{visibility:hidden;pointer-events:none}",
     ".sp-p.host .sp-in{background:transparent;box-shadow:none}",
     "#split[hidden]{display:none}",
@@ -184,7 +185,7 @@
   }
   var _sc = window.scrollTo; // body-lah yang menggulir saat split aktif
   window.scrollTo = function (a, b) {
-    if (HTML.classList.contains("spon")) { var y = a && typeof a === "object" ? (a.top || 0) : (b || 0); document.body.scrollTop = y; return; }
+    if (HTML.classList.contains("spon")) { var y = a && typeof a === "object" ? (a.top || 0) : (b || 0); var sh = document.getElementById("shell"); if (sh) sh.scrollTop = y; return; }
     return _sc.apply(window, arguments);
   };
 
@@ -289,14 +290,19 @@
 
   function open() {
     build();
+    var y0 = window.pageYOffset || 0, sh = document.getElementById("shell");
     root.hidden = false; HTML.classList.add("spon"); moveFx(true);
+    if (sh) sh.scrollTop = y0;
     apply(); hostTitle();
     clearInterval(tick); tick = setInterval(hostTitle, 600);
   }
   function close() {
     if (!root) return;
     root.hidden = true; maxI = -1; clearInterval(tick);
+    var sh = document.getElementById("shell"), y1 = sh ? sh.scrollTop : 0;
     HTML.classList.remove("spon", "p0off"); moveFx(false);
+    if (sh) sh.scrollTop = 0;
+    _sc.call(window, 0, y1);
     ["--p0x", "--p0y", "--p0w", "--p0h"].forEach(function (k) { HTML.style.removeProperty(k); });
     save();
   }
