@@ -208,7 +208,9 @@
   }
 
   /* ---------- parser struktur soal ---------- */
-  function newQ(n, t, line, i) { return { num: n, q: t, o: {}, ol: {}, ql: line ? [line] : [], cnt: 0, last: "", inExp: false, expl: "", textKey: "", i0: i, i1: i }; }
+  function newQ(n, t, line, i) { return { num: n, q: t, o: {}, ol: {}, ql: line ? [line] : [], cnt: 0, last: "", inExp: false, expl: "", ex: {}, exL: "", textKey: "", i0: i, i1: i }; }
+  // pembahasan per pilihan: baris "A. …" / "A) …" di dalam blok pembahasan
+  var reOptExp = /^\s*\(?([A-Ea-e])\)?\s*[.):\-–]\s+(\S.*)$/;
   function nextMissing(o) { for (var k = 0; k < 5; k++) if (!(LET[k] in o)) return LET[k]; return ""; }
   function lookA(L, i) { for (var k = i + 1; k < Math.min(L.length, i + 13); k++) { var m = optStart(L[k].t, !!L[k].ocr, "A"); if (m && m.L === "A") return true; } return false; }
   function looksKeyTable(L, i) { return i < L.length && /^\s*\d{1,4}\s*[.):\-–=]?\s*\(?[A-Ea-e]\)?(?![A-Za-z0-9])/.test(L[i].t); }
@@ -239,7 +241,10 @@
     for (var i = 0; i < L.length; i++) {
       var ln = L[i], t = ln.t, m, ocr = !!ln.ocr;
       if (mode === "front") {
-        if (cur && Q.length && (reHead.test(t) || (reHeadBare.test(t) && looksKeyTable(L, i + 1))) && (cur.cnt >= 2 || cur.inExp)) { mode = "back"; bq = null; continue; }
+        // kepala bagian kunci/pembahasan di AKHIR dokumen selalu pindah mode;
+        // kepala "PEMBAHASAN:" yang menyusul KUNCI: tetap milik soal berjalan (pembahasan per soal)
+        var hardHead = /^\s*(kunci\s*jawaban|kunci\s*(?:dan|&)\s*pembahasan|jawaban\s*(?:dan|&)\s*pembahasan|answer\s*key|daftar\s*jawaban)(\s+soal)?\s*:?\s*$/i.test(t);
+        if (cur && Q.length && (hardHead || ((reHead.test(t) || (reHeadBare.test(t) && looksKeyTable(L, i + 1))) && !cur.inExp)) && (cur.cnt >= 2 || cur.inExp)) { mode = "back"; bq = null; continue; }
         if ((m = reKey.exec(t) || reKey2.exec(t)) && cur && cur.cnt >= 2) { cur.textKey = m[1].toUpperCase(); cur.inExp = true; if (m[2]) cur.expl = cat(cur.expl, m[2]); own(cur, i); continue; }
         if ((m = reExp.exec(t)) && cur && cur.cnt >= 1) { cur.inExp = true; if (m[2]) cur.expl = cat(cur.expl, m[2]); own(cur, i); continue; }
         var qs = qStart(t);
@@ -259,7 +264,12 @@
         }
         if (!cur) continue; // teks sebelum soal pertama (judul/petunjuk)
         own(cur, i);
-        if (cur.inExp) cur.expl = cat(cur.expl, t);
+        if (cur.inExp) { // pembahasan per pilihan (A–E) dipisah dari pembahasan umum
+          var xm = reOptExp.exec(t);
+          if (xm) { cur.exL = xm[1].toUpperCase(); cur.ex[cur.exL] = cat(cur.ex[cur.exL] || "", xm[2]); }
+          else if (cur.exL) cur.ex[cur.exL] = cat(cur.ex[cur.exL] || "", t);
+          else cur.expl = cat(cur.expl, t);
+        }
         else if (cur.last) { cur.o[cur.last] = cat(cur.o[cur.last], t); cur.ol[cur.last].push(ln); }
         else { cur.q = cat(cur.q, t); cur.ql.push(ln); }
       } else { // bagian kunci/pembahasan di akhir dokumen
@@ -646,7 +656,7 @@
     P({ stage: "Menyusun soal, kunci & gambar…", pct: 0.97 });
     var Q = parse(all), un = assignFigs(Q, all, figsAll, 2);
     var items = Q.map(function (q) {
-      var d = decide(q), o = { num: q.num, q: q.q.trim(), expl: (q.expl || "").trim(), diff: 2, ans: d.ans, via: d.via, active: true, img: "", imgs: q.imgs || [], ocr: !!(q.ql[0] && q.ql[0].ocr),
+      var d = decide(q), o = { num: q.num, q: q.q.trim(), expl: (q.expl || "").trim(), ex: Object.keys(q.ex || {}).length ? q.ex : null, diff: 2, ans: d.ans, via: d.via, active: true, img: "", imgs: q.imgs || [], ocr: !!(q.ql[0] && q.ql[0].ocr),
         page: (q.ql[0] || (q.ol.A || [])[0] || {}).p || 0 };
       LET.forEach(function (L) { o[L.toLowerCase()] = (q.o[L] || "").trim(); });
       var ql = quality(o); o.status = worst(d.status, ql.status); o.notes = d.notes.concat(ql.notes);
