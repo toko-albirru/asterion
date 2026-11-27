@@ -1,6 +1,8 @@
 // ASTERION dashboard - Cloudflare Worker (login, data, jadwal)
 import { farmakoApi, farmakoCron } from "./farmako.js";
 import { meter, flushUsage } from "./d1meter.js";
+import { aiApi } from "./ai.js";
+import { donApi } from "./donasi.js";
 const SHEET_ID = "1D3ZaMWmvgEmWs1eKBVPs4FYY3y3_KnYUglsJz1qdYEw";
 const YT = (n, id) => ({ n, u: "https://www.youtube.com/playlist?list=" + id });
 const BLOK = ["1.1", "1.2", "1.3", "2.1", "2.2", "2.3", "3.1", "3.2", "3.3"];
@@ -1150,6 +1152,7 @@ async function handle(request, env) {
       return J({ token: await mint(u, env), u, admin: false, mc: !rec });
     }
 
+    if (path === "don/saweria" && M === "POST") return donApi(request, env, null, "saweria", url, body, M); // webhook Saweria (publik; keaslian dicek lewat tanda tangan)
     const a = await auth(request, env);
     if (!a) return J({ err: "auth" }, 401);
 
@@ -1168,6 +1171,8 @@ async function handle(request, env) {
     }
     if (path.startsWith("run/")) return runApi(request, env, a, path.slice(4), url, body, M);
     if (path.startsWith("farmako/")) return farmakoApi(request, env, a, path.slice(8), url, body, M);
+    if (path.startsWith("don/")) return donApi(request, env, a, path.slice(4), url, body, M); // donasi & dinding donatur
+    if (path.startsWith("ai/")) return aiApi(request, env, a, path.slice(3), url, body, M); // AI terpusat (APInex + Supabase)
     if (path === "dokter" || path.startsWith("dokter/")) return dokter(env, a, path, M, body);
 
     if (path === "data") {
