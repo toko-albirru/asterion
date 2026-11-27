@@ -66,7 +66,7 @@
   function draw(res) {
     var nm = (window.MHS && MHS[S.u]) || "", adm = S.admin;
     var modes = [["anon", "Anonim", "tampil sebagai “Hamba Allah”"]].concat(adm ? [] : [["nim", "NIM", esc(S.u)], ["nama", "Nama di daftar mahasiswa", esc(nm || "namamu")]]).concat([["bebas", "Nama pilihanku sendiri", "<input type='text' id='dnN' maxlength='30' placeholder='mis. Hamba Allah, Alumni 2020, atau namamu'>"]]);
-    box.innerHTML = "<div class='dx'><h3>DUKUNG ASTERION ❤️</h3><div class='mu'>Donasi dipakai untuk biaya server dan AI. Berapa pun sangat berarti — terima kasih!</div>" +
+    box.innerHTML = "<div class='dx'><h3>DUKUNG ASTERION ❤️</h3><div class='mu'>Donasi dipakai untuk biaya server dan AI. Berapa pun sangat berarti — terima kasih!</div><div class='imp' style='margin-top:10px'>✨ <b>Donasi berapa pun, minimal Rp1.000,</b> akan muncul di teks berjalan di beranda.</div>" +
       (res ? "<h4>Kode donasimu</h4><div class='code' id='dnC'>" + esc(res.code) + "</div>" +
         "<ol style='margin:6px 0 6px 18px;padding:0'><li>Buka halaman Saweria.</li><li><div class='imp'><b>Tulis kode di atas di kolom PESAN Saweria</b> (boleh ditambah kalimat lain).<br><span class='mu'>Kode inilah yang membuat namamu tampil sesuai pilihanmu tadi.</span></div></li><li>Selesaikan pembayaran. " + (res.auto ? "Namamu otomatis muncul di teks berjalan beranda setelah pembayaran terverifikasi." : "Namamu muncul setelah admin menyetujui.") + "</li></ol>" +
         "<p class='mu'>Tanpa kode, namamu tampil sesuai nama yang kamu ketik di Saweria. Pesanmu di Saweria ikut tampil di teks berjalan (tautan dan nomor telepon otomatis dibuang).</p><p>" +
