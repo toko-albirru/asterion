@@ -411,6 +411,9 @@ select.in option{background:#241a3f;color:#fff}
 :root[data-theme="light"] .vw img.pi{background:#f3effa}
 /* ---------- MODE PANEL (dibuka di dalam SPLIT SCREEN) ---------- */
 html.pane .fx,html.pane .fxp,html.pane .fxo,html.pane .thmf,html.pane #out,html.pane #splitBtn,html.pane #hov [data-hv="split"]{display:none!important}
+/* semua scrollbar disembunyikan, scroll tetap berfungsi */
+html,html *{scrollbar-width:none}
+html::-webkit-scrollbar,html ::-webkit-scrollbar{display:none;width:0;height:0}
 html.pane .wrap{padding-bottom:84px}
 html.pane .nav{width:calc(100% - 16px);bottom:calc(8px + env(safe-area-inset-bottom,0))}
 @media (max-width:480px){html.pane .top{padding-left:10px;padding-right:10px;gap:6px}html.pane .top h2{font-size:11px;letter-spacing:.06em}html.pane .wrap{padding-left:10px;padding-right:10px}}
@@ -797,7 +800,7 @@ HFIX+="<script>("+(function(){
   addEventListener("hashchange",function(){clear();els=[];try{parent.postMessage({astts:"reset"},"*")}catch(e){}});
 }).toString()+")()<\/script>";
 function hPrep(h,pos){ // <base> agar alamat foto "/api/html/img/…" mengarah ke server web ini
-  var add="<base href=\""+location.origin+"/\">"+hFix(pos),m=/<head\b[^>]*>/i.exec(h)||/<!doctype[^>]*>/i.exec(h);
+  var add="<base href=\""+location.origin+"/\">"+hFix(pos)+"<style>html,body,*{scrollbar-width:none}::-webkit-scrollbar{display:none;width:0;height:0}</style>",m=/<head\b[^>]*>/i.exec(h)||/<!doctype[^>]*>/i.exec(h);
   return m?h.slice(0,m.index+m[0].length)+add+h.slice(m.index+m[0].length):add+h}
 // foto base64 di dalam HTML dipisah: disimpan sebagai gambar di server, HTML hanya memuat alamatnya
 var DURI=/data:image\/(png|jpe?g|webp|gif);base64,(?:[A-Za-z0-9+\/=]|\\\/)+/g;
