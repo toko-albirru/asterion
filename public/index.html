@@ -409,10 +409,17 @@ select.in option{background:#241a3f;color:#fff}
 :root[data-theme="light"] .pp .nb.no{color:#6a5d86}
 :root[data-theme="light"] .pp .ct,:root[data-theme="light"] .pp .nh2{color:#6a5d86}
 :root[data-theme="light"] .vw img.pi{background:#f3effa}
+/* ---------- MODE PANEL (dibuka di dalam SPLIT SCREEN) ---------- */
+html.pane .fx,html.pane .fxp,html.pane .fxo,html.pane .thmf,html.pane #out,html.pane #splitBtn,html.pane #hov [data-hv="split"]{display:none!important}
+html.pane .wrap{padding-bottom:84px}
+html.pane .nav{width:calc(100% - 16px);bottom:calc(8px + env(safe-area-inset-bottom,0))}
+@media (max-width:480px){html.pane .top{padding-left:10px;padding-right:10px;gap:6px}html.pane .top h2{font-size:11px;letter-spacing:.06em}html.pane .wrap{padding-left:10px;padding-right:10px}}
+@media (max-width:360px){html.pane .nav{padding:4px;gap:2px}html.pane .nav a{font-size:0;padding:6px 0}html.pane .nav a b{font-size:17px;margin:0}}
 </style>
 </head>
 <body>
 <script>try{if(localStorage.getItem("theme")==="light")document.documentElement.setAttribute("data-theme","light");var fz=+localStorage.getItem("ast.fz");if(fz>=.8&&fz<=1.5)document.documentElement.style.setProperty("--fz",fz)}catch(e){}</script>
+<script>try{if(/[?&]pane=1/.test(location.search))document.documentElement.classList.add("pane")}catch(e){}</script>
 <div id="toast"></div>
 
 <div id="gate" class="gate" hidden>
@@ -437,7 +444,7 @@ select.in option{background:#241a3f;color:#fff}
 </div>
 
 <div id="shell" hidden>
-  <div class="top"><a class="ib g" id="back" href="#/" hidden>‹</a><h2 id="ttl"></h2><div class="topr"><a class="ib g" id="prof" href="#/profil" title="Profil &amp; progres" aria-label="Profil">👤</a><button class="ib g" id="out" title="Keluar">⎋</button></div></div>
+  <div class="top"><a class="ib g" id="back" href="#/" hidden>‹</a><h2 id="ttl"></h2><div class="topr"><button class="ib g" id="splitBtn" title="Split screen" aria-label="Split screen">⊞</button><a class="ib g" id="prof" href="#/profil" title="Profil &amp; progres" aria-label="Profil">👤</a><button class="ib g" id="out" title="Keluar">⎋</button></div></div>
   <div class="wrap" id="main"></div>
   <nav class="nav g" id="nav"></nav>
   <button class="ib g thmf" id="thm" title="Ganti tema" aria-label="Ganti tema">🌙</button>
@@ -474,10 +481,12 @@ select.in option{background:#241a3f;color:#fff}
 <script src="profil.js"></script>
 <script src="ai.js?v=1" defer></script>
 <script src="donasi.js?v=1" defer></script>
+<script src="split.js?v=1" defer></script>
 <script>
 var $=function(i){return document.getElementById(i)};
 var esc=function(s){return String(s==null?"":s).replace(/[&<>"']/g,function(c){return{"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]})};
 var S={t:localStorage.getItem("tk")||"",data:null,u:"",admin:false};
+var PANE=/[?&]pane=1/.test(location.search); // true = halaman ini sedang jadi satu panel di split screen
 /* detak "sedang online": dikirim tiap 90 dtk selama tab terlihat (admin tidak dihitung) */
 var BT=0;
 /* analytics: halaman dibuka, materi dibuka, dan lama aktif (hanya saat tab terlihat). Ditumpuk di memori lalu ikut
@@ -488,10 +497,11 @@ function anPv(tab){if(S.admin||!S.t)return;AN.pv[tab]=(AN.pv[tab]||0)+1}
 function anIt(x){if(S.admin||!x||!x.n)return;var k=mKey(x).slice(0,120),o=AN.it[k];AN.it[k]=[String(x.n).slice(0,160),(o?o[1]:0)+1]}
 function anTake(force){anTick(force);var has=AN.sec>=1||Object.keys(AN.pv).length||Object.keys(AN.it).length;if(!has||(!force&&Date.now()-AN.sent<27e4))return null;
   var p={sec:Math.round(AN.sec),pv:AN.pv,it:AN.it,dev:/Mobi|Android|iPhone|iPad/i.test(navigator.userAgent)?"m":"d"};AN.sec=0;AN.pv={};AN.it={};AN.sent=Date.now();return p}
-function beat(){if(!S.t||S.admin||document.hidden)return;var an=anTake(false);api("ping",{m:"POST",b:an?{an:an}:undefined}).catch(function(){})}
+function beat(){if(PANE){var pa=anTake(false);if(pa)try{parent.postMessage({astan:pa},location.origin)}catch(e){}return}
+  if(!S.t||S.admin||document.hidden)return;var an=anTake(false);api("ping",{m:"POST",b:an?{an:an}:undefined}).catch(function(){})}
 function beatStart(){if(BT||S.admin||!S.t)return;beat();BT=setInterval(beat,9e4)}
 document.addEventListener("visibilitychange",function(){if(!document.hidden){AN.last=Date.now();beat();return}
-  if(!S.t||S.admin)return;var an=anTake(true);if(an)try{fetch("/api/ping",{method:"POST",keepalive:true,headers:{"content-type":"application/json",authorization:"Bearer "+S.t},body:JSON.stringify({an:an})})}catch(e){}});
+  if(!S.t||S.admin)return;var an=anTake(true);if(an&&PANE){try{parent.postMessage({astan:an},location.origin)}catch(e){}return}if(an)try{fetch("/api/ping",{method:"POST",keepalive:true,headers:{"content-type":"application/json",authorization:"Bearer "+S.t},body:JSON.stringify({an:an})})}catch(e){}});
 function myName(){var u=String(S.u||"").toUpperCase();return S.admin?"Admin":((window.MHS||{})[u]||S.u)}
 function toast(m,kind){var t=$("toast"),s=String(m==null?"":m);if(!kind){kind=/gagal|error|tidak valid|tidak boleh|belum diisi|kosong|salah/i.test(s)?"bad":(/✓|✅|🎉|tersimpan|dihapus|terkirim|berhasil|disalin/i.test(s)?"good":"")}t.className=kind||"";t.innerHTML="<span class='ti'>"+(kind==="bad"?"⚠️":kind==="good"?"✅":"💬")+"</span><span>"+esc(s)+"</span>";t.classList.add("on");clearTimeout(toast.h);toast.h=setTimeout(function(){t.classList.remove("on")},2600)}
 /* ---------- dialog kustom: pengganti alert/confirm/prompt bawaan browser ---------- */
@@ -546,7 +556,7 @@ window.Dlg=Dlg;
 async function api(p,o){o=o||{};var r=await fetch("/api/"+p,{method:o.m||"GET",headers:{"content-type":"application/json",authorization:"Bearer "+S.t},body:o.b?JSON.stringify(o.b):undefined});
   if(r.status===401&&p!=="login"){logout();throw 0}var j=null;try{j=await r.json()}catch(e){}return{ok:r.ok,s:r.status,j:j}}
 function setUser(){var u=S.t.split(".")[0]||"";S.u=u;S.admin=u==="admin"}
-function logout(){clearInterval(BT);BT=0;localStorage.removeItem("tk");S.t="";S.data=null;location.hash="#/";show("gate");$("lp").value=""}
+function logout(){if(PANE){try{parent.postMessage({astout:1},location.origin)}catch(e){}}clearInterval(BT);BT=0;localStorage.removeItem("tk");S.t="";S.data=null;location.hash="#/";show("gate");$("lp").value=""}
 function show(w){["gate","shell"].forEach(function(i){$(i).hidden=i!==w});document.body.dataset.r=w==="gate"?"login":(location.hash.replace(/^#\/?/,"").split("/")[0]||"home");if(w==="gate"){$("fLogin").hidden=false;$("fPw").hidden=true}}
 $("out").onclick=logout;
 
@@ -624,13 +634,14 @@ function pickHtml(){return new Promise(function(ok){var i=document.createElement
 function hClose(){ttsStop();var o=$("hov");if(o)o.remove();HCUR="";document.documentElement.classList.remove("hov-on")}
 function hOpen(x){
   hClose();HCUR=mKey(x);var pos=lsJ("ast.hpos")[HCUR]||"",o=document.createElement("div");o.id="hov";
-  o.innerHTML="<div class='hvbar'><button type='button' class='g' data-hv='back' aria-label='Kembali'>‹</button><b></b>"+(ttsOK()?"<button type='button' class='g' data-hv='tts' aria-label='Bacakan (text to speech)' title='Bacakan materi'>🔊</button>":"")+"<button type='button' class='g' data-hv='fx' aria-label='Mode fokus / pomodoro' title='Mode fokus / pomodoro'>🎯</button><button type='button' class='g' data-hv='dl' aria-label='Unduh rangkuman' title='Unduh rangkuman (.html)'>⬇</button><button type='button' class='g' data-hv='fs' aria-label='Layar penuh'>⛶</button></div><div class='ttsp' id='ttsp' hidden><button type='button' data-tt='prev' aria-label='Sebelumnya'>⏮</button><button type='button' class='pri' data-tt='play' id='ttsPlay' aria-label='Putar'>▶</button><button type='button' data-tt='next' aria-label='Berikutnya'>⏭</button><button type='button' data-tt='stop' aria-label='Berhenti'>⏹</button><select id='ttsRate' aria-label='Kecepatan'><option value='1'>1×</option><option value='1.15'>1.15×</option><option value='1.3'>1.3×</option><option value='1.5'>1.5×</option><option value='1.75'>1.75×</option><option value='2'>2×</option><option value='2.5'>2.5×</option><option value='3'>3×</option></select><select id='ttsVoice' aria-label='Suara'></select><div class='st' id='ttsSt'></div></div><iframe id='hf' sandbox='allow-scripts'></iframe>";
+  o.innerHTML="<div class='hvbar'><button type='button' class='g' data-hv='back' aria-label='Kembali'>‹</button><b></b>"+(ttsOK()?"<button type='button' class='g' data-hv='tts' aria-label='Bacakan (text to speech)' title='Bacakan materi'>🔊</button>":"")+"<button type='button' class='g' data-hv='split' aria-label='Split screen' title='Split screen'>⊞</button><button type='button' class='g' data-hv='fx' aria-label='Mode fokus / pomodoro' title='Mode fokus / pomodoro'>🎯</button><button type='button' class='g' data-hv='dl' aria-label='Unduh rangkuman' title='Unduh rangkuman (.html)'>⬇</button><button type='button' class='g' data-hv='fs' aria-label='Layar penuh'>⛶</button></div><div class='ttsp' id='ttsp' hidden><button type='button' data-tt='prev' aria-label='Sebelumnya'>⏮</button><button type='button' class='pri' data-tt='play' id='ttsPlay' aria-label='Putar'>▶</button><button type='button' data-tt='next' aria-label='Berikutnya'>⏭</button><button type='button' data-tt='stop' aria-label='Berhenti'>⏹</button><select id='ttsRate' aria-label='Kecepatan'><option value='1'>1×</option><option value='1.15'>1.15×</option><option value='1.3'>1.3×</option><option value='1.5'>1.5×</option><option value='1.75'>1.75×</option><option value='2'>2×</option><option value='2.5'>2.5×</option><option value='3'>3×</option></select><select id='ttsVoice' aria-label='Suara'></select><div class='st' id='ttsSt'></div></div><iframe id='hf' sandbox='allow-scripts'></iframe>";
   o.querySelector("b").textContent=x.n||"";
   o.addEventListener("click",function(ev){var b=ev.target.closest("[data-hv]");if(!b)return;
     if(b.dataset.hv==="back"){var bk=$("back")&&$("back").getAttribute("href");location.hash=bk&&bk!=="#/"?bk:"#/materi"} // bukan history.back(): riwayat tab di dalam materi ikut tercatat
     else if(b.dataset.hv==="dl")hDownload(x,b);
     else if(b.dataset.hv==="tts")ttsToggle(b);
     else if(b.dataset.hv==="fx")hvFocus();
+    else if(b.dataset.hv==="split"){if(window.Split)Split.open()}
     else{if(FX.on){toast("Layar penuh dikunci selama mode fokus berjalan");return}try{if(document.fullscreenElement)document.exitFullscreen();else o.requestFullscreen()}catch(e){}}});
   document.body.appendChild(o);document.documentElement.classList.add("hov-on");
   hvFxSync();
@@ -638,6 +649,7 @@ function hOpen(x){
 // ---- mode fokus / pomodoro dari dalam viewer materi (memakai fitur fokus yang sudah ada) ----
 function hvFxSync(){var b=document.querySelector("#hov [data-hv=fx]");if(b)b.classList.toggle("on",!!(FX.on||FX.bk))}
 function hvFocus(){
+  if(PANE){try{parent.postMessage({astfx:1},location.origin)}catch(e){}return} // Fokus berlaku untuk seluruh split → ditangani jendela utama
   var p=$("fxP");
   if(FX.on||FX.bk){var ov=$("fxOver");if(ov)ov.hidden=false;if(FX.on)fxFs().catch(function(){});return}
   if(p&&p.hidden){p.style.left="";p.style.top="";p.style.right="";p.style.bottom="";p._moved=0;if($("fxMin"))$("fxMin").value=FX.min}
@@ -1794,6 +1806,7 @@ function themeSet(t,save){
   ["thm","gthm"].forEach(function(id){var b=$(id);if(b){b.textContent=t==="light"?"☀️":"🌙";b.title=t==="light"?"Ganti ke mode gelap":"Ganti ke mode terang"}})
   if(save){try{localStorage.setItem("theme",t)}catch(e){}}
   if(S.t){api("run/prefs",{m:"POST",b:{theme:t}}).catch(function(){})}}
+window.addEventListener("storage",function(e){if(e.key!=="theme")return;var t=e.newValue==="light"?"light":"dark";document.documentElement.setAttribute("data-theme",t);["thm","gthm"].forEach(function(id){var b=$(id);if(b)b.textContent=t==="light"?"☀️":"🌙"})});
 function themeToggle(){var n=themeNow()==="light"?"dark":"light";themeSet(n,1);toast(n==="light"?"☀️ Mode terang aktif":"🌙 Mode gelap aktif")}
 
 /* ---------- MODE FOKUS MENGAMBANG ---------- */
@@ -2266,7 +2279,8 @@ function route(){
   anPv(tab);document.body.dataset.r=tab;renderNav();$("main").innerHTML=v;$("ttl").textContent=(tab!=="home"&&tab!=="atur"&&uiName(tab)?uiName(tab).toUpperCase():TT[tab]);
   $("back").hidden=P.length<2;$("back").href="#/"+P.slice(0,-1).join("/");
   [].forEach.call(document.querySelectorAll(".nav a"),function(a){a.classList.toggle("on",a.dataset.t===tab)});
-  if(tab!=="jadwal")window.scrollTo(0,0)}
+  if(tab!=="jadwal")window.scrollTo(0,0);
+  if(PANE){var hv=$("hov"),hb=hv&&hv.querySelector(".hvbar b");try{parent.postMessage({astp:1,h:location.hash,t:(hb&&hb.textContent)||$("ttl").textContent},location.origin)}catch(e){}}}
 window.addEventListener("hashchange",route);
 
 $("main").addEventListener("click",async function(e){
