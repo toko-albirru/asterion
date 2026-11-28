@@ -20,7 +20,7 @@
   function curActive() { return !!(AI.cur && ($("hov") || $("pvm") || $("ft"))); }
 
   /* ---------- gaya ---------- */
-  var css = "#aiFab{position:fixed;right:14px;bottom:calc(16px + env(safe-area-inset-bottom,0px));z-index:10003;width:50px;height:50px;border-radius:50%;border:1px solid rgba(245,192,74,.55);background:linear-gradient(135deg,#4b2f8f,#2a1b55);color:#f5c04a;font-size:22px;cursor:pointer;box-shadow:0 6px 22px rgba(0,0,0,.45);display:flex;align-items:center;justify-content:center;padding:0}" +
+  var css = "#aiFab{position:fixed;right:14px;bottom:calc(16px + env(safe-area-inset-bottom,0px));z-index:10003;width:50px;height:50px;border-radius:50%;border:1px solid rgba(245,192,74,.55);background:linear-gradient(135deg,#4b2f8f,#2a1b55);color:#f5c04a;font-size:22px;cursor:pointer;box-shadow:0 6px 22px rgba(0,0,0,.45);display:flex;align-items:center;justify-content:center;padding:0;touch-action:none;-webkit-user-select:none;user-select:none}#aiFab.dg{cursor:grabbing;transition:none;opacity:.9}" +
     "#aiFab[hidden],#aiP[hidden]{display:none!important}#aiFab:active{transform:scale(.94)}" +
     "#aiP{position:fixed;z-index:10004;right:12px;bottom:12px;width:min(430px,calc(100vw - 24px));height:min(640px,calc(100dvh - 24px));display:flex;flex-direction:column;border-radius:20px;overflow:hidden;background:rgba(24,17,44,.97);color:#fff;border:1px solid rgba(255,255,255,.2);box-shadow:0 16px 60px rgba(0,0,0,.6);font:14px/1.5 Inter,system-ui,sans-serif}" +
     ":root[data-theme=light] #aiP{background:rgba(255,255,255,.98);color:#241a3f;border-color:rgba(0,0,0,.15)}" +
@@ -69,7 +69,8 @@
   var fab, pan, ms, ta, goB, hs;
   function build() {
     fab = document.createElement("button"); fab.id = "aiFab"; fab.type = "button"; fab.hidden = true; fab.setAttribute("aria-label", "Tanya AI"); fab.title = "Tanya AI"; fab.textContent = "✨";
-    fab.onclick = openP; document.body.appendChild(fab);
+    fab.onclick = function () { if (fab._moved) { fab._moved = false; return } openP() };
+    document.body.appendChild(fab); dragFab(fab);
     pan = document.createElement("div"); pan.id = "aiP"; pan.hidden = true;
     pan.innerHTML = "<div class='ah'><button class='ib' data-a='hist' title='Riwayat'>🕘</button><b>TANYA AI</b><button class='ib' data-a='new' title='Percakapan baru'>＋</button><button class='ib' data-a='adm' title='Pengaturan AI (admin)' hidden>⚙</button><button class='ib' data-a='x' title='Tutup'>✕</button></div>" +
       "<div class='sc' id='aiSc'></div><div class='ms' id='aiMs'></div><div class='hs' id='aiHs' hidden></div><div class='cp' id='aiCp'></div>" +
@@ -97,6 +98,33 @@
     }
     var c = e.target.closest("sup.aic");
     if (c) { var box = c.closest(".m"), t = box && box.querySelector(".sb[data-n='" + c.dataset.n + "']"); if (t) { t.scrollIntoView({ block: "nearest" }); t.style.outline = "2px solid #f5c04a"; setTimeout(function () { t.style.outline = "" }, 1200) } }
+  }
+  /* tombol AI bisa digeser (tahan lalu seret); posisi diingat di perangkat ini, menempel ke tepi kiri/kanan */
+  function dragFab(el) {
+    var KEY = "ast.aifab", sx = 0, sy = 0, ox = 0, oy = 0, down = false, drag = false;
+    function off() { var h = document.documentElement; return h.classList.contains("pane") || h.classList.contains("spon") }
+    function clamp(x, y) { var m = 6, w = el.offsetWidth || 50, h = el.offsetHeight || 50; return [Math.max(m, Math.min(innerWidth - w - m, x)), Math.max(m, Math.min(innerHeight - h - m, y))] }
+    function put(x, y) { var c = clamp(x, y); el.style.right = "auto"; el.style.bottom = "auto"; el.style.left = c[0] + "px"; el.style.top = c[1] + "px"; return c }
+    function load() { if (off()) return; try { var o = JSON.parse(localStorage.getItem(KEY) || "null"); if (o && typeof o.x === "number") put(o.x * innerWidth, o.y * innerHeight) } catch (e) {} }
+    el.addEventListener("pointerdown", function (e) {
+      if (off() || (e.pointerType === "mouse" && e.button !== 0)) return;
+      var r = el.getBoundingClientRect(); down = true; drag = false; sx = e.clientX; sy = e.clientY; ox = r.left; oy = r.top;
+      try { el.setPointerCapture(e.pointerId) } catch (_) {}
+    });
+    el.addEventListener("pointermove", function (e) {
+      if (!down) return; var dx = e.clientX - sx, dy = e.clientY - sy;
+      if (!drag && Math.abs(dx) + Math.abs(dy) < 8) return;
+      drag = true; el.classList.add("dg"); put(ox + dx, oy + dy); e.preventDefault();
+    });
+    function end(e) {
+      if (!down) return; down = false; el.classList.remove("dg");
+      try { el.releasePointerCapture(e.pointerId) } catch (_) {}
+      if (!drag) return; drag = false; el._moved = true; setTimeout(function () { el._moved = false }, 350);
+      var r = el.getBoundingClientRect(), x = r.left + r.width / 2 < innerWidth / 2 ? 10 : innerWidth - r.width - 10, c = put(x, r.top);
+      try { localStorage.setItem(KEY, JSON.stringify({ x: c[0] / innerWidth, y: c[1] / innerHeight })) } catch (_) {}
+    }
+    el.addEventListener("pointerup", end); el.addEventListener("pointercancel", end);
+    addEventListener("resize", load); load();
   }
   function openP() {
     if (!pan) return; AI.open = true; pan.hidden = false; fab.hidden = true; hs.hidden = true;
