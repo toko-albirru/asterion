@@ -101,6 +101,7 @@ h1{margin:0;display:inline-block;padding:0 .12em;font-family:Cinzel,Georgia,seri
 .err{color:#fca5a5;font-size:13px;min-height:18px;margin-top:8px}
 .vw{border-radius:20px;overflow:hidden;aspect-ratio:16/9;background:#000;margin-bottom:12px}
 .vw.tall{aspect-ratio:auto;height:70vh}
+.nbw{margin-bottom:12px}.nbb{display:flex;align-items:center;justify-content:space-between;gap:8px;margin:0 2px 8px;font-weight:600;font-size:13px}.nbb button{padding:7px 12px;border-radius:12px;border:1px solid var(--line);color:inherit;font:inherit;font-size:12px;cursor:pointer}.nbh{margin:6px 2px 0}.nbw .vw{margin-bottom:0}.nbw:fullscreen{background:#000;display:flex;flex-direction:column;padding:0}.nbw:fullscreen .nbb{margin:0;padding:8px 12px;color:#fff}.nbw:fullscreen .vw{flex:1;height:auto;border-radius:0}.nbw:fullscreen .nbh{display:none}
 .vw iframe{width:100%;height:100%;border:0;display:block}
 #hov{position:fixed;inset:0;z-index:10002;display:flex;flex-direction:column;background:#0d0820}
 #hov iframe{flex:1;width:100%;border:0;display:block}
@@ -489,7 +490,7 @@ html.spon .thmf{left:10px;bottom:calc(76px + env(safe-area-inset-bottom,0));widt
 <script src="farmako-md.js?v=4"></script>
 <script src="farmako.js?v=16"></script>
 <script src="profil.js"></script>
-<script src="ai.js?v=1" defer></script>
+<script src="ai.js?v=2" defer></script>
 <script src="donasi.js?v=1" defer></script>
 <script src="split.js?v=1" defer></script>
 <script>
@@ -606,6 +607,7 @@ function embed(u){
   if(/youtube\.com|youtu\.be/.test(u)){
     if(m=u.match(/[?&]list=([\w-]+)/))return{s:"https://www.youtube.com/embed/videoseries?list="+m[1]+"&rel=0",yt:1};
     if(m=u.match(/youtu\.be\/([\w-]+)|[?&]v=([\w-]+)/))return{s:"https://www.youtube.com/embed/"+(m[1]||m[2])+"?rel=0",yt:1}}
+  if(/^https:\/\/notebooklm\.google\.com\/notebook\/[\w-]+/.test(u))return{s:u,tall:1,nb:1};
   if(m=u.match(/drive\.google\.com\/file\/d\/([\w-]+)/))return{s:"https://drive.google.com/file/d/"+m[1]+"/preview",tall:1};
   if(m=u.match(/docs\.google\.com\/(document|presentation|spreadsheets)\/d\/([\w-]+)/))return{s:"https://docs.google.com/"+m[1]+"/d/"+m[2]+(m[1]==="presentation"?"/embed":"/preview"),tall:1};
   if(/^https?:\/\/[^\s]+\.(png|jpe?g|gif|webp|bmp|svg)(\?[^\s]*)?$/i.test(u))return{s:u,img:1,tall:1};
@@ -621,6 +623,7 @@ function viewer(x,ex){
   else if(pl&&e){h=h.replace("class='sec' id='ft'","class='sec' id='ft' style='margin:8px 2px 10px'");h+="<div class='pw'><div class='vw' id='pv'><iframe id='pf' src=\""+esc(e.s)+"\" allowfullscreen allow='fullscreen; autoplay; encrypted-media; picture-in-picture'></iframe></div><div class='plw'><button class='pa l g' data-pa='-1' disabled aria-label='Sebelumnya'>‹</button><div id='pl'><div class='empty'>Memuat daftar video…</div></div><button class='pa r g' data-pa='1' aria-label='Berikutnya'>›</button></div></div>";setTimeout(function(){plFill(pl,x.u)},0)}
   else if(fr){if(sub)ou="https://drive.google.com/drive/folders/"+sub;h+="<div id='fd' data-q='"+esc(sub?"id="+sub:fr)+"'>"+skel(3)+"</div>";setTimeout(fdFill,0)}
   else if(e&&e.img)h+="<div class='vw tall g'><img class='pi' alt='' src=\""+esc(e.s)+"\"></div>";
+  else if(e&&e.nb)h+="<div class='nbw' id='nbw'><div class='nbb'><span>NotebookLM</span><button type='button' class='g' data-nbfs='1' aria-label='Layar penuh' title='Layar penuh'>⛶ Layar penuh</button></div><div class='vw tall'><iframe src=\""+esc(e.s)+"\" allowfullscreen allow='fullscreen; clipboard-write; autoplay' referrerpolicy='no-referrer-when-downgrade'></iframe></div><div class='hint nbh'>Kalau tampilan kosong / minta login, Google memblokir penyematan. Pakai tombol “Buka di tab baru” di bawah.</div></div>";
   else if(e)h+="<div class='vw"+(e.tall?" tall":"")+"'><iframe src=\""+esc(e.s)+"\" allowfullscreen loading='lazy' allow='fullscreen; autoplay; encrypted-media; picture-in-picture'></iframe></div>";
   else h+="<div class='pn g empty'>Tautan ini tidak bisa dibuka langsung di dalam web.</div>";
   var gi=!x.h&&!x.hid&&!pl&&!fr&&x.u&&(/drive\.google\.com\/file\/d\//.test(x.u)||/docs\.google\.com\/presentation\/d\//.test(x.u))?gid(x.u):"";
@@ -2317,6 +2320,13 @@ $("main").addEventListener("click",async function(e){
   save();route()});
 
 if(S.t)boot();else show("gate");
+</script>
+<script>
+document.addEventListener('click',function(ev){var b=ev.target.closest&&ev.target.closest('[data-nbfs]');if(!b)return;
+  var w=document.getElementById('nbw');if(!w)return;
+  if(typeof FX!=='undefined'&&FX.on)return;
+  try{if(document.fullscreenElement===w)document.exitFullscreen();else if(w.requestFullscreen)w.requestFullscreen({navigationUI:'hide'});else if(w.webkitRequestFullscreen)w.webkitRequestFullscreen()}catch(e){}
+});
 </script>
 </body>
 </html>
