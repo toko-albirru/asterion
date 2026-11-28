@@ -1587,7 +1587,7 @@ function cards(items){return items.map(function(c){return "<a class='card g' hre
 /* ---------- pengaturan menu / navbar / kategori (admin) ---------- */
 var UI_DEF={
   nav:[{id:"home",n:"Beranda",i:"🏠"},{id:"materi",n:"Materi",i:"📚"},{id:"rekaman",n:"Rekaman",i:"🎬"},{id:"jadwal",n:"Jadwal",i:"🗓️"},{id:"tutor",n:"Tutor",i:"👥"},{id:"run",n:"Kuis",i:"🏃"},{id:"notebook",n:"Notebook",i:"📓"},{id:"dokter",n:"Dokter",i:"📞"}],
-  menu:[{id:"materi",n:"Materi & Rangkuman",i:"📚",s:"Per blok, lab, dan Google Drive"},{id:"rekaman",n:"Rekaman Kuliah",i:"🎬",s:"Putar langsung per tahun"},{id:"jadwal",n:"Jadwal Kuliah",i:"🗓️",s:"Terhubung ke spreadsheet"},{id:"tutor",n:"Jadwal Tutorial",i:"👥",s:"Kelompok, tutor & ruang · konfirmasi WA ke tutor"},{id:"run",n:"GAME KUIS",i:"🏃",s:"3 mode: game 3D, mode soal & simulasi ujian"},{id:"notebook",n:"NotebookLM",i:"📓",s:"Tanya jawab dari sumber materi · login akun Google sendiri"},{id:"farmako",n:"Pharmacology Session",i:"💊",s:"Materi, pustaka obat, interaksi & permainan farmakologi"},{id:"dokter",n:"Kontak Dokter",i:"📞",s:"Nomor HP dosen & dokter · bisa usul ubah/tambah"}],
+  menu:[{id:"materi",n:"Materi & Rangkuman",i:"📚",s:"Per blok, lab, dan Google Drive"},{id:"rekaman",n:"Rekaman Kuliah",i:"🎬",s:"Putar langsung per tahun"},{id:"jadwal",n:"Jadwal Kuliah",i:"🗓️",s:"Terhubung ke spreadsheet"},{id:"tutor",n:"Jadwal Tutorial",i:"👥",s:"Kelompok, tutor & ruang · konfirmasi WA ke tutor"},{id:"run",n:"GAME KUIS",i:"🏃",s:"3 mode: game 3D, mode soal & simulasi ujian"},{id:"notebook",n:"Gemini Notebook",i:"📓",s:"Dulu NotebookLM · tanya jawab dari sumber materi, login akun Google sendiri"},{id:"farmako",n:"Pharmacology Session",i:"💊",s:"Materi, pustaka obat, interaksi & permainan farmakologi"},{id:"dokter",n:"Kontak Dokter",i:"📞",s:"Nomor HP dosen & dokter · bisa usul ubah/tambah"}],
   mp:[{id:"blok",n:"PILIH BLOK",i:"📘"},{id:"drive",n:"DRIVE",i:"🗂️",c:"Google Drive Materi"}],
   cm:[{id:"all",n:"Seluruh Blok",i:"📖"},{id:"lab",n:"Lab",i:"🔬"}],
   cr:[{id:"kl",n:"Kuliah Lain",i:"📝"},{id:"blok",n:"Blok",i:"🧠"},{id:"lab",n:"Lab",i:"🔬"}]
@@ -1615,12 +1615,12 @@ function uiRow(g,x,i,n){
   "<div class='ctl'><button data-a='ui-up' data-g='"+g+"' data-i='"+i+"'>↑</button><button data-a='ui-dn' data-g='"+g+"' data-i='"+i+"'>↓</button><button data-a='ui-ren' data-g='"+g+"' data-i='"+i+"'>✎</button>"+
   (g==="nav"||g==="menu"?"<button data-a='ui-hide' data-g='"+g+"' data-i='"+i+"'>"+(x.h?"👁️‍🗨️":"👁")+"</button>":"")+"</div></div>"}
 /* ---------- TAB NOTEBOOKLM (tersendiri, link diisi admin) ---------- */
-var NB_RE=/^https:\/\/notebooklm\.google\.com\/notebook\/[\w-]+/;
+var NB_RE=/^https:\/\/(notebooklm|notebook)\.google\.com\/\S*$/; /* NotebookLM kini bernama Gemini Notebook (notebook.google.com); domain lama tetap diterima */
 function pNotebook(){
   var n=S.data&&S.data.nblm,u=n&&typeof n.u==="string"?n.u:"",ok=NB_RE.test(u),h="";
-  if(ok)h+="<div class='nbw' id='nbw' data-u=\""+esc(u)+"\"><div class='nbb'><span>📓 NotebookLM</span><span style='display:flex;gap:6px'><button type='button' class='g' data-nbo='1' title='Buka di jendela sendiri'>↗ Jendela sendiri</button><button type='button' class='g' data-nbfs='1' aria-label='Layar penuh' title='Layar penuh'>⛶ Layar penuh</button></span></div><div class='vw tall nbt'><iframe src=\""+esc(u)+"\" allowfullscreen allow='fullscreen; clipboard-write; autoplay'></iframe></div><div class='hint nbh'>Login memakai akun Google masing-masing. Kalau tampilan kosong atau tidak bisa login di sini, pakai “↗ Jendela sendiri”. Mode fokus tetap jalan.</div></div>";
-  else h+="<div class='pn g empty'>"+(S.admin?"Belum ada link NotebookLM. Isi di bawah.":"NotebookLM belum diatur oleh admin.")+"</div>";
-  if(S.admin)h+="<div class='pn g'><b>Link NotebookLM</b><label for='nbU'>Link notebook</label><input id='nbU' placeholder='https://notebooklm.google.com/notebook/...' value=\""+esc(u)+"\"><button class='btn' data-nbsave='1'>Simpan</button>"+(u?"<button class='btn s' data-nbsave='0'>Hapus</button>":"")+"<div class='hint'>Di NotebookLM: Bagikan → akses “Siapa saja yang memiliki link”, lalu tempel link-nya di sini.</div></div>";
+  if(ok)h+="<div class='nbw' id='nbw' data-u=\""+esc(u)+"\"><div class='nbb'><span>📓 Gemini Notebook (NotebookLM)</span><span style='display:flex;gap:6px'><button type='button' class='g' data-nbo='1' title='Buka di jendela sendiri'>↗ Jendela sendiri</button><button type='button' class='g' data-nbfs='1' aria-label='Layar penuh' title='Layar penuh'>⛶ Layar penuh</button></span></div><div class='vw tall nbt'><iframe src=\""+esc(u)+"\" allowfullscreen allow='fullscreen; clipboard-write; autoplay'></iframe></div><div class='hint nbh'>Login memakai akun Google masing-masing. Kalau tampilan kosong atau tidak bisa login di sini, pakai “↗ Jendela sendiri”. Mode fokus tetap jalan.</div></div>";
+  else h+="<div class='pn g empty'>"+(S.admin?"Belum ada link Gemini Notebook. Isi di bawah.":"Gemini Notebook belum diatur oleh admin.")+"</div>";
+  if(S.admin)h+="<div class='pn g'><b>Link Gemini Notebook / NotebookLM</b><label for='nbU'>Link notebook</label><input id='nbU' placeholder='https://notebook.google.com/notebook/...' value=\""+esc(u)+"\"><button class='btn' data-nbsave='1'>Simpan</button>"+(u?"<button class='btn s' data-nbsave='0'>Hapus</button>":"")+"<div class='hint'>Di NotebookLM: Bagikan → akses “Siapa saja yang memiliki link”, lalu tempel link-nya di sini.</div></div>";
   return h}
 function pAtur(){
   if(!S.admin)return "<div class='empty'>Khusus admin.</div>";
@@ -2169,7 +2169,7 @@ async function anLoad(d){
 $("main").addEventListener("click",function(e){var b=e.target.closest("[data-an]");if(!b)return;anLoad(+b.dataset.an)});
 
 /* ---------- router ---------- */
-var TT={analytics:"ANALYTICS",atur:"ATUR MENU",home:"ASTERION",materi:"MATERI & RANGKUMAN",rekaman:"REKAMAN KULIAH",jadwal:"JADWAL KULIAH",tutor:"JADWAL TUTORIAL",run:"GAME KUIS",farmako:"FARMAKOLOGI",dokter:"KONTAK DOKTER",notebook:"NOTEBOOKLM",akun:"STATUS AKUN",profil:"PROFIL & PROGRES"};
+var TT={analytics:"ANALYTICS",atur:"ATUR MENU",home:"ASTERION",materi:"MATERI & RANGKUMAN",rekaman:"REKAMAN KULIAH",jadwal:"JADWAL KULIAH",tutor:"JADWAL TUTORIAL",run:"GAME KUIS",farmako:"FARMAKOLOGI",dokter:"KONTAK DOKTER",notebook:"GEMINI NOTEBOOK",akun:"STATUS AKUN",profil:"PROFIL & PROGRES"};
 /* ---------- PENCARIAN: Materi, Rekaman, Jadwal (sampai ke dalam folder / playlist / tab lain) ---------- */
 var SQ={net:{},run:{},jc:{},jq:0};
 function sqNorm(s){var t=String(s==null?"":s).toLowerCase();try{t=t.normalize("NFD").replace(/[\u0300-\u036f]/g,"")}catch(e){}return t}
@@ -2335,7 +2335,7 @@ document.addEventListener('click',function(ev){var t=ev.target.closest&&ev.targe
   if(t.hasAttribute('data-nbsave')){ev.preventDefault();if(!S.admin||!S.data)return;
     if(t.getAttribute('data-nbsave')==='0'){delete S.data.nblm}
     else{var v=((document.getElementById('nbU')||{}).value||'').trim();
-      if(!NB_RE.test(v)||v.length>500){toast('Link harus berawalan https://notebooklm.google.com/notebook/...');return}
+      if(!NB_RE.test(v)||v.length>500){toast('Link harus dari notebook.google.com atau notebooklm.google.com (https)');return}
       S.data.nblm={u:v}}
     save();route();return}
   var box=document.getElementById('nbw'),u=box&&box.getAttribute('data-u');
@@ -2343,7 +2343,7 @@ document.addEventListener('click',function(ev){var t=ev.target.closest&&ev.targe
     if(typeof FX!=='undefined'&&FX.on){FX.nb=1;FX.nbT=Date.now();FX.left=false}
     var w=null;try{w=window.open(u,'notebooklm','popup=yes,noopener,noreferrer,left=0,top=0,width='+screen.availWidth+',height='+screen.availHeight)}catch(e){}
     if(!w){try{var a=document.createElement('a');a.href=u;a.target='_blank';a.rel='noopener noreferrer';document.body.appendChild(a);a.click();a.remove()}catch(e){}}
-    if(typeof FX!=='undefined'&&FX.on)toast('NotebookLM dibuka. Fokus tetap berjalan, kembali ke sini setelah selesai.');return}
+    if(typeof FX!=='undefined'&&FX.on)toast('Gemini Notebook dibuka. Fokus tetap berjalan, kembali ke sini setelah selesai.');return}
   if(t.hasAttribute('data-nbfs')){if(!box)return;if(typeof FX!=='undefined'&&FX.on)return;
     try{if(document.fullscreenElement===box)document.exitFullscreen();else if(box.requestFullscreen)box.requestFullscreen({navigationUI:'hide'});else if(box.webkitRequestFullscreen)box.webkitRequestFullscreen()}catch(e){}}
 });
