@@ -43,7 +43,8 @@
     ":root[data-theme=light] #aiP textarea{border-color:rgba(0,0,0,.2);background:#fff}#aiP .go{width:40px;height:40px;border-radius:12px;border:0;background:#f5c04a;color:#1b1233;font-size:17px;font-weight:700}#aiP .go:disabled{opacity:.45}" +
     "#aiP .nt{padding:0 12px 8px;font-size:11px;opacity:.7;display:flex;justify-content:space-between;gap:8px}" +
     "#aiP .hs{position:absolute;inset:55px 0 0 0;background:inherit;z-index:2;overflow-y:auto;padding:10px 12px}#aiP .hs[hidden]{display:none}#aiP .hr{display:flex;gap:6px;margin-bottom:6px}#aiP .hr .t{flex:1;text-align:left;border:1px solid rgba(255,255,255,.2);background:rgba(255,255,255,.06);border-radius:10px;padding:8px 10px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}" +
-    "#aiP .em{margin:auto;text-align:center;opacity:.8;padding:10px 14px}";
+    "#aiP .em{margin:auto;text-align:center;opacity:.8;padding:10px 14px}" +
+    "#aiP.dock{position:relative;right:auto;bottom:auto;width:100%;height:calc(100dvh - 210px);min-height:420px;border-radius:20px;box-shadow:none;z-index:1}#aiP.dock [data-a=x]{display:none}";
   var st = document.createElement("style"); st.textContent = css; document.head.appendChild(st);
 
   /* ---------- markdown ringan ---------- */
@@ -130,9 +131,9 @@
     if (!pan) return; AI.open = true; pan.hidden = false; fab.hidden = true; hs.hidden = true;
     AI.scope = curActive() ? "cur" : "all"; drawScope(); drawChips(); draw();
     $("aiP").querySelector("[data-a=adm]").hidden = !S.admin;
-    loadStatus(); setTimeout(function () { try { ta.focus() } catch (e) {} }, 60);
+    loadStatus(); if (!AI.docked) setTimeout(function () { try { ta.focus() } catch (e) {} }, 60);
   }
-  function closeP() { AI.open = false; pan.hidden = true; tick() }
+  function closeP() { if (AI.docked) return; AI.open = false; pan.hidden = true; tick() }
   function newChat() { if (AI.busy) return; AI.conv = ""; AI.msgs = []; hs.hidden = true; draw(); drawChips() }
   function drawScope() {
     var has = curActive(), el = $("aiSc");
@@ -230,12 +231,25 @@
   }
 
   /* ---------- tampil/sembunyi tombol ---------- */
+  /* tab AI: panel yang sama dipasang penuh di halaman (#aiTabHost); di tab lain kembali jadi panel melayang */
+  function sync() {
+    if (!pan) return;
+    var tab = (location.hash.replace(/^#\/?/, "").split("/")[0]) || "home", host = $("aiTabHost");
+    if (tab === "ai" && host) {
+      if (pan.parentNode !== host) host.appendChild(pan);
+      pan.classList.add("dock");
+      if (!AI.docked) { AI.docked = true; openP() } else { pan.hidden = false; AI.open = true; fab.hidden = true }
+      return;
+    }
+    if (AI.docked) { AI.docked = false; pan.classList.remove("dock"); if (pan.parentNode !== document.body) document.body.appendChild(pan); AI.open = false; pan.hidden = true; tick() }
+  }
+  AI.sync = sync;
   function tick() {
     if (!fab) return;
     var on = !!S.t && $("shell") && !$("shell").hidden;
     fab.hidden = !on || AI.open;
     if (!on && AI.open) { AI.open = false; pan.hidden = true }
   }
-  function init() { build(); setInterval(tick, 1200); tick() }
+  function init() { build(); setInterval(tick, 1200); tick(); sync() }
   if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", init); else init();
 })();
