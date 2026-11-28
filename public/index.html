@@ -14,7 +14,8 @@
 :root[data-theme="light"] body::before{background:radial-gradient(460px 460px at 88% 22%,rgba(245,192,74,.34),transparent 70%),radial-gradient(540px 540px at 6% 48%,rgba(150,100,255,.24),transparent 70%),radial-gradient(500px 500px at 82% 82%,rgba(245,192,74,.22),transparent 70%),radial-gradient(520px 520px at 12% 96%,rgba(150,100,255,.20),transparent 70%)}
 :root[data-theme="light"] body::after{opacity:.04}
 :root[data-theme="light"] .g{background:linear-gradient(135deg,rgba(255,255,255,.95),rgba(255,255,255,.72));box-shadow:0 6px 22px rgba(60,40,110,.14),inset 0 1px 0 #fff}
-:root[data-theme="light"] .card,:root[data-theme="light"] .ib,:root[data-theme="light"] .nav a.on{color:#241a3f}
+:root[data-theme="light"] .card,:root[data-theme="light"] .ib,:root[data-theme="light"] .nav.many{width:min(580px,calc(100% - 12px));gap:2px;padding:5px}.nav.many a{font-size:9px}.nav.many a b{font-size:17px}
+.nav a.on{color:#241a3f}
 :root[data-theme="light"] .btn.s{background:rgba(60,40,110,.10);color:#241a3f;border-color:rgba(48,28,88,.22)}
 :root[data-theme="light"] .pn input,:root[data-theme="light"] .pn textarea,:root[data-theme="light"] .in,:root[data-theme="light"] select.in{background:#fff!important;color:#241a3f!important}
 :root[data-theme="light"] .top::before{background:linear-gradient(180deg,rgba(247,245,250,.94),rgba(247,245,250,.78));border-bottom:1px solid rgba(48,28,88,.12);box-shadow:0 8px 24px rgba(60,40,110,.12)}
@@ -101,7 +102,6 @@ h1{margin:0;display:inline-block;padding:0 .12em;font-family:Cinzel,Georgia,seri
 .err{color:#fca5a5;font-size:13px;min-height:18px;margin-top:8px}
 .vw{border-radius:20px;overflow:hidden;aspect-ratio:16/9;background:#000;margin-bottom:12px}
 .vw.tall{aspect-ratio:auto;height:70vh}
-.nbw{margin-bottom:12px}.nbb{display:flex;align-items:center;justify-content:space-between;gap:8px;margin:0 2px 8px;font-weight:600;font-size:13px}.nbb button{padding:7px 12px;border-radius:12px;border:1px solid var(--line);color:inherit;font:inherit;font-size:12px;cursor:pointer}.nbh{margin:6px 2px 0}.nbt{height:calc(100dvh - 250px);min-height:360px}.nbw .vw{margin-bottom:0}.nbw:fullscreen{background:#000;display:flex;flex-direction:column;padding:0}.nbw:fullscreen .nbb{margin:0;padding:8px 12px;color:#fff}.nbw:fullscreen .vw{flex:1;height:auto;border-radius:0}.nbw:fullscreen .nbh{display:none}
 .vw iframe{width:100%;height:100%;border:0;display:block}
 #hov{position:fixed;inset:0;z-index:10002;display:flex;flex-direction:column;background:#0d0820}
 #hov iframe{flex:1;width:100%;border:0;display:block}
@@ -490,7 +490,7 @@ html.spon .thmf{left:10px;bottom:calc(76px + env(safe-area-inset-bottom,0));widt
 <script src="farmako-md.js?v=4"></script>
 <script src="farmako.js?v=16"></script>
 <script src="profil.js"></script>
-<script src="ai.js?v=2" defer></script>
+<script src="ai.js?v=3" defer></script>
 <script src="donasi.js?v=1" defer></script>
 <script src="split.js?v=1" defer></script>
 <script>
@@ -1586,8 +1586,8 @@ function cards(items){return items.map(function(c){return "<a class='card g' hre
 
 /* ---------- pengaturan menu / navbar / kategori (admin) ---------- */
 var UI_DEF={
-  nav:[{id:"home",n:"Beranda",i:"🏠"},{id:"materi",n:"Materi",i:"📚"},{id:"rekaman",n:"Rekaman",i:"🎬"},{id:"jadwal",n:"Jadwal",i:"🗓️"},{id:"tutor",n:"Tutor",i:"👥"},{id:"run",n:"Kuis",i:"🏃"},{id:"notebook",n:"Notebook",i:"📓"},{id:"dokter",n:"Dokter",i:"📞"}],
-  menu:[{id:"materi",n:"Materi & Rangkuman",i:"📚",s:"Per blok, lab, dan Google Drive"},{id:"rekaman",n:"Rekaman Kuliah",i:"🎬",s:"Putar langsung per tahun"},{id:"jadwal",n:"Jadwal Kuliah",i:"🗓️",s:"Terhubung ke spreadsheet"},{id:"tutor",n:"Jadwal Tutorial",i:"👥",s:"Kelompok, tutor & ruang · konfirmasi WA ke tutor"},{id:"run",n:"GAME KUIS",i:"🏃",s:"3 mode: game 3D, mode soal & simulasi ujian"},{id:"notebook",n:"Gemini Notebook",i:"📓",s:"Dulu NotebookLM · tanya jawab dari sumber materi, login akun Google sendiri"},{id:"farmako",n:"Pharmacology Session",i:"💊",s:"Materi, pustaka obat, interaksi & permainan farmakologi"},{id:"dokter",n:"Kontak Dokter",i:"📞",s:"Nomor HP dosen & dokter · bisa usul ubah/tambah"}],
+  nav:[{id:"home",n:"Beranda",i:"🏠"},{id:"materi",n:"Materi",i:"📚"},{id:"rekaman",n:"Rekaman",i:"🎬"},{id:"jadwal",n:"Jadwal",i:"🗓️"},{id:"tutor",n:"Tutor",i:"👥"},{id:"run",n:"Kuis",i:"🏃"},{id:"farmako",n:"Farmako",i:"💊"},{id:"ai",n:"AI",i:"✨"},{id:"dokter",n:"Dokter",i:"📞"}],
+  menu:[{id:"materi",n:"Materi & Rangkuman",i:"📚",s:"Per blok, lab, dan Google Drive"},{id:"rekaman",n:"Rekaman Kuliah",i:"🎬",s:"Putar langsung per tahun"},{id:"jadwal",n:"Jadwal Kuliah",i:"🗓️",s:"Terhubung ke spreadsheet"},{id:"tutor",n:"Jadwal Tutorial",i:"👥",s:"Kelompok, tutor & ruang · konfirmasi WA ke tutor"},{id:"run",n:"GAME KUIS",i:"🏃",s:"3 mode: game 3D, mode soal & simulasi ujian"},{id:"ai",n:"Tanya AI",i:"✨",s:"Tanya jawab dari materi kuliah · bisa fokus ke materi yang sedang dibuka"},{id:"farmako",n:"Pharmacology Session",i:"💊",s:"Materi, pustaka obat, interaksi & permainan farmakologi"},{id:"dokter",n:"Kontak Dokter",i:"📞",s:"Nomor HP dosen & dokter · bisa usul ubah/tambah"}],
   mp:[{id:"blok",n:"PILIH BLOK",i:"📘"},{id:"drive",n:"DRIVE",i:"🗂️",c:"Google Drive Materi"}],
   cm:[{id:"all",n:"Seluruh Blok",i:"📖"},{id:"lab",n:"Lab",i:"🔬"}],
   cr:[{id:"kl",n:"Kuliah Lain",i:"📝"},{id:"blok",n:"Blok",i:"🧠"},{id:"lab",n:"Lab",i:"🔬"}]
@@ -1606,7 +1606,7 @@ function uiSet(g,list){S.data.ui=S.data.ui||{};S.data.ui[g]=list}
 function uiName(id){var m=uiList("menu").filter(function(x){return x.id===id})[0];return m?m.n:null}
 function renderNav(){
   var l=uiList("nav").filter(function(x){return !x.h});if(l.length<2)l=UI_DEF.nav;
-  $("nav").innerHTML=l.map(function(x){return "<a href='"+(x.id==="home"?"#/":"#/"+x.id)+"' data-t='"+x.id+"'><b>"+esc(x.i)+"</b>"+esc(x.n)+"</a>"}).join("")}
+  $("nav").classList.toggle("many",l.length>7);$("nav").innerHTML=l.map(function(x){return "<a href='"+(x.id==="home"?"#/":"#/"+x.id)+"' data-t='"+x.id+"'><b>"+esc(x.i)+"</b>"+esc(x.n)+"</a>"}).join("")}
 function catCards(g,idx,o,suffix){
   return cards(uiList(g).map(function(c){var arr=o[c.id]||[],r=g==="cm"?mCount(arr):0,nw=g==="cm"?arr.filter(mNew).length:0;
     return["#/"+(g==="cm"?"materi":"rekaman")+"/"+idx+"/"+c.id,c.i,c.n,arr.length+suffix+(r?" · "+r+"/"+arr.length+" dibuka":"")+(nw?" · "+nw+" baru":"")]}))}
@@ -1614,14 +1614,8 @@ function uiRow(g,x,i,n){
   return "<div class='row'><div class='card g' style='margin-bottom:0;cursor:default"+(x.h?";opacity:.45":"")+"'><span class='i'>"+esc(x.i)+"</span><span class='t'>"+esc(x.n)+(x.s!==undefined?"<small>"+esc(x.s)+"</small>":"")+(x.c!==undefined?"<small>Kartu: "+esc(x.c)+"</small>":"")+"</span></div>"+
   "<div class='ctl'><button data-a='ui-up' data-g='"+g+"' data-i='"+i+"'>↑</button><button data-a='ui-dn' data-g='"+g+"' data-i='"+i+"'>↓</button><button data-a='ui-ren' data-g='"+g+"' data-i='"+i+"'>✎</button>"+
   (g==="nav"||g==="menu"?"<button data-a='ui-hide' data-g='"+g+"' data-i='"+i+"'>"+(x.h?"👁️‍🗨️":"👁")+"</button>":"")+"</div></div>"}
-/* ---------- TAB NOTEBOOKLM (tersendiri, link diisi admin) ---------- */
-var NB_RE=/^https:\/\/(notebooklm|notebook)\.google\.com\/\S*$/; /* NotebookLM kini bernama Gemini Notebook (notebook.google.com); domain lama tetap diterima */
-function pNotebook(){
-  var n=S.data&&S.data.nblm,u=n&&typeof n.u==="string"?n.u:"",ok=NB_RE.test(u),h="";
-  if(ok)h+="<div class='nbw' id='nbw' data-u=\""+esc(u)+"\"><div class='nbb'><span>📓 Gemini Notebook (NotebookLM)</span><span style='display:flex;gap:6px'><button type='button' class='g' data-nbo='1' title='Buka di jendela sendiri'>↗ Jendela sendiri</button><button type='button' class='g' data-nbfs='1' aria-label='Layar penuh' title='Layar penuh'>⛶ Layar penuh</button></span></div><div class='vw tall nbt'><iframe src=\""+esc(u)+"\" allowfullscreen allow='fullscreen; clipboard-write; autoplay'></iframe></div><div class='hint nbh'>Login memakai akun Google masing-masing. Kalau tampilan kosong atau tidak bisa login di sini, pakai “↗ Jendela sendiri”. Mode fokus tetap jalan.</div></div>";
-  else h+="<div class='pn g empty'>"+(S.admin?"Belum ada link Gemini Notebook. Isi di bawah.":"Gemini Notebook belum diatur oleh admin.")+"</div>";
-  if(S.admin)h+="<div class='pn g'><b>Link Gemini Notebook / NotebookLM</b><label for='nbU'>Link notebook</label><input id='nbU' placeholder='https://notebook.google.com/notebook/...' value=\""+esc(u)+"\"><button class='btn' data-nbsave='1'>Simpan</button>"+(u?"<button class='btn s' data-nbsave='0'>Hapus</button>":"")+"<div class='hint'>Di NotebookLM: Bagikan → akses “Siapa saja yang memiliki link”, lalu tempel link-nya di sini.</div></div>";
-  return h}
+/* ---------- TAB AI: panel Tanya AI dipasang penuh di halaman (ai.js: AI.sync) ---------- */
+function pAI(){return"<div id='aiTabHost'></div>"}
 function pAtur(){
   if(!S.admin)return "<div class='empty'>Khusus admin.</div>";
   var h="<div class='hint'>Atur urutan dengan ↑ ↓, ganti nama/ikon dengan ✎, sembunyikan dengan 👁 (item tersembunyi tampak redup). Perubahan langsung tersimpan.</div>";
@@ -1829,9 +1823,7 @@ window.addEventListener("storage",function(e){if(e.key!=="theme")return;var t=e.
 function themeToggle(){var n=themeNow()==="light"?"dark":"light";themeSet(n,1);toast(n==="light"?"☀️ Mode terang aktif":"🌙 Mode gelap aktif")}
 
 /* ---------- MODE FOKUS MENGAMBANG ---------- */
-var FX={on:false,end:0,iv:0,min:25,left:false,dur:25,pomo:null,bk:null,bkIv:0,nb:0,nbT:0};
-/* pengecualian NotebookLM: selama jendela NotebookLM dibuka, keluar layar penuh/pindah tab tidak dianggap pelanggaran; waktu fokus tetap jalan */
-function fxNbBack(){if(!FX.nb)return;FX.nb=0;FX.left=false;if(FX.on){fxRefs();toast("Kembali ke mode fokus 🎯")}}
+var FX={on:false,end:0,iv:0,min:25,left:false,dur:25,pomo:null,bk:null,bkIv:0};
 function fxFmt(ms){var s=Math.max(0,Math.ceil(ms/1000)),m=Math.floor(s/60);s=s%60;return p2(m)+":"+p2(s)}
 function fxLeft(){return Math.max(0,FX.end-Date.now())}
 function fxFs(){try{var el=document.documentElement;if(el.requestFullscreen)return el.requestFullscreen({navigationUI:"hide"});if(el.webkitRequestFullscreen)return el.webkitRequestFullscreen()}catch(e){}return Promise.reject()}
@@ -1871,7 +1863,7 @@ function fxTick(){
   var rem=fxLeft(),t=$("fxT");if(t)t.textContent=fxFmt(rem);
   var e=$("fxEarly");if(e)e.textContent=rem>0?"⏹ Akhiri lebih awal":"✅ Selesai";
   if(rem<=0)fxEnd(0)}
-function fxRefs(){if(FX.on&&!FX.nb&&!document.fullscreenElement)fxFs().catch(function(){})}
+function fxRefs(){if(FX.on&&!document.fullscreenElement)fxFs().catch(function(){})}
 function fxWarn(m){return Dlg.alert(m+"\n\nMode fokus masih berjalan.\nSisa waktu: "+fxFmt(fxLeft())+"\nKamu baru bisa keluar setelah waktu habis.",{title:"Mode fokus aktif",icon:"🎯",okText:"Mengerti"}).then(fxRefs)}
 async function fxEnd(early){
   if(!FX.on)return;
@@ -1887,16 +1879,15 @@ async function fxEnd(early){
   if(early)FX.pomo=null;
   toast(early?"Mode fokus diakhiri.":"Mode fokus selesai. Kerja bagus! 🎉")}
 document.addEventListener("fullscreenchange",function(){
-  if(!FX.on||FX.nb)return;
+  if(!FX.on)return;
   if(!document.fullscreenElement){fxRefs();fxWarn("Kamu keluar dari layar penuh.")}});
 document.addEventListener("visibilitychange",function(){
   if(!FX.on)return;
-  if(FX.nb){if(!document.hidden&&Date.now()-FX.nbT>1500)fxNbBack();return}
   if(document.hidden)FX.left=true;
   else if(FX.left){FX.left=false;fxRefs();fxWarn("Kamu meninggalkan halaman ini.")}});
 /* browser hanya mengizinkan layar penuh setelah ada sentuhan/klik: sentuhan pertama setelah kembali langsung memulihkannya */
 ["pointerdown","touchend","click","keydown"].forEach(function(ev){document.addEventListener(ev,fxRefs,true)});
-window.addEventListener("focus",function(){if(FX.nb&&Date.now()-FX.nbT>1500){fxNbBack();return}fxRefs()});
+window.addEventListener("focus",fxRefs);
 window.addEventListener("beforeunload",function(e){if(FX.on){e.preventDefault();e.returnValue="Mode fokus masih berjalan.";return e.returnValue}});
 (function fxInit(){
   try{FX.min=+localStorage.getItem("fxMin")||25;var po=JSON.parse(localStorage.getItem("fxPo")||"null");if(po){$("fxPW").value=po.w;$("fxPB").value=po.b;$("fxPL").value=po.l}}catch(e){}
@@ -2169,7 +2160,7 @@ async function anLoad(d){
 $("main").addEventListener("click",function(e){var b=e.target.closest("[data-an]");if(!b)return;anLoad(+b.dataset.an)});
 
 /* ---------- router ---------- */
-var TT={analytics:"ANALYTICS",atur:"ATUR MENU",home:"ASTERION",materi:"MATERI & RANGKUMAN",rekaman:"REKAMAN KULIAH",jadwal:"JADWAL KULIAH",tutor:"JADWAL TUTORIAL",run:"GAME KUIS",farmako:"FARMAKOLOGI",dokter:"KONTAK DOKTER",notebook:"GEMINI NOTEBOOK",akun:"STATUS AKUN",profil:"PROFIL & PROGRES"};
+var TT={analytics:"ANALYTICS",atur:"ATUR MENU",home:"ASTERION",materi:"MATERI & RANGKUMAN",rekaman:"REKAMAN KULIAH",jadwal:"JADWAL KULIAH",tutor:"JADWAL TUTORIAL",run:"GAME KUIS",farmako:"FARMAKOLOGI",dokter:"KONTAK DOKTER",ai:"TANYA AI",akun:"STATUS AKUN",profil:"PROFIL & PROGRES"};
 /* ---------- PENCARIAN: Materi, Rekaman, Jadwal (sampai ke dalam folder / playlist / tab lain) ---------- */
 var SQ={net:{},run:{},jc:{},jq:0};
 function sqNorm(s){var t=String(s==null?"":s).toLowerCase();try{t=t.normalize("NFD").replace(/[\u0300-\u036f]/g,"")}catch(e){}return t}
@@ -2297,8 +2288,8 @@ $("main").addEventListener("click",function(e){var b=e.target.closest&&e.target.
 function route(){
   if(!S.data)return;
   var P=location.hash.replace(/^#\/?/,"").split("/").filter(Boolean),tab=P[0]||"home",v;
-  if(tab==="materi")v=pMateri(P);else if(tab==="rekaman")v=pRekaman(P);else if(tab==="jadwal")v=pJadwal(P);else if(tab==="tutor")v=pTutor(P);else if(tab==="run"&&window.pRun)v=window.pRun(P);else if(tab==="farmako"&&window.pFarmako)v=window.pFarmako(P);else if(tab==="notebook")v=pNotebook(P);else if(tab==="dokter")v=pDokter(P);else if(tab==="atur")v=pAtur();else if(tab==="akun")v=pAkun();else if(tab==="analytics"&&S.admin)v=pAnalytics();else if(tab==="profil"&&window.pProfil)v=window.pProfil(P);else{tab="home";v=pHome()}
-  anPv(tab);document.body.dataset.r=tab;renderNav();$("main").innerHTML=v;$("ttl").textContent=(tab!=="home"&&tab!=="atur"&&uiName(tab)?uiName(tab).toUpperCase():TT[tab]);
+  if(tab==="materi")v=pMateri(P);else if(tab==="rekaman")v=pRekaman(P);else if(tab==="jadwal")v=pJadwal(P);else if(tab==="tutor")v=pTutor(P);else if(tab==="run"&&window.pRun)v=window.pRun(P);else if(tab==="farmako"&&window.pFarmako)v=window.pFarmako(P);else if(tab==="ai")v=pAI();else if(tab==="dokter")v=pDokter(P);else if(tab==="atur")v=pAtur();else if(tab==="akun")v=pAkun();else if(tab==="analytics"&&S.admin)v=pAnalytics();else if(tab==="profil"&&window.pProfil)v=window.pProfil(P);else{tab="home";v=pHome()}
+  anPv(tab);document.body.dataset.r=tab;renderNav();$("main").innerHTML=v;if(window.AI&&AI.sync)AI.sync();$("ttl").textContent=(tab!=="home"&&tab!=="atur"&&uiName(tab)?uiName(tab).toUpperCase():TT[tab]);
   $("back").hidden=P.length<2;$("back").href="#/"+P.slice(0,-1).join("/");
   [].forEach.call(document.querySelectorAll(".nav a"),function(a){a.classList.toggle("on",a.dataset.t===tab)});
   if(tab!=="jadwal")window.scrollTo(0,0);
@@ -2329,24 +2320,6 @@ $("main").addEventListener("click",async function(e){
   save();route()});
 
 if(S.t)boot();else show("gate");
-</script>
-<script>
-document.addEventListener('click',function(ev){var t=ev.target.closest&&ev.target.closest('[data-nbo],[data-nbfs],[data-nbsave]');if(!t)return;
-  if(t.hasAttribute('data-nbsave')){ev.preventDefault();if(!S.admin||!S.data)return;
-    if(t.getAttribute('data-nbsave')==='0'){delete S.data.nblm}
-    else{var v=((document.getElementById('nbU')||{}).value||'').trim();
-      if(!NB_RE.test(v)||v.length>500){toast('Link harus dari notebook.google.com atau notebooklm.google.com (https)');return}
-      S.data.nblm={u:v}}
-    save();route();return}
-  var box=document.getElementById('nbw'),u=box&&box.getAttribute('data-u');
-  if(t.hasAttribute('data-nbo')){ev.preventDefault();if(!NB_RE.test(u||''))return;
-    if(typeof FX!=='undefined'&&FX.on){FX.nb=1;FX.nbT=Date.now();FX.left=false}
-    var w=null;try{w=window.open(u,'notebooklm','popup=yes,noopener,noreferrer,left=0,top=0,width='+screen.availWidth+',height='+screen.availHeight)}catch(e){}
-    if(!w){try{var a=document.createElement('a');a.href=u;a.target='_blank';a.rel='noopener noreferrer';document.body.appendChild(a);a.click();a.remove()}catch(e){}}
-    if(typeof FX!=='undefined'&&FX.on)toast('Gemini Notebook dibuka. Fokus tetap berjalan, kembali ke sini setelah selesai.');return}
-  if(t.hasAttribute('data-nbfs')){if(!box)return;if(typeof FX!=='undefined'&&FX.on)return;
-    try{if(document.fullscreenElement===box)document.exitFullscreen();else if(box.requestFullscreen)box.requestFullscreen({navigationUI:'hide'});else if(box.webkitRequestFullscreen)box.webkitRequestFullscreen()}catch(e){}}
-});
 </script>
 </body>
 </html>
